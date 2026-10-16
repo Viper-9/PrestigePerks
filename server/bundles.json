@@ -1,0 +1,8 @@
+{
+  "manifest": [
+    {
+      "key": "prestige_coin.bundle",
+      "dependencyKeys": ["shaders"]
+    }
+  ]
+}
