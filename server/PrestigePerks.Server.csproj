@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <AssemblyName>PrestigePerks</AssemblyName>
+    <RootNamespace>PrestigePerks</RootNamespace>
+    <OutputPath>bin\$(Configuration)\$(AssemblyName)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SPTushonka.Common" Version="4.1.5" />
+    <PackageReference Include="SPTushonka.DI" Version="4.1.5" />
+    <PackageReference Include="SPTushonka.Server.Core" Version="4.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Data\** 는 SDK 기본 글롭으로 이미 None 항목이므로 Include 가 아니라 Update 로 복사 속성만 붙인다 (중복 항목 오류 방지) -->
+    <None Update="Data\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 프레스티지 코인 번들. bundles.json 은 번들이 있을 때만 내보낸다 (없으면 SPT가 "Could not find bundle" 오류를 낸다) -->
+    <None Update="bundles\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Remove="bundles.json" />
+    <None Remove="bundles.json" />
+    <None Include="bundles.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('bundles\prestige_coin.bundle')" />
+    <InternalsVisibleTo Include="PrestigePerks.Tests" />
+  </ItemGroup>
+
+</Project>
