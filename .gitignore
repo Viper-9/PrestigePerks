@@ -1,0 +1,28 @@
+# Build outputs
+bin/
+obj/
+dist/
+*.zip
+TestResults/
+
+# Local paths (game install)
+*.local.props
+
+# Logs
+*.log
+
+# IDE / OS
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.DotSettings.user
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local docs / tool state (kept out of the public repo)
+dev-docs/
+.superpowers/
+.claude/

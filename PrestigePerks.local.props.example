@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- SPT 설치 폴더 (EscapeFromTarkov_Data, BepInEx 가 있는 곳). 클라이언트 빌드에만 쓴다 -->
+    <SptRoot>F:\SPT4.1.2</SptRoot>
+  </PropertyGroup>
+</Project>
