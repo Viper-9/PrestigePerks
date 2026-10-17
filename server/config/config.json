@@ -1,0 +1,11 @@
+{
+  "perks": {
+    // P1 ~ P6 유료 리롤 기본가 (코인)
+    "rerollBasePrice": [25, 35, 45, 55, 65, 75],
+    // 유료 리롤 비용 = 기본가 × (1 + lockCostStep × 잠근 개수) × paidCostGrowth^(유료 회차 − 1), 소수점 올림
+    "lockCostStep": 0.5,
+    "paidCostGrowth": 2,
+    // 특전 화면을 열 때 주는 무료 리롤 횟수 (잠금 개수와 상관없이 무료)
+    "freeRerolls": 3
+  }
+}

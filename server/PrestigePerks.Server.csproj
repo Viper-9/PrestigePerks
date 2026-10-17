@@ -25,6 +25,10 @@
     <Content Remove="bundles.json" />
     <None Remove="bundles.json" />
     <None Include="bundles.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('bundles\prestige_coin.bundle')" />
+    <!-- 설정 파일. Web SDK 가 *.json 을 Content 로 잡으므로 빼고 None 으로 복사한다 -->
+    <Content Remove="config\**" />
+    <None Remove="config\**" />
+    <None Include="config\**" CopyToOutputDirectory="PreserveNewest" />
     <InternalsVisibleTo Include="PrestigePerks.Tests" />
   </ItemGroup>
 
