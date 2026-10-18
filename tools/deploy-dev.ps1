@@ -1,4 +1,4 @@
-﻿# 개발용 배포: Release 로 빌드해서 로컬 SPT 에 바로 복사한다.
+﻿# 개발용 배포: 서버는 Dev(개발용 명령 포함), 클라는 Release 로 빌드해서 로컬 SPT 에 바로 복사한다.
 #   서버 → <SptRoot>\SPT_Runtime\user\mods\PrestigePerks (폴더를 통째로 교체)
 #   클라 → <SptRoot>\BepInEx\plugins\PrestigePerks
 # SPT 경로는 PrestigePerks.local.props 의 SptRoot 를 쓴다. 서버·게임이 켜져 있으면 DLL 이 잠겨 있어 멈춘다.
@@ -20,9 +20,9 @@ if (-not $ServerOnly) { $running += @(Get-Process -Name 'EscapeFromTarkov' -Erro
 if ($running) { throw "먼저 종료하세요: $(($running | ForEach-Object ProcessName | Sort-Object -Unique) -join ', ')" }
 
 # ---------------------------------------------------------------- server
-dotnet build (Join-Path $root 'server\PrestigePerks.Server.csproj') -c Release
+dotnet build (Join-Path $root 'server\PrestigePerks.Server.csproj') -c Dev
 if ($LASTEXITCODE -ne 0) { throw 'server build failed' }
-$serverOut = Join-Path $root 'server\bin\Release\PrestigePerks'
+$serverOut = Join-Path $root 'server\bin\Dev\PrestigePerks'
 $serverDest = Join-Path $spt 'SPT_Runtime\user\mods\PrestigePerks'
 
 # SPT 가 이미 들고 있는 DLL 이 섞이면 충돌한다

@@ -12,9 +12,12 @@ using SPTarkov.Server.Core.Services.Commerce;
 
 namespace PrestigePerks.Commands;
 
+// 개발용 명령은 Dev 빌드에만 넣는다 (상용 Release 빌드에는 이 클래스가 없다). 서버 csproj 의 Dev 구성 참고
+#if DEV_COMMANDS
+
 /// <summary>
 /// Commando 채팅 명령 "prestige ...". SPT 의 "spt give" 와 같은 개발·테스트용이라
-/// core.json 의 giveCommandEnabled 가 꺼져 있으면 명령을 등록하지 않는다.
+/// Dev 빌드에만 들어가고, core.json 의 giveCommandEnabled 가 꺼져 있으면 명령을 등록하지 않는다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public class PrestigeCommandoCommand(
@@ -198,3 +201,4 @@ public class PrestigeCommandoCommand(
         return text.ToString();
     }
 }
+#endif

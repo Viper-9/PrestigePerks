@@ -23,3 +23,9 @@ Work in progress.
 
 1. Copy `PrestigePerks.local.props.example` to `PrestigePerks.local.props` and set `SptRoot` to your SPT folder.
 2. `dotnet build PrestigePerks.slnx`
+
+## Testing
+
+Tester builds (`tools/package.ps1 -Dev`, `PrestigePerks-<version>-dev.zip`) include dev chat commands (`prestige coin`, `prestige perk ...`) and a profile tool to set the prestige level. See [TESTING.md](TESTING.md) (Korean).
+Release builds (`tools/package.ps1`) do not contain the dev commands.
+
