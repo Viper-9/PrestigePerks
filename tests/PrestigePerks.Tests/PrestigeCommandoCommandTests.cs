@@ -31,13 +31,11 @@ public class PrestigeCommandoCommandTests
 
     [Theory]
     [InlineData("prestige perk status", PrestigeCommandoCommand.PerkAction.Status, 0)]
-    [InlineData("prestige perk OPEN", PrestigeCommandoCommand.PerkAction.Open, 0)]
-    [InlineData("prestige perk roll", PrestigeCommandoCommand.PerkAction.Roll, 0)]
+    [InlineData("prestige perk ROLL", PrestigeCommandoCommand.PerkAction.Roll, 0)]
     [InlineData("prestige perk lock 1", PrestigeCommandoCommand.PerkAction.Lock, 1)]
     [InlineData("prestige perk unlock 6", PrestigeCommandoCommand.PerkAction.Unlock, 6)]
-    [InlineData("prestige perk confirm", PrestigeCommandoCommand.PerkAction.Confirm, 0)]
-    [InlineData("prestige perk balance 0", PrestigeCommandoCommand.PerkAction.Balance, 0)]
-    [InlineData("prestige perk balance 500 ", PrestigeCommandoCommand.PerkAction.Balance, 500)]
+    [InlineData("prestige perk free 0", PrestigeCommandoCommand.PerkAction.Free, 0)]
+    [InlineData("prestige perk free 100 ", PrestigeCommandoCommand.PerkAction.Free, 100)]
     [InlineData("prestige perk reset", PrestigeCommandoCommand.PerkAction.Reset, 0)]
     public void Parses_perk_commands(string text, PrestigeCommandoCommand.PerkAction action, int argument)
     {
@@ -49,9 +47,12 @@ public class PrestigeCommandoCommandTests
     [InlineData("prestige perk lock")]
     [InlineData("prestige perk lock 0")]
     [InlineData("prestige perk lock 7")]
-    [InlineData("prestige perk balance")]
-    [InlineData("prestige perk balance 100001")]
+    [InlineData("prestige perk free")]
+    [InlineData("prestige perk free 101")]
     [InlineData("prestige perk roll 2")]
+    [InlineData("prestige perk open")]
+    [InlineData("prestige perk confirm")]
+    [InlineData("prestige perk balance 10")]
     [InlineData("prestige perk dance")]
     [InlineData("prestige perk 1")]
     [InlineData(null)]
@@ -66,21 +67,18 @@ public class PrestigeCommandoCommandTests
         var text = PrestigeCommandoCommand.FormatState(new PerkState
         {
             PrestigeLevel = 3,
-            CoinBalance = 120,
-            ActivePerks = [1, 8],
-            Session = new PerkSession
-            {
-                Reason = PerkSessionReason.Prestige,
-                Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24 }, new PerkSlot()],
-                FreeRerollsLeft = 0,
-                PaidRerolls = 1,
-            },
+            ActivePerks = [1, 24, 8],
+            Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24 }, new PerkSlot { Perk = 8 }],
+            NewPerks = [8],
+            FreeRerollsLeft = 0,
+            PaidRerolls = 1,
             NextRerollCost = 90,
         });
 
         Assert.Equal(
-            "P3 | coins 120 | active: experience(1), scav(8)\n" +
-            "screen (prestige):  [1] experience(1) (locked)  [2] mastery(24)  [3] empty\n" +
+            "P3 | active: experience(1), mastery(24), scav(8)\n" +
+            "new perks: scav(8)\n" +
+            "slots:  [1] experience(1) (locked)  [2] mastery(24)  [3] scav(8)\n" +
             "free rerolls 0 | paid rerolls 1 | next reroll: 90 coins",
             text);
     }

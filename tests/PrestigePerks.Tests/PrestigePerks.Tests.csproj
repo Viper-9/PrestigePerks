@@ -23,4 +23,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- 클라이언트의 게임 의존 없는 모델(응답 파싱, 화면 상태, 문구)만 가져와 검증한다. 게임 DLL 없이 돈다 -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Compile Include="..\..\client\PrestigePerks.Client\Model\*.cs" Link="ClientModel\%(Filename)%(Extension)" />
+    <None Include="..\..\client\PrestigePerks.Client\Locales\*.json" Link="ClientLocales\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

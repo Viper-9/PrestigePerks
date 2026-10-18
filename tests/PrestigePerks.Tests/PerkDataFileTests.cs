@@ -18,24 +18,22 @@ public sealed class PerkDataFileTests : IDisposable
 
     private static PerkData Sample() => new()
     {
-        Perks = [1, 24],
-        CoinBalance = 120,
-        Session = new PerkSession
-        {
-            Reason = PerkSessionReason.Prestige,
-            Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24 }, new PerkSlot { Perk = 8 }],
-            FreeRerollsLeft = 2,
-            PaidRerolls = 1,
-        },
+        Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24 }, new PerkSlot { Perk = 8 }],
+        Rerolls = new PerkRerolls { Level = 3, FreeLeft = 2, Paid = 1 },
+        UnseenNewPerks = [8],
     };
+
+    private static PerkData WithPerks(params int[] perks) => new() { Slots = perks.Select(perk => new PerkSlot { Perk = perk }).ToList() };
+
+    private static IEnumerable<int> Perks(PerkData data) => data.Slots.Select(slot => slot.Perk);
 
     [Fact]
     public void Missing_file_gives_new_data()
     {
         var result = PerkDataFile.Read(FilePath);
         Assert.Equal(PerkDataSource.New, result.Source);
-        Assert.Empty(result.Data.Perks);
-        Assert.Null(result.Data.Session);
+        Assert.Empty(result.Data.Slots);
+        Assert.Equal(0, result.Data.Rerolls.Level);
         Assert.Equal(PerkData.CurrentSchemaVersion, result.Data.SchemaVersion);
         Assert.False(File.Exists(FilePath));
     }
@@ -49,37 +47,38 @@ public sealed class PerkDataFileTests : IDisposable
         Assert.Equal(PerkDataSource.Main, result.Source);
         Assert.Empty(result.Warnings);
         var data = result.Data;
-        Assert.Equal([1, 24], data.Perks);
-        Assert.Equal(120, data.CoinBalance);
-        Assert.Equal(PerkSessionReason.Prestige, data.Session!.Reason);
-        Assert.Equal([1, 24, 8], data.Session.Slots.Select(slot => slot.Perk!.Value));
-        Assert.Equal([true, false, false], data.Session.Slots.Select(slot => slot.Locked));
-        Assert.Equal(2, data.Session.FreeRerollsLeft);
-        Assert.Equal(1, data.Session.PaidRerolls);
+        Assert.Equal([1, 24, 8], Perks(data));
+        Assert.Equal([true, false, false], data.Slots.Select(slot => slot.Locked));
+        Assert.Equal(3, data.Rerolls.Level);
+        Assert.Equal(2, data.Rerolls.FreeLeft);
+        Assert.Equal(1, data.Rerolls.Paid);
+        Assert.Equal([8], data.UnseenNewPerks);
     }
 
     [Fact]
     public void Json_uses_the_documented_field_names()
     {
         var json = PerkDataFile.Serialize(Sample());
-        foreach (var name in new[] { "schemaVersion", "perks", "coinBalance", "session", "reason", "slots", "perk", "locked", "freeRerollsLeft", "paidRerolls" })
+        foreach (var name in new[] { "schemaVersion", "slots", "perk", "locked", "rerolls", "level", "freeLeft", "paid", "unseenNewPerks" })
         {
             Assert.Contains($"\"{name}\"", json);
         }
 
         Assert.DoesNotContain("LoadFailed", json);
+        Assert.DoesNotContain("\"perks\"", json);
+        Assert.Contains("\"schemaVersion\": 2", json);
     }
 
     [Fact]
     public void Second_write_keeps_the_previous_version_as_bak()
     {
-        PerkDataFile.Write(FilePath, new PerkData { Perks = [1] });
+        PerkDataFile.Write(FilePath, WithPerks(1));
         Assert.False(File.Exists(BackupPath));
 
-        PerkDataFile.Write(FilePath, new PerkData { Perks = [1, 2] });
+        PerkDataFile.Write(FilePath, WithPerks(1, 2));
 
-        Assert.Equal([1], PerkDataFile.Deserialize(File.ReadAllText(BackupPath)).Perks);
-        Assert.Equal([1, 2], PerkDataFile.Deserialize(File.ReadAllText(FilePath)).Perks);
+        Assert.Equal([1], Perks(PerkDataFile.Deserialize(File.ReadAllText(BackupPath))));
+        Assert.Equal([1, 2], Perks(PerkDataFile.Deserialize(File.ReadAllText(FilePath))));
         Assert.False(File.Exists(FilePath + ".tmp"));
     }
 
@@ -89,14 +88,14 @@ public sealed class PerkDataFileTests : IDisposable
     [InlineData("null")]
     public void Corrupt_file_is_restored_from_bak(string corrupt)
     {
-        PerkDataFile.Write(FilePath, new PerkData { Perks = [8] });
-        PerkDataFile.Write(FilePath, new PerkData { Perks = [8, 9] });
+        PerkDataFile.Write(FilePath, WithPerks(8));
+        PerkDataFile.Write(FilePath, WithPerks(8, 9));
         File.WriteAllText(FilePath, corrupt);
 
         var result = PerkDataFile.Read(FilePath);
 
         Assert.Equal(PerkDataSource.Backup, result.Source);
-        Assert.Equal([8], result.Data.Perks);
+        Assert.Equal([8], Perks(result.Data));
         Assert.NotNull(result.CorruptCopyPath);
         Assert.True(File.Exists(result.CorruptCopyPath));
         Assert.Equal(corrupt, File.ReadAllText(result.CorruptCopyPath!));
@@ -114,27 +113,67 @@ public sealed class PerkDataFileTests : IDisposable
         var result = PerkDataFile.Read(FilePath);
 
         Assert.Equal(PerkDataSource.Reset, result.Source);
-        Assert.Empty(result.Data.Perks);
+        Assert.Empty(result.Data.Slots);
         Assert.True(File.Exists(result.CorruptCopyPath));
         Assert.NotEmpty(result.Warnings);
     }
 
     [Fact]
-    public void Unknown_and_duplicate_perks_are_dropped()
+    public void Unknown_and_duplicate_perks_and_negative_counts_are_cleaned()
     {
         Directory.CreateDirectory(directory);
         File.WriteAllText(FilePath, """
-            { "schemaVersion": 1, "perks": [1, 5, 1, 99, 24], "coinBalance": -3,
-              "session": { "reason": "prestige", "slots": [ { "perk": 13, "locked": true }, { "perk": 2 }, { "perk": 2 } ], "freeRerollsLeft": -1, "paidRerolls": 0 } }
+            { "schemaVersion": 2,
+              "slots": [ { "perk": 1, "locked": true }, { "perk": 5 }, { "perk": 1 }, { "perk": 99 }, { "perk": 24 } ],
+              "rerolls": { "level": 3, "freeLeft": -1, "paid": -2 },
+              "unseenNewPerks": [24, 13] }
             """);
 
         var result = PerkDataFile.Read(FilePath);
 
-        Assert.Equal([1, 24], result.Data.Perks);
-        Assert.Equal(0, result.Data.CoinBalance);
-        Assert.Equal(new int?[] { null, 2, null }, result.Data.Session!.Slots.Select(slot => slot.Perk));
-        Assert.False(result.Data.Session.Slots[0].Locked);
-        Assert.Equal(0, result.Data.Session.FreeRerollsLeft);
+        Assert.Equal([1, 24], Perks(result.Data));
+        Assert.True(result.Data.Slots[0].Locked);
+        Assert.Equal(0, result.Data.Rerolls.FreeLeft);
+        Assert.Equal(0, result.Data.Rerolls.Paid);
+        Assert.Equal(3, result.Data.Rerolls.Level);
+        Assert.Equal([24], result.Data.UnseenNewPerks);
         Assert.NotEmpty(result.Warnings);
+    }
+
+    [Fact]
+    public void Schema_one_keeps_confirmed_perks_and_drops_the_screen_and_balance()
+    {
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(FilePath, """
+            { "schemaVersion": 1, "perks": [27, 4, 1], "coinBalance": 120,
+              "session": { "reason": "dev", "slots": [ { "perk": 9, "locked": true } ], "freeRerollsLeft": 2, "paidRerolls": 0 } }
+            """);
+
+        var result = PerkDataFile.Read(FilePath);
+
+        Assert.Equal([27, 4, 1], Perks(result.Data));
+        Assert.All(result.Data.Slots, slot => Assert.False(slot.Locked));
+        Assert.Equal(0, result.Data.Rerolls.Level);
+        Assert.Equal(PerkData.CurrentSchemaVersion, result.Data.SchemaVersion);
+        Assert.Null(result.Data.LegacyPerks);
+        Assert.NotEmpty(result.Warnings);
+
+        PerkDataFile.Write(FilePath, result.Data);
+        Assert.DoesNotContain("coinBalance", File.ReadAllText(FilePath));
+        Assert.Empty(PerkDataFile.Read(FilePath).Warnings);
+    }
+
+    // 개발용 reset(PerkDataStore.Delete)은 빈 데이터를 덮어쓴다. 파일만 지우면 다음 읽기가 .bak 에서 복구해 reset 이 무효였다
+    [Fact]
+    public void Reset_by_writing_empty_data_is_not_undone_by_the_backup()
+    {
+        PerkDataFile.Write(FilePath, Sample());
+        PerkDataFile.Write(FilePath, Sample());
+        PerkDataFile.Write(FilePath, new PerkData());
+
+        var result = PerkDataFile.Read(FilePath);
+        Assert.Equal(PerkDataSource.Main, result.Source);
+        Assert.Empty(result.Data.Slots);
+        Assert.Equal([1, 24, 8], Perks(PerkDataFile.Read(BackupPath).Data));
     }
 }
