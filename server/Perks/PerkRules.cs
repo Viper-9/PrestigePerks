@@ -1,14 +1,29 @@
 namespace PrestigePerks.Perks;
 
+/// <summary>흔들기 결과.</summary>
+public enum ShakeOutcome
+{
+    /// <summary>그대로 멈춘다.</summary>
+    Stay,
+    /// <summary>한 칸 더 가서 다음 칸 특전이 된다.</summary>
+    Next,
+    /// <summary>거꾸로 돌아 다른 특전이 된다.</summary>
+    Reverse,
+}
+
 public enum PerkError
 {
     None,
     NoSlots,
-    SessionAlreadyOpen,
-    NoSession,
     InvalidSlot,
     AllLocked,
     NotEnoughCoins,
+    /// <summary>클라이언트가 본 비용과 서버가 계산한 비용이 다르다 (화면이 오래된 상태).</summary>
+    CostChanged,
+    /// <summary>개발용 무료 리롤 명령인데 무료 횟수가 없다.</summary>
+    NoFreeRerolls,
+    /// <summary>흔들 리롤이 없다 (이미 흔들었거나, 시간이 지났거나, 리롤하지 않았다).</summary>
+    NoShake,
 }
 
 public readonly record struct RollOutcome(PerkError Error, int Cost)
@@ -17,159 +32,173 @@ public readonly record struct RollOutcome(PerkError Error, int Cost)
 }
 
 /// <summary>
-/// 특전 화면 규칙 (dev-docs 2_특전.md 1~2절). 파일·프로필을 모르는 순수 함수라 단위 테스트로 검증한다.
+/// 특전 규칙 (dev-docs 2_특전.md 1~2절). 파일·프로필·인벤토리를 모르는 순수 함수라 단위 테스트로 검증한다.
+/// 코인 결제는 부르는 쪽(<see cref="PerkService"/>)이 <see cref="CheckRoll"/> 과 <see cref="NextRerollCost"/> 로 확인하고 받은 뒤 <see cref="Roll"/> 한다.
 /// </summary>
 public static class PerkRules
 {
     /// <summary>
-    /// 유료 리롤 비용 = 기본가 × (1 + 계수 × 잠근 개수) × 배율^(유료 회차 − 1), 소수점 올림.
+    /// 유료 리롤 비용 = 기본가 × (1 + 계수 × 잠근 개수) × 배율^(min(유료 회차, 상한 회차) − 1), 소수점 올림.
     /// </summary>
     /// <param name="paidRound">이번에 할 유료 리롤이 몇 번째인지 (1 부터).</param>
     public static int RerollCost(PerkConfig config, int prestigeLevel, int lockedCount, int paidRound)
     {
+        var round = Math.Clamp(paidRound, 1, Math.Max(config.PaidCostCapRound, 1));
         var cost = config.BasePrice(prestigeLevel)
                    * (1 + config.LockCostStep * lockedCount)
-                   * Math.Pow(config.PaidCostGrowth, Math.Max(paidRound, 1) - 1);
+                   * Math.Pow(config.PaidCostGrowth, round - 1);
         // 262.5 같은 값이 부동소수 오차로 262.50000001 이 되어 한 칸 더 올라가지 않게 한다
         return (int)Math.Ceiling(cost - 1e-9);
     }
 
     /// <summary>다음 리롤 비용. 무료 횟수가 남았으면 0.</summary>
-    public static int NextRerollCost(PerkConfig config, int prestigeLevel, PerkSession session) =>
-        session.FreeRerollsLeft > 0
+    public static int NextRerollCost(PerkConfig config, int prestigeLevel, PerkData data) =>
+        data.Rerolls.FreeLeft > 0
             ? 0
-            : RerollCost(config, prestigeLevel, session.Slots.Count(slot => slot.Locked), session.PaidRerolls + 1);
+            : RerollCost(config, prestigeLevel, ActiveSlots(data, prestigeLevel).Count(slot => slot.Locked), data.Rerolls.Paid + 1);
 
-    /// <summary>효과를 적용할 특전: 확정 특전의 앞에서부터 단계 수만큼.</summary>
+    /// <summary>효과가 적용되는 슬롯: 앞에서부터 단계 수만큼.</summary>
+    public static IReadOnlyList<PerkSlot> ActiveSlots(PerkData data, int prestigeLevel) =>
+        data.Slots.Take(Math.Max(prestigeLevel, 0)).ToList();
+
+    /// <summary>효과를 적용할 특전.</summary>
     public static IReadOnlyList<int> ActivePerks(PerkData data, int prestigeLevel) =>
-        data.Perks.Where(PerkCatalog.IsKnown).Distinct().Take(Math.Max(prestigeLevel, 0)).ToList();
-
-    /// <summary>보유 슬롯 &lt; 단계이고 화면이 닫혀 있으면 열어야 한다 (새 프레스티지와 소급 유저를 같은 규칙으로).</summary>
-    public static bool NeedsSession(PerkData data, int prestigeLevel) =>
-        data.Session is null && ActivePerks(data, prestigeLevel).Count < prestigeLevel;
+        ActiveSlots(data, prestigeLevel).Select(slot => slot.Perk).Where(PerkCatalog.IsKnown).Distinct().ToList();
 
     /// <summary>
-    /// 화면을 연다. 이전 특전 + 빈 슬롯(단계까지)을 만들고 빈 슬롯을 자동 추첨한다. 자동 추첨은 무료 횟수에서 빼지 않는다.
-    /// 슬롯이 이미 꽉 차 있으면 (재추첨권·개발용) 자동 추첨 없이 무료 리롤부터 시작한다.
+    /// 새 단계 진입 처리. 단계가 기록보다 높으면 무료 횟수를 다시 채우고 유료 회차를 0 으로 되돌린다.
+    /// 슬롯이 단계보다 적으면 빈 슬롯을 "전체 − 보유 특전"에서 자동 추첨한다 (무료 횟수 차감 없음). 새 프레스티지와 소급 유저가 같은 규칙이다.
     /// </summary>
-    public static PerkError OpenSession(PerkData data, int prestigeLevel, string reason, PerkConfig config, Random random)
+    /// <returns>데이터가 바뀌었는지와 새로 뽑은 특전.</returns>
+    public static (bool Changed, IReadOnlyList<int> NewPerks) EnterLevel(PerkData data, int prestigeLevel, PerkConfig config, Random random)
     {
-        if (data.Session is not null)
-        {
-            return PerkError.SessionAlreadyOpen;
-        }
-
         if (prestigeLevel <= 0)
         {
-            return PerkError.NoSlots;
+            return (false, []);
         }
 
-        var slots = ActivePerks(data, prestigeLevel).Select(perk => new PerkSlot { Perk = perk }).ToList();
-        while (slots.Count < prestigeLevel)
+        var changed = false;
+        if (prestigeLevel > data.Rerolls.Level)
         {
-            slots.Add(new PerkSlot());
+            data.Rerolls = new PerkRerolls { Level = prestigeLevel, FreeLeft = config.FreeRerolls, Paid = 0 };
+            changed = true;
         }
 
-        FillEmptySlots(slots, random);
-        data.Session = new PerkSession
+        var newPerks = new List<int>();
+        var pool = PerkCatalog.Numbers.Except(data.Slots.Select(slot => slot.Perk)).ToList();
+        while (data.Slots.Count < prestigeLevel && Take(pool, random) is { } perk)
         {
-            Reason = reason,
-            Slots = slots,
-            FreeRerollsLeft = config.FreeRerolls,
-            PaidRerolls = 0,
-        };
-        return PerkError.None;
+            data.Slots.Add(new PerkSlot { Perk = perk });
+            newPerks.Add(perk);
+        }
+
+        if (newPerks.Count > 0)
+        {
+            data.UnseenNewPerks.AddRange(newPerks);
+            changed = true;
+        }
+
+        return (changed, newPerks);
     }
 
     /// <summary>슬롯 잠금. slotIndex 는 0 부터.</summary>
-    public static PerkError SetLock(PerkData data, int slotIndex, bool locked)
+    public static PerkError SetLock(PerkData data, int prestigeLevel, int slotIndex, bool locked)
     {
-        if (data.Session is null)
-        {
-            return PerkError.NoSession;
-        }
-
-        if (slotIndex < 0 || slotIndex >= data.Session.Slots.Count || data.Session.Slots[slotIndex].Perk is null)
+        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, prestigeLevel).Count)
         {
             return PerkError.InvalidSlot;
         }
 
-        data.Session.Slots[slotIndex].Locked = locked;
+        data.Slots[slotIndex].Locked = locked;
         return PerkError.None;
+    }
+
+    /// <summary>리롤할 수 있는지 (코인 제외).</summary>
+    public static PerkError CheckRoll(PerkData data, int prestigeLevel)
+    {
+        var slots = ActiveSlots(data, prestigeLevel);
+        if (slots.Count == 0)
+        {
+            return PerkError.NoSlots;
+        }
+
+        return slots.All(slot => slot.Locked) ? PerkError.AllLocked : PerkError.None;
     }
 
     /// <summary>
-    /// 리롤. 잠그지 않은 슬롯을 전부 다시 뽑는다. 무료 횟수가 남았으면 무료, 아니면 잔액에서 비용을 빼고 유료 회차를 올린다.
+    /// 리롤. 잠그지 않은 슬롯을 전부 다시 뽑는다. 무료 횟수가 남았으면 무료 −1, 아니면 유료 회차 +1.
+    /// 유료면 비용(<see cref="RollOutcome.Cost"/>)을 부르는 쪽이 미리 받아 두어야 한다.
     /// </summary>
     public static RollOutcome Roll(PerkData data, int prestigeLevel, PerkConfig config, Random random)
     {
-        var session = data.Session;
-        if (session is null)
+        var error = CheckRoll(data, prestigeLevel);
+        if (error != PerkError.None)
         {
-            return new RollOutcome(PerkError.NoSession, 0);
+            return new RollOutcome(error, 0);
         }
 
-        if (session.Slots.All(slot => slot.Locked))
+        var cost = NextRerollCost(config, prestigeLevel, data);
+        if (data.Rerolls.FreeLeft > 0)
         {
-            return new RollOutcome(PerkError.AllLocked, 0);
-        }
-
-        var cost = NextRerollCost(config, prestigeLevel, session);
-        if (cost > data.CoinBalance)
-        {
-            return new RollOutcome(PerkError.NotEnoughCoins, cost);
-        }
-
-        if (session.FreeRerollsLeft > 0)
-        {
-            session.FreeRerollsLeft--;
+            data.Rerolls.FreeLeft--;
         }
         else
         {
-            data.CoinBalance -= cost;
-            session.PaidRerolls++;
+            data.Rerolls.Paid++;
         }
 
-        Redraw(session.Slots, random);
+        // 단계보다 뒤의 슬롯(단계가 내려간 경우)은 효과가 없지만 겹치지 않게 후보에서 뺀다
+        Redraw(data.Slots.Take(prestigeLevel).ToList(), random, data.Slots.Skip(prestigeLevel).Select(slot => slot.Perk));
         return new RollOutcome(PerkError.None, cost);
     }
 
-    /// <summary>확정. 화면 슬롯을 보유 특전으로 저장하고 화면을 닫는다. 메일로 보낼 코인(남은 잔액)을 돌려주고 잔액은 0 이 된다.</summary>
-    public static PerkError Confirm(PerkData data, out int coinsToMail)
-    {
-        coinsToMail = 0;
-        if (data.Session is null)
-        {
-            return PerkError.NoSession;
-        }
-
-        data.Perks = data.Session.Slots.Where(slot => slot.Perk is not null).Select(slot => slot.Perk!.Value).ToList();
-        data.Session = null;
-        coinsToMail = data.CoinBalance;
-        data.CoinBalance = 0;
-        return PerkError.None;
-    }
-
-    /// <summary>빈 슬롯만 뽑는다. 이미 있는 특전(잠금 여부 무관)과 겹치지 않는다.</summary>
-    internal static void FillEmptySlots(List<PerkSlot> slots, Random random)
-    {
-        var taken = slots.Where(slot => slot.Perk is not null).Select(slot => slot.Perk!.Value).ToHashSet();
-        var pool = PerkCatalog.Numbers.Where(number => !taken.Contains(number)).ToList();
-        foreach (var slot in slots.Where(slot => slot.Perk is null))
-        {
-            slot.Perk = Take(pool, random);
-            slot.Locked = false;
-        }
-    }
-
     /// <summary>잠그지 않은 슬롯을 다시 뽑는다. 잠근 특전은 빠지고, 잠그지 않은 이전 특전은 다시 나올 수 있다.</summary>
-    internal static void Redraw(List<PerkSlot> slots, Random random)
+    /// <summary>
+    /// 흔들기: 멈추려는 슬롯 하나. <paramref name="nextPerk"/> 는 화면에서 그 릴의 다음 칸에 보이는 특전이다.
+    /// reverseChance 확률로 리버스(다른 특전), nextChance 확률로 다음 칸 특전, 나머지는 그대로.
+    /// 다음 칸 특전이 다른 슬롯과 겹치거나 모르는 특전이면 한 칸 더 가지 않는다 (그대로).
+    /// </summary>
+    public static ShakeOutcome Shake(PerkData data, int prestigeLevel, int slotIndex, int nextPerk, double nextChance, double reverseChance, Random random)
     {
-        var locked = slots.Where(slot => slot.Locked && slot.Perk is not null).Select(slot => slot.Perk!.Value).ToHashSet();
+        var active = ActiveSlots(data, prestigeLevel);
+        if (slotIndex < 0 || slotIndex >= active.Count || active[slotIndex].Locked)
+        {
+            return ShakeOutcome.Stay;
+        }
+
+        var taken = data.Slots.Select(slot => slot.Perk).ToHashSet();
+        var roll = random.NextDouble();
+        if (roll < reverseChance)
+        {
+            var pool = PerkCatalog.Numbers.Where(number => !taken.Contains(number) && number != nextPerk).ToList();
+            if (Take(pool, random) is { } perk)
+            {
+                active[slotIndex].Perk = perk;
+                return ShakeOutcome.Reverse;
+            }
+
+            return ShakeOutcome.Stay;
+        }
+
+        if (roll < reverseChance + nextChance && PerkCatalog.IsKnown(nextPerk) && !taken.Contains(nextPerk))
+        {
+            active[slotIndex].Perk = nextPerk;
+            return ShakeOutcome.Next;
+        }
+
+        return ShakeOutcome.Stay;
+    }
+
+    internal static void Redraw(List<PerkSlot> slots, Random random, IEnumerable<int>? alsoExclude = null)
+    {
+        var locked = slots.Where(slot => slot.Locked).Select(slot => slot.Perk).Concat(alsoExclude ?? []).ToHashSet();
         var pool = PerkCatalog.Numbers.Where(number => !locked.Contains(number)).ToList();
         foreach (var slot in slots.Where(slot => !slot.Locked))
         {
-            slot.Perk = Take(pool, random);
+            if (Take(pool, random) is { } perk)
+            {
+                slot.Perk = perk;
+            }
         }
     }
 

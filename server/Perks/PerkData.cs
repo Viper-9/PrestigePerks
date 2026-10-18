@@ -7,60 +7,51 @@ namespace PrestigePerks.Perks;
 /// </summary>
 public sealed class PerkData
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     [JsonPropertyName("schemaVersion")]
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
-    /// <summary>확정된 보유 특전 (슬롯 순서). 효과는 이 목록의 앞에서부터 프레스티지 단계 수만큼만 적용한다.</summary>
+    /// <summary>보유 특전과 잠금 (슬롯 순서). 효과는 앞에서부터 프레스티지 단계 수만큼만 적용한다. 리롤 결과가 바로 여기에 저장된다.</summary>
+    [JsonPropertyName("slots")]
+    public List<PerkSlot> Slots { get; set; } = [];
+
+    [JsonPropertyName("rerolls")]
+    public PerkRerolls Rerolls { get; set; } = new();
+
+    /// <summary>새 단계 진입 때 자동으로 뽑았지만 아직 클라이언트에 알리지 않은 특전. state 라우트가 알리고 비운다.</summary>
+    [JsonPropertyName("unseenNewPerks")]
+    public List<int> UnseenNewPerks { get; set; } = [];
+
+    /// <summary>schema 1 의 확정 특전. 읽을 때만 쓰고 슬롯으로 옮긴 뒤 비운다.</summary>
     [JsonPropertyName("perks")]
-    public List<int> Perks { get; set; } = [];
-
-    /// <summary>특전 화면에서 쓰는 코인 잔액. 확정하면 메일로 지급하고 0 이 된다.</summary>
-    [JsonPropertyName("coinBalance")]
-    public int CoinBalance { get; set; }
-
-    /// <summary>특전 화면 상태. null 이면 확정(닫힘), 값이 있으면 열림.</summary>
-    [JsonPropertyName("session")]
-    public PerkSession? Session { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<int>? LegacyPerks { get; set; }
 
     /// <summary>파일을 읽다 예상 못 한 오류가 나 빈 데이터로 대신한 경우. 이 데이터로는 파일을 덮어쓰지 않는다.</summary>
     [JsonIgnore]
     public bool LoadFailed { get; init; }
 }
 
-public sealed class PerkSession
-{
-    /// <summary>화면을 연 이유. <see cref="PerkSessionReason"/></summary>
-    [JsonPropertyName("reason")]
-    public string Reason { get; set; } = PerkSessionReason.Prestige;
-
-    [JsonPropertyName("slots")]
-    public List<PerkSlot> Slots { get; set; } = [];
-
-    [JsonPropertyName("freeRerollsLeft")]
-    public int FreeRerollsLeft { get; set; }
-
-    /// <summary>이번 화면에서 한 유료 리롤 횟수. 화면을 열 때마다 0 부터 센다.</summary>
-    [JsonPropertyName("paidRerolls")]
-    public int PaidRerolls { get; set; }
-}
-
 public sealed class PerkSlot
 {
-    /// <summary>특전 번호. null 이면 빈 슬롯.</summary>
     [JsonPropertyName("perk")]
-    public int? Perk { get; set; }
+    public int Perk { get; set; }
 
     [JsonPropertyName("locked")]
     public bool Locked { get; set; }
 }
 
-public static class PerkSessionReason
+public sealed class PerkRerolls
 {
-    /// <summary>보유 슬롯 &lt; 프레스티지 단계 (새 프레스티지, 소급 유저).</summary>
-    public const string Prestige = "prestige";
+    /// <summary>무료·유료 횟수가 속한 프레스티지 단계. 현재 단계가 더 높으면 새 단계로 보고 횟수를 처음으로 되돌린다.</summary>
+    [JsonPropertyName("level")]
+    public int Level { get; set; }
 
-    /// <summary>개발용 명령으로 강제로 연 화면. 재추첨권 화면과 같다 (자동 추첨 없이 무료 리롤부터).</summary>
-    public const string Dev = "dev";
+    [JsonPropertyName("freeLeft")]
+    public int FreeLeft { get; set; }
+
+    /// <summary>이 단계에서 한 유료 리롤 횟수.</summary>
+    [JsonPropertyName("paid")]
+    public int Paid { get; set; }
 }

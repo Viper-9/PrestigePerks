@@ -30,8 +30,8 @@ public class PrestigeCommandoCommand(
     /// <summary>한 번에 받을 수 있는 최대 개수. 스택 100개짜리 10묶음.</summary>
     public const int MaxCoinAmount = 1000;
 
-    /// <summary>개발용 잔액 상한.</summary>
-    public const int MaxBalance = 100_000;
+    /// <summary>개발용 무료 리롤 설정 상한.</summary>
+    public const int MaxFreeRerolls = 100;
 
     private static readonly Regex CoinRegex = new($"^{Prefix} {CoinCommand}(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
@@ -45,15 +45,13 @@ public class PrestigeCommandoCommand(
         command switch
         {
             CoinCommand => $"{Prefix} {CoinCommand}\n========\nSends prestige coins to the player through the message system.\n\n\t{Prefix} {CoinCommand} [quantity]\n\t\tEx: {Prefix} {CoinCommand} 10\n\t\tQuantity defaults to 1, max {MaxCoinAmount}.",
-            PerkCommand => $"{Prefix} {PerkCommand}\n========\nDev commands for the prestige perk screen.\n\n" +
+            PerkCommand => $"{Prefix} {PerkCommand}\n========\nDev commands for prestige perks.\n\n" +
                             $"\t{Prefix} {PerkCommand} status\n" +
-                            $"\t{Prefix} {PerkCommand} open\t\topen the screen even if all slots are filled (like a reroll ticket)\n" +
-                            $"\t{Prefix} {PerkCommand} roll\n" +
+                            $"\t{Prefix} {PerkCommand} roll\t\tfree rerolls only (paid rerolls use inventory coins on the perk page)\n" +
                             $"\t{Prefix} {PerkCommand} lock <slot>\t\tslot starts at 1\n" +
                             $"\t{Prefix} {PerkCommand} unlock <slot>\n" +
-                            $"\t{Prefix} {PerkCommand} confirm\t\tremaining coins are mailed\n" +
-                            $"\t{Prefix} {PerkCommand} balance <coins>\t\tset coin balance (0-{MaxBalance})\n" +
-                            $"\t{Prefix} {PerkCommand} reset\t\tdelete perk data (previous file kept as .bak)",
+                            $"\t{Prefix} {PerkCommand} free <count>\t\tset free rerolls left (0-{MaxFreeRerolls})\n" +
+                            $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, free/paid rerolls (previous file kept as .bak)",
             _ => "",
         };
 
@@ -93,12 +91,10 @@ public class PrestigeCommandoCommand(
         var state = action switch
         {
             PerkAction.Status => perkService.GetState(sessionId),
-            PerkAction.Open => perkService.Open(sessionId, PerkSessionReason.Dev),
-            PerkAction.Roll => perkService.Roll(sessionId),
+            PerkAction.Roll => perkService.RollFree(sessionId),
             PerkAction.Lock => perkService.SetLock(sessionId, argument - 1, true),
             PerkAction.Unlock => perkService.SetLock(sessionId, argument - 1, false),
-            PerkAction.Confirm => perkService.Confirm(sessionId),
-            PerkAction.Balance => perkService.SetBalance(sessionId, argument),
+            PerkAction.Free => perkService.SetFreeRerolls(sessionId, argument),
             PerkAction.Reset => perkService.Reset(sessionId),
             _ => throw new ArgumentOutOfRangeException(nameof(action)),
         };
@@ -115,12 +111,10 @@ public class PrestigeCommandoCommand(
     public enum PerkAction
     {
         Status,
-        Open,
         Roll,
         Lock,
         Unlock,
-        Confirm,
-        Balance,
+        Free,
         Reset,
     }
 
@@ -143,7 +137,7 @@ public class PrestigeCommandoCommand(
             : null;
     }
 
-    /// <summary>"prestige perk &lt;동작&gt; [n]". lock/unlock 은 슬롯(1~6), balance 는 0~MaxBalance 가 필요하다. 틀리면 null.</summary>
+    /// <summary>"prestige perk &lt;동작&gt; [n]". lock/unlock 은 슬롯(1~6), free 는 0~MaxFreeRerolls 가 필요하다. 틀리면 null.</summary>
     internal static (PerkAction Action, int Argument)? ParsePerkCommand(string? text)
     {
         var match = PerkRegex.Match(text?.Trim() ?? "");
@@ -162,15 +156,15 @@ public class PrestigeCommandoCommand(
         return action switch
         {
             PerkAction.Lock or PerkAction.Unlock => hasArgument && argument is >= 1 and <= 6 ? (action, argument) : null,
-            PerkAction.Balance => hasArgument && argument is >= 0 and <= MaxBalance ? (action, argument) : null,
+            PerkAction.Free => hasArgument && argument is >= 0 and <= MaxFreeRerolls ? (action, argument) : null,
             _ => hasArgument ? null : (action, 0),
         };
     }
 
     /// <summary>
-    /// P3 | coins 120 | active: experience(1), scav(8)
-    /// screen (prestige): [1] experience(1) (locked)  [2] mastery(24)  [3] scav(8)
-    /// free rerolls 2 | next reroll: free
+    /// P3 | active: experience(1), scav(8)
+    /// slots:  [1] experience(1) (locked)  [2] mastery(24)  [3] scav(8)
+    /// free rerolls 2 | paid rerolls 0 | next reroll: free
     /// </summary>
     internal static string FormatState(PerkState state)
     {
@@ -180,35 +174,27 @@ public class PrestigeCommandoCommand(
             text.Append($"Error: {state.Error}\n");
         }
 
-        text.Append($"P{state.PrestigeLevel} | coins {state.CoinBalance} | active: ");
+        text.Append($"P{state.PrestigeLevel} | active: ");
         text.Append(state.ActivePerks.Count == 0 ? "none" : string.Join(", ", state.ActivePerks.Select(PerkCatalog.Describe)));
         if (state.RollCost is > 0)
         {
             text.Append($"\nreroll paid {state.RollCost} coins");
         }
 
-        if (state.CoinsMailed is { } mailed)
+        if (state.NewPerks.Count > 0)
         {
-            text.Append($"\nconfirmed, {mailed} coins mailed");
+            text.Append($"\nnew perks: {string.Join(", ", state.NewPerks.Select(PerkCatalog.Describe))}");
         }
 
-        if (state.Session is { } session)
+        text.Append("\nslots:");
+        for (var i = 0; i < state.Slots.Count; i++)
         {
-            text.Append($"\nscreen ({session.Reason}):");
-            for (var i = 0; i < session.Slots.Count; i++)
-            {
-                var slot = session.Slots[i];
-                text.Append($"  [{i + 1}] {(slot.Perk is { } perk ? PerkCatalog.Describe(perk) : "empty")}{(slot.Locked ? " (locked)" : "")}");
-            }
-
-            text.Append($"\nfree rerolls {session.FreeRerollsLeft} | paid rerolls {session.PaidRerolls} | next reroll: ");
-            text.Append(state.NextRerollCost is > 0 ? $"{state.NextRerollCost} coins" : "free");
-        }
-        else
-        {
-            text.Append("\nscreen closed");
+            var slot = state.Slots[i];
+            text.Append($"  [{i + 1}] {PerkCatalog.Describe(slot.Perk)}{(slot.Locked ? " (locked)" : "")}");
         }
 
+        text.Append($"\nfree rerolls {state.FreeRerollsLeft} | paid rerolls {state.PaidRerolls} | next reroll: ");
+        text.Append(state.NextRerollCost > 0 ? $"{state.NextRerollCost} coins" : "free");
         return text.ToString();
     }
 }

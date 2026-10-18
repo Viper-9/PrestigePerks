@@ -39,19 +39,17 @@ public class PerkDataStore(ISptLogger<PerkDataStore> logger)
         }
     }
 
-    /// <summary>개발용 reset: 파일과 캐시를 지운다. .bak 은 남겨 되돌릴 수 있게 한다.</summary>
+    /// <summary>
+    /// 개발용 reset: 빈 데이터로 덮어쓴다. 직전 데이터는 .bak 으로 남아 되돌릴 수 있다.
+    /// 파일을 지우기만 하면 다음 읽기가 본 파일이 없다고 .bak 에서 복구해 reset 이 무효가 된다.
+    /// </summary>
     public void Delete(MongoId profileId)
     {
         lock (GetLock(profileId))
         {
-            var path = GetPath(profileId);
-            if (File.Exists(path))
-            {
-                File.Copy(path, path + PerkDataFile.BackupSuffix, overwrite: true);
-                File.Delete(path);
-            }
-
-            cache.TryRemove(profileId, out _);
+            var data = new PerkData();
+            PerkDataFile.Write(GetPath(profileId), data);
+            cache[profileId] = data;
         }
     }
 

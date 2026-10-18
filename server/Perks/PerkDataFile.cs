@@ -85,7 +85,7 @@ public static class PerkDataFile
         }
     }
 
-    /// <summary>모르는 특전 번호·중복·잘못된 값을 정리한다. 정리한 내용은 warnings 에 남긴다.</summary>
+    /// <summary>schema 1 을 옮기고, 모르는 특전 번호·중복·잘못된 값을 정리한다. 정리한 내용은 warnings 에 남긴다.</summary>
     internal static PerkData Normalize(PerkData data, List<string> warnings)
     {
         if (data.SchemaVersion > PerkData.CurrentSchemaVersion)
@@ -93,37 +93,36 @@ public static class PerkDataFile
             warnings.Add($"schemaVersion {data.SchemaVersion} 은 이 버전보다 새 형식입니다. 아는 항목만 읽습니다");
         }
 
+        data.Slots ??= [];
+        data.Rerolls ??= new PerkRerolls();
+        data.UnseenNewPerks ??= [];
+        if (data.SchemaVersion < 2)
+        {
+            // schema 1 은 2026-10-18 개발 중에만 쓴 형식이다. 확정 특전만 슬롯으로 옮기고 화면 상태·잔액은 버린다
+            data.Slots = (data.LegacyPerks ?? []).Select(perk => new PerkSlot { Perk = perk }).ToList();
+            warnings.Add($"schemaVersion {data.SchemaVersion} 을 {PerkData.CurrentSchemaVersion} 으로 옮겼습니다. 특전 [{string.Join(", ", data.LegacyPerks ?? [])}] 만 남기고 화면 상태·코인 잔액은 버립니다");
+        }
+
+        data.LegacyPerks = null;
         data.SchemaVersion = PerkData.CurrentSchemaVersion;
-        data.Perks ??= [];
-        var perks = data.Perks.Where(PerkCatalog.IsKnown).Distinct().ToList();
-        if (perks.Count != data.Perks.Count)
+
+        var seen = new HashSet<int>();
+        var slots = data.Slots.Where(slot => slot is not null && PerkCatalog.IsKnown(slot.Perk) && seen.Add(slot.Perk)).ToList();
+        if (slots.Count != data.Slots.Count)
         {
-            warnings.Add($"모르는 특전 번호나 중복을 지웠습니다: [{string.Join(", ", data.Perks)}] → [{string.Join(", ", perks)}]");
+            warnings.Add($"모르는 특전 번호나 중복 슬롯을 지웠습니다: [{string.Join(", ", data.Slots.Select(slot => slot?.Perk))}] → [{string.Join(", ", slots.Select(slot => slot.Perk))}]");
         }
 
-        data.Perks = perks;
-        if (data.CoinBalance < 0)
-        {
-            warnings.Add($"음수 코인 잔액 {data.CoinBalance} 을 0 으로 바꿨습니다");
-            data.CoinBalance = 0;
-        }
+        data.Slots = slots;
+        data.UnseenNewPerks = data.UnseenNewPerks.Where(seen.Contains).Distinct().ToList();
 
-        if (data.Session is { } session)
+        var rerolls = data.Rerolls;
+        if (rerolls.Level < 0 || rerolls.FreeLeft < 0 || rerolls.Paid < 0)
         {
-            session.Slots ??= [];
-            var seen = new HashSet<int>();
-            foreach (var slot in session.Slots)
-            {
-                if (slot.Perk is { } perk && (!PerkCatalog.IsKnown(perk) || !seen.Add(perk)))
-                {
-                    warnings.Add($"화면 슬롯의 특전 #{perk} 를 비웠습니다 (모르는 번호 또는 중복)");
-                    slot.Perk = null;
-                    slot.Locked = false;
-                }
-            }
-
-            session.FreeRerollsLeft = Math.Max(session.FreeRerollsLeft, 0);
-            session.PaidRerolls = Math.Max(session.PaidRerolls, 0);
+            warnings.Add($"음수 리롤 값을 0 으로 바꿨습니다 (level {rerolls.Level}, freeLeft {rerolls.FreeLeft}, paid {rerolls.Paid})");
+            rerolls.Level = Math.Max(rerolls.Level, 0);
+            rerolls.FreeLeft = Math.Max(rerolls.FreeLeft, 0);
+            rerolls.Paid = Math.Max(rerolls.Paid, 0);
         }
 
         return data;

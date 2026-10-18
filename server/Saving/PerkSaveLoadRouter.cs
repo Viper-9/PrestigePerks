@@ -29,7 +29,7 @@ public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataS
         return profile;
     }
 
-    /// <summary>PMC 에 현재 특전 Bonus 를 넣는다 (멱등). 특전 확정·게임 시작 때도 부른다.</summary>
+    /// <summary>PMC 에 현재 특전 Bonus 를 넣는다 (멱등). 새 단계 진입·리롤·게임 시작 때도 부른다.</summary>
     public static void ApplyPerkBonuses(SptProfile profile, PerkDataStore store)
     {
         var profileId = profile.ProfileInfo?.ProfileId;
