@@ -17,6 +17,9 @@ public class Plugin : BaseUnityPlugin
         Instance = this;
         Log.Source = Logger;
         var harmony = new Harmony("com.viper.prestigeperks");
+        PerkController.Create();
+        PatchOne(harmony, typeof(Patches.MenuTaskBarAwakePatch));
+        PatchOne(harmony, typeof(Patches.MenuScreenShowPatch));
         foreach (var m in harmony.GetPatchedMethods()) Log.Info($"patched {m.DeclaringType?.Name}.{m.Name}");
         Log.Info($"PrestigePerks {Info.Metadata.Version} loaded");
     }
