@@ -23,6 +23,11 @@ public sealed class PerkData
     [JsonPropertyName("unseenNewPerks")]
     public List<int> UnseenNewPerks { get; set; } = [];
 
+    /// <summary>개발용 (Dev 빌드만): 슬롯과 상관없이 모든 특전을 적용한다. 상용 빌드는 읽을 때 끈다 (<see cref="PerkDataFile.Normalize"/>).</summary>
+    [JsonPropertyName("devAllPerks")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DevAllPerks { get; set; }
+
     /// <summary>schema 1 의 확정 특전. 읽을 때만 쓰고 슬롯으로 옮긴 뒤 비운다.</summary>
     [JsonPropertyName("perks")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

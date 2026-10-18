@@ -63,9 +63,11 @@ public static class PerkRules
     public static IReadOnlyList<PerkSlot> ActiveSlots(PerkData data, int prestigeLevel) =>
         data.Slots.Take(Math.Max(prestigeLevel, 0)).ToList();
 
-    /// <summary>효과를 적용할 특전.</summary>
+    /// <summary>효과를 적용할 특전. 개발용 <see cref="PerkData.DevAllPerks"/> 면 슬롯과 상관없이 전부.</summary>
     public static IReadOnlyList<int> ActivePerks(PerkData data, int prestigeLevel) =>
-        ActiveSlots(data, prestigeLevel).Select(slot => slot.Perk).Where(PerkCatalog.IsKnown).Distinct().ToList();
+        data.DevAllPerks
+            ? PerkCatalog.Numbers
+            : ActiveSlots(data, prestigeLevel).Select(slot => slot.Perk).Where(PerkCatalog.IsKnown).Distinct().ToList();
 
     /// <summary>
     /// 새 단계 진입 처리. 단계가 기록보다 높으면 무료 횟수를 다시 채우고 유료 회차를 0 으로 되돌린다.

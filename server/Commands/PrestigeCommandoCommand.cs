@@ -9,6 +9,10 @@ using SPTarkov.Server.Core.Models.Eft.Dialog;
 using SPTarkov.Server.Core.Models.Eft.Profile;
 using SPTarkov.Server.Core.Models.Spt.Config;
 using SPTarkov.Server.Core.Services.Commerce;
+using SPTarkov.Server.Core.Controllers;
+using SPTarkov.Server.Core.Helpers.Profile;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Server.Core.Servers;
 
 namespace PrestigePerks.Commands;
 
@@ -24,7 +28,11 @@ public class PrestigeCommandoCommand(
     CoreConfig coreConfig,
     PrestigeCoinMailer coinMailer,
     PerkService perkService,
-    MailSendService mailSendService) : ICommandoCommand
+    MailSendService mailSendService,
+    SaveServer saveServer,
+    HideoutHelper hideoutHelper,
+    HideoutController hideoutController,
+    HideoutTable hideoutTable) : ICommandoCommand
 {
     public const string Prefix = "prestige";
     public const string CoinCommand = "coin";
@@ -39,6 +47,8 @@ public class PrestigeCommandoCommand(
     private static readonly Regex CoinRegex = new($"^{Prefix} {CoinCommand}(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
+    private static readonly Regex HideoutRegex = new($"^{Prefix} {PerkCommand} hideout$", RegexOptions.IgnoreCase);
+    private static readonly Regex AllRegex = new($"^{Prefix} {PerkCommand} all (on|off)$", RegexOptions.IgnoreCase);
 
     public string CommandPrefix => Prefix;
 
@@ -56,6 +66,8 @@ public class PrestigeCommandoCommand(
                             $"\t{Prefix} {PerkCommand} unlock <slot>\n" +
                             $"\t{Prefix} {PerkCommand} free <count>\t\tset free rerolls left (0-{MaxFreeRerolls})\n" +
                             $"\t{Prefix} {PerkCommand} set <slot> <perk>\t\tput perk number <perk> in a slot (swaps if another slot has it). Reopen the perk page or main menu to apply it in game\n" +
+                            $"\t{Prefix} {PerkCommand} all on|off\t\tapply every perk regardless of slots (dev testing). Reopen the perk page or main menu to apply it in game\n" +
+                            $"\t{Prefix} {PerkCommand} hideout\t\tshow server hideout times with artisan(17) applied (compare all on/off)\n" +
                             $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, free/paid rerolls (previous file kept as .bak)",
             _ => "",
         };
@@ -89,6 +101,16 @@ public class PrestigeCommandoCommand(
         if (ParseSetCommand(text) is var (slot, perk))
         {
             return FormatState(perkService.SetPerk(sessionId, slot - 1, perk));
+        }
+
+        if (HideoutRegex.IsMatch(text?.Trim() ?? ""))
+        {
+            return DescribeHideout(sessionId);
+        }
+
+        if (ParseAllCommand(text) is { } all)
+        {
+            return FormatState(perkService.SetAllPerks(sessionId, all));
         }
 
         var parsed = ParsePerkCommand(text);
@@ -181,6 +203,48 @@ public class PrestigeCommandoCommand(
         }
 
         return slot is >= 1 and <= 6 && PerkCatalog.IsKnown(perk) ? (slot, perk) : null;
+    }
+
+    /// <summary>
+    /// 개발용: 서버가 지금 계산하는 은신처 시간 (17번 패치를 지난 실제 값). all on / all off 로 비교하면 ×0.8 인지 바로 보인다.
+    /// 클라이언트 화면 시간은 레시피 화면을 연 뒤 BepInEx [dev] 로그의 17 줄로 확인한다.
+    /// </summary>
+    private string DescribeHideout(MongoId sessionId)
+    {
+        if (!saveServer.ProfileExists(sessionId) || saveServer.GetProfile(sessionId).CharacterData?.PmcData is not { Info: not null } pmc)
+        {
+            return "No PMC profile.";
+        }
+
+        var active = PerkArtisan.Has(pmc);
+        var text = new StringBuilder($"artisan(17) {(active ? "ACTIVE" : "inactive")} (server times in seconds)");
+        var recipes = (hideoutTable.Production.Recipes ?? [])
+            .Where(recipe => recipe.Id != HideoutHelper.BitcoinProductionId && recipe.ProductionTime > 0)
+            .GroupBy(recipe => recipe.Continuous == true)
+            .SelectMany(group => group.Take(group.Key ? 1 : 3));
+        foreach (var recipe in recipes)
+        {
+            var adjusted = hideoutHelper.GetAdjustedCraftTimeWithSkills(pmc, recipe.Id, applyHideoutManagementBonus: recipe.Continuous == true);
+            text.Append($"\ncraft {recipe.AreaType} {recipe.Id}{(recipe.Continuous == true ? " (continuous)" : "")}: base {recipe.ProductionTime:0} -> {adjusted:0.#}");
+        }
+
+        var scavRecipe = hideoutTable.Production.ScavRecipes?.FirstOrDefault(recipe => recipe.ProductionTime > 0);
+        if (scavRecipe is not null)
+        {
+            var scavTime = typeof(HideoutController).GetMethod("GetScavCaseTime", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.Invoke(hideoutController, [pmc, scavRecipe.ProductionTime]);
+            text.Append($"\nscav case {scavRecipe.Id}: base {scavRecipe.ProductionTime:0} -> {scavTime:0.#} (fence modifier included, crafting skill not)");
+        }
+
+        text.Append($"\ncultist 43200 (12h) -> {(active ? PerkArtisan.CraftTime(43200) : 43200):0}");
+        text.Append($"\nbitcoin progress per 100 s elapsed -> {(active ? PerkArtisan.BitcoinElapsed(100) : 100)} s");
+        return text.ToString();
+    }
+
+    /// <summary>"prestige perk all on|off". 틀리면 null.</summary>
+    internal static bool? ParseAllCommand(string? text)
+    {
+        var match = AllRegex.Match(text?.Trim() ?? "");
+        return match.Success ? match.Groups[1].Value.Equals("on", StringComparison.OrdinalIgnoreCase) : null;
     }
 
     /// <summary>

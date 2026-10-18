@@ -183,6 +183,18 @@ public class PerkService(
             return BuildState(data, level, error);
         });
 
+    /// <summary>개발용: 슬롯과 상관없이 모든 특전을 켜거나 끈다 (패치 특전 부하·대상 확인용). 게임 반영은 다음 state.</summary>
+    public PerkState SetAllPerks(MongoId sessionId, bool on) =>
+        Run(sessionId, (profile, data, level) =>
+        {
+            EnterLevel(sessionId, profile);
+            data.DevAllPerks = on;
+            store.Save(sessionId, data);
+            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+            logger.Info($"[PrestigePerks] {sessionId}: 개발용 all {(on ? "on" : "off")} → [{string.Join(", ", PerkRules.ActivePerks(data, level))}]");
+            return BuildState(data, level);
+        });
+
     /// <summary>개발용: 무료 리롤만 (서버는 인벤토리 코인을 뺄 수 없다).</summary>
     public PerkState RollFree(MongoId sessionId) =>
         Run(sessionId, (profile, data, level) =>

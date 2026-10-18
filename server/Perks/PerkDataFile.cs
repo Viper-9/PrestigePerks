@@ -105,6 +105,14 @@ public static class PerkDataFile
 
         data.LegacyPerks = null;
         data.SchemaVersion = PerkData.CurrentSchemaVersion;
+#if !DEV_COMMANDS
+        if (data.DevAllPerks)
+        {
+            // 개발용 플래그는 상용 빌드에서 효과가 없다 (테스터 파일을 그대로 가져온 경우)
+            warnings.Add("개발용 devAllPerks 를 껐습니다");
+            data.DevAllPerks = false;
+        }
+#endif
 
         var seen = new HashSet<int>();
         var slots = data.Slots.Where(slot => slot is not null && PerkCatalog.IsKnown(slot.Perk) && seen.Add(slot.Perk)).ToList();
