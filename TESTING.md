@@ -26,6 +26,7 @@ SPT 설정 `SPT_Data/configs/core.json` 의 `giveCommandEnabled` 가 `true` 여�
 | `prestige perk lock <슬롯>` | 슬롯 잠금. 슬롯 번호는 1부터 |
 | `prestige perk unlock <슬롯>` | 슬롯 잠금 풀기 |
 | `prestige perk free <횟수>` | 남은 무료 리롤 횟수를 정합니다 (0~100) |
+| `prestige perk set <슬롯> <특전 번호>` | 슬롯에 원하는 특전을 넣습니다. 다른 슬롯에 같은 특전이 있으면 서로 바꿉니다. 특전 페이지를 다시 열거나 메인 메뉴로 가면 게임에 반영됩니다 |
 | `prestige perk reset` | 특전 데이터 초기화: 슬롯·잠금·무료/유료 리롤. 지금 단계로 다시 들어가 슬롯을 새로 뽑고 무료 리롤 3회를 줍니다. 직전 데이터는 `.bak` 으로 남습니다 |
 | `help` | Commando 명령 도움말 (영어) |
 
@@ -37,6 +38,16 @@ prestige perk free 100
 prestige perk lock 2
 prestige perk status
 ```
+
+### 특전 효과 수치 확인
+
+테스터용 빌드는 특전이 반영될 때마다 게임이 계산한 효과를 `BepInEx/LogOutput.log` 에 남깁니다.
+
+```
+[dev] bonus calc (input 100): Physical 120, Combat 100, Practical 100, Mental 100, ExperienceRate 110
+```
+
+입력 100 에 대한 결과라서 120 이면 1.2배입니다. 예: `prestige perk set 1 2` 후 특전 페이지를 다시 열고 로그에서 해당 그룹 값이 바뀌었는지 확인합니다.
 
 ## 3. 프로필 프레스티지 단계 바꾸기
 

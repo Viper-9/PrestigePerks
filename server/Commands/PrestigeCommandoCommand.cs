@@ -38,6 +38,7 @@ public class PrestigeCommandoCommand(
 
     private static readonly Regex CoinRegex = new($"^{Prefix} {CoinCommand}(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
+    private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
 
     public string CommandPrefix => Prefix;
 
@@ -54,6 +55,7 @@ public class PrestigeCommandoCommand(
                             $"\t{Prefix} {PerkCommand} lock <slot>\t\tslot starts at 1\n" +
                             $"\t{Prefix} {PerkCommand} unlock <slot>\n" +
                             $"\t{Prefix} {PerkCommand} free <count>\t\tset free rerolls left (0-{MaxFreeRerolls})\n" +
+                            $"\t{Prefix} {PerkCommand} set <slot> <perk>\t\tput perk number <perk> in a slot (swaps if another slot has it). Reopen the perk page or main menu to apply it in game\n" +
                             $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, free/paid rerolls (previous file kept as .bak)",
             _ => "",
         };
@@ -84,6 +86,11 @@ public class PrestigeCommandoCommand(
 
     private string HandlePerk(MongoId sessionId, string? text)
     {
+        if (ParseSetCommand(text) is var (slot, perk))
+        {
+            return FormatState(perkService.SetPerk(sessionId, slot - 1, perk));
+        }
+
         var parsed = ParsePerkCommand(text);
         if (parsed is null)
         {
@@ -162,6 +169,18 @@ public class PrestigeCommandoCommand(
             PerkAction.Free => hasArgument && argument is >= 0 and <= MaxFreeRerolls ? (action, argument) : null,
             _ => hasArgument ? null : (action, 0),
         };
+    }
+
+    /// <summary>"prestige perk set &lt;슬롯&gt; &lt;특전 번호&gt;". 슬롯 1~6, 특전은 목록에 있는 번호. 틀리면 null.</summary>
+    internal static (int Slot, int Perk)? ParseSetCommand(string? text)
+    {
+        var match = SetRegex.Match(text?.Trim() ?? "");
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var slot) || !int.TryParse(match.Groups[2].Value, out var perk))
+        {
+            return null;
+        }
+
+        return slot is >= 1 and <= 6 && PerkCatalog.IsKnown(perk) ? (slot, perk) : null;
     }
 
     /// <summary>

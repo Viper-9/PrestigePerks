@@ -24,6 +24,8 @@ public enum PerkError
     NoFreeRerolls,
     /// <summary>흔들 리롤이 없다 (이미 흔들었거나, 시간이 지났거나, 리롤하지 않았다).</summary>
     NoShake,
+    /// <summary>모르는 특전 번호 (개발용 set 명령).</summary>
+    UnknownPerk,
 }
 
 public readonly record struct RollOutcome(PerkError Error, int Cost)
@@ -187,6 +189,31 @@ public static class PerkRules
         }
 
         return ShakeOutcome.Stay;
+    }
+
+    /// <summary>
+    /// 개발용: 슬롯에 특전을 직접 넣는다. 다른 슬롯이 그 특전을 갖고 있으면 서로 바꾼다 (겹치지 않게). 잠금은 그대로 둔다.
+    /// </summary>
+    public static PerkError SetPerk(PerkData data, int prestigeLevel, int slotIndex, int perk)
+    {
+        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, prestigeLevel).Count)
+        {
+            return PerkError.InvalidSlot;
+        }
+
+        if (!PerkCatalog.IsKnown(perk))
+        {
+            return PerkError.UnknownPerk;
+        }
+
+        var other = data.Slots.FindIndex(slot => slot.Perk == perk);
+        if (other >= 0 && other != slotIndex)
+        {
+            data.Slots[other].Perk = data.Slots[slotIndex].Perk;
+        }
+
+        data.Slots[slotIndex].Perk = perk;
+        return PerkError.None;
     }
 
     internal static void Redraw(List<PerkSlot> slots, Random random, IEnumerable<int>? alsoExclude = null)

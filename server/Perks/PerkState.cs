@@ -51,6 +51,10 @@ public sealed record PerkState
     [JsonPropertyName("rollCost")]
     public int? RollCost { get; init; }
 
+    /// <summary>서버가 개발용(Dev) 빌드다. 클라이언트가 개발용 진단 로그(특전 효과 계산값)를 남긴다.</summary>
+    [JsonPropertyName("dev")]
+    public bool Dev { get; init; }
+
     /// <summary>흔들기가 한 칸 더 밀 확률 (0~1). 화면 안내용.</summary>
     [JsonPropertyName("shakeChance")]
     public double ShakeChance { get; init; }

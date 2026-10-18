@@ -30,6 +30,12 @@ public class PerkService(
 
     private readonly Random random = Random.Shared;
 
+#if DEV_COMMANDS
+    private const bool DevBuild = true;
+#else
+    private const bool DevBuild = false;
+#endif
+
     /// <summary>
     /// 흔들 수 있는 리롤: 리롤한 시각과 돌린(잠기지 않은) 슬롯. 리롤마다 한 번, <see cref="PerkConfig.ShakeWindowSeconds"/> 안에만.
     /// 릴이 도는 몇 초 동안만 의미가 있어 저장하지 않는다 (서버를 다시 켜면 사라진다).
@@ -161,6 +167,22 @@ public class PerkService(
         pendingShakes[sessionId] = (DateTime.UtcNow, rolled);
     }
 
+    /// <summary>개발용: 슬롯에 특전을 직접 넣는다 (특전 효과를 비교해 보려고). 다른 슬롯에 있던 특전이면 서로 바꾼다.</summary>
+    public PerkState SetPerk(MongoId sessionId, int slotIndex, int perk) =>
+        Run(sessionId, (profile, data, level) =>
+        {
+            EnterLevel(sessionId, profile);
+            var error = PerkRules.SetPerk(data, level, slotIndex, perk);
+            if (error == PerkError.None)
+            {
+                store.Save(sessionId, data);
+                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+                logger.Info($"[PrestigePerks] {sessionId}: 개발용 set 슬롯 {slotIndex + 1} → {perk}, [{string.Join(", ", PerkRules.ActivePerks(data, level))}]");
+            }
+
+            return BuildState(data, level, error);
+        });
+
     /// <summary>개발용: 무료 리롤만 (서버는 인벤토리 코인을 뺄 수 없다).</summary>
     public PerkState RollFree(MongoId sessionId) =>
         Run(sessionId, (profile, data, level) =>
@@ -266,6 +288,7 @@ public class PerkService(
             Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActivePerks(data, level)),
             BonusIds = BonusIds,
             ShakeChance = Config.ShakeChance,
+            Dev = DevBuild,
             Error = error == PerkError.None ? null : error.ToString(),
         };
 
