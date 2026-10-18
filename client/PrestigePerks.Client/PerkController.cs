@@ -121,7 +121,11 @@ namespace PrestigePerks
         }
 
         /// <summary>메인 메뉴에 들어올 때마다 (레이드 뒤 포함): 상태를 받아 Bonus 를 반영하고 새 특전을 알린다.</summary>
-        public void OnMainMenuShown() => _ = RefreshFromMainMenu();
+        public void OnMainMenuShown()
+        {
+            PerkEffects.FlushDevLog();
+            _ = RefreshFromMainMenu();
+        }
 
         private async Task RefreshFromMainMenu()
         {
@@ -151,6 +155,7 @@ namespace PrestigePerks
         {
             state = fresh;
             PerkBonusSync.Apply(state);
+            PerkEffects.Set(state.ActivePerks, state.Dev);
             if (state.NewPerks.Count == 0)
             {
                 return;
