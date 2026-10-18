@@ -241,6 +241,15 @@ public class PerkRulesTests
     }
 
     [Fact]
+    public void Dev_all_perks_applies_every_perk_regardless_of_slots()
+    {
+        var data = WithSlots(1, 8);
+        data.DevAllPerks = true;
+        Assert.Equal(PerkCatalog.Numbers, PerkRules.ActivePerks(data, 1));
+        Assert.Equal(PerkCatalog.Numbers, PerkRules.ActivePerks(data, 0));
+    }
+
+    [Fact]
     public void Roll_does_not_draw_perks_held_in_slots_beyond_the_level()
     {
         for (var seed = 0; seed < 200; seed++)

@@ -81,6 +81,23 @@ public class PrestigeCommandoCommandTests
         Assert.Null(PrestigeCommandoCommand.ParseSetCommand(text));
     }
 
+    [Theory]
+    [InlineData("prestige perk all on", true)]
+    [InlineData(" PRESTIGE PERK ALL OFF ", false)]
+    public void Parses_all_command(string text, bool on)
+    {
+        Assert.Equal(on, PrestigeCommandoCommand.ParseAllCommand(text));
+    }
+
+    [Theory]
+    [InlineData("prestige perk all")]
+    [InlineData("prestige perk all yes")]
+    [InlineData(null)]
+    public void Rejects_invalid_all_commands(string? text)
+    {
+        Assert.Null(PrestigeCommandoCommand.ParseAllCommand(text));
+    }
+
     [Fact]
     public void Formats_state_for_chat()
     {
