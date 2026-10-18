@@ -20,6 +20,9 @@ namespace PrestigePerks.Model
         [JsonProperty("rollCost")] public int? RollCost;
         [JsonProperty("shakeChance")] public double ShakeChance;
 
+        /// <summary>서버가 개발용 빌드다. 개발용 진단 로그를 남긴다.</summary>
+        [JsonProperty("dev")] public bool Dev;
+
         /// <summary>흔들기 응답: Stay, Next (한 칸 더), Reverse (거꾸로 돌아 다른 특전). 흔들기 응답이 아니면 null.</summary>
         [JsonProperty("shakeOutcome")] public string ShakeOutcome;
 

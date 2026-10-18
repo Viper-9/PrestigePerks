@@ -51,6 +51,30 @@ namespace PrestigePerks.Game
                     Log.Warn($"add bonus {bonus.Id} failed: {e.Message}");
                 }
             }
+
+            if (state.Dev)
+            {
+                LogCalculated(controller);
+            }
+        }
+
+        private static readonly ESkillClass[] LoggedClasses = { ESkillClass.Physical, ESkillClass.Combat, ESkillClass.Practical, ESkillClass.Mental };
+
+        /// <summary>
+        /// 개발용: 게임이 실제로 계산한 효과를 남긴다. 입력 100 에 대한 결과라서 120 이면 ×1.2 (스킬 성장 특전 2·3·4, 경험치 1 확인용).
+        /// </summary>
+        private static void LogCalculated(BonusController controller)
+        {
+            try
+            {
+                var parts = LoggedClasses.Select(c => $"{c} {controller.Calculate(c, 100):0.##}")
+                    .Append($"ExperienceRate {controller.Calculate(EBonusType.ExperienceRate, 100):0.##}");
+                Log.Info($"[dev] bonus calc (input 100): {string.Join(", ", parts)}");
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"[dev] bonus calc failed: {e.Message}");
+            }
         }
 
         private static BonusDescriptor ToDescriptor(PerkBonusDto bonus)
