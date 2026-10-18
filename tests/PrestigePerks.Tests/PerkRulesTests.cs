@@ -272,6 +272,29 @@ public class PerkRulesTests
     }
 
     [Fact]
+    public void Set_puts_a_perk_in_a_slot_and_swaps_when_another_slot_has_it()
+    {
+        var data = WithSlots(1, 4, 8);
+        data.Slots[0].Locked = true;
+        Assert.Equal(PerkError.None, PerkRules.SetPerk(data, 3, 1, 24));
+        Assert.Equal([1, 24, 8], data.Slots.Select(slot => slot.Perk));
+
+        Assert.Equal(PerkError.None, PerkRules.SetPerk(data, 3, 2, 1));
+        Assert.Equal([8, 24, 1], data.Slots.Select(slot => slot.Perk));
+        Assert.True(data.Slots[0].Locked);
+    }
+
+    [Fact]
+    public void Set_rejects_inactive_slots_and_unknown_perks()
+    {
+        var data = WithSlots(1, 4, 8);
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 2, 2, 24));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 3, -1, 24));
+        Assert.Equal(PerkError.UnknownPerk, PerkRules.SetPerk(data, 3, 0, 999));
+        Assert.Equal([1, 4, 8], data.Slots.Select(slot => slot.Perk));
+    }
+
+    [Fact]
     public void Shake_next_takes_the_perk_shown_in_the_next_cell()
     {
         var data = WithSlots(1, 4, 8);

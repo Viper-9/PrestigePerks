@@ -61,6 +61,26 @@ public class PrestigeCommandoCommandTests
         Assert.Null(PrestigeCommandoCommand.ParsePerkCommand(text));
     }
 
+    [Theory]
+    [InlineData("prestige perk set 1 2", 1, 2)]
+    [InlineData("  PRESTIGE PERK SET 6 29 ", 6, 29)]
+    public void Parses_set_command(string text, int slot, int perk)
+    {
+        Assert.Equal((slot, perk), PrestigeCommandoCommand.ParseSetCommand(text));
+    }
+
+    [Theory]
+    [InlineData("prestige perk set 0 2")]
+    [InlineData("prestige perk set 7 2")]
+    [InlineData("prestige perk set 1 999")]
+    [InlineData("prestige perk set 1")]
+    [InlineData("prestige perk set")]
+    [InlineData(null)]
+    public void Rejects_invalid_set_commands(string? text)
+    {
+        Assert.Null(PrestigeCommandoCommand.ParseSetCommand(text));
+    }
+
     [Fact]
     public void Formats_state_for_chat()
     {
