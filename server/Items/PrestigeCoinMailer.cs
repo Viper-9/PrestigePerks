@@ -11,8 +11,14 @@ namespace PrestigePerks.Items;
 [Injectable(InjectionType.Singleton)]
 public class PrestigeCoinMailer(TemplateTable templateTable, ItemHelper itemHelper, MailSendService mailSendService)
 {
+    /// <summary>코인 메일 보관 기간 1년 (바닐라 프레스티지 전달 메일과 같음). SPT 기본값은 48시간이다.</summary>
+    public const long OneYearSeconds = 31_536_000;
+
+    /// <summary>코인 아이템이 등록돼 있는지.</summary>
+    public bool IsAvailable => templateTable.Items.ContainsKey(PrestigeCoinItem.TemplateId);
+
     /// <summary>코인 아이템이 등록돼 있지 않으면 false.</summary>
-    public bool TrySend(MongoId sessionId, int amount, string message)
+    public bool TrySend(MongoId sessionId, int amount, string message, long maxStorageSeconds)
     {
         if (amount <= 0 || !templateTable.Items.TryGetValue(PrestigeCoinItem.TemplateId, out var template))
         {
@@ -29,7 +35,7 @@ public class PrestigeCoinMailer(TemplateTable templateTable, ItemHelper itemHelp
 
         var items = itemHelper.SplitStack(coin);
         itemHelper.SetFoundInRaid(items);
-        mailSendService.SendSystemMessageToPlayer(sessionId, message, items);
+        mailSendService.SendSystemMessageToPlayer(sessionId, message, items, maxStorageSeconds);
         return true;
     }
 }

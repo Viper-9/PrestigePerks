@@ -27,6 +27,7 @@ namespace PrestigePerks.Commands;
 public class PrestigeCommandoCommand(
     CoreConfig coreConfig,
     PrestigeCoinMailer coinMailer,
+    PrestigeCoinService coinService,
     PerkService perkService,
     MailSendService mailSendService,
     SaveServer saveServer,
@@ -45,6 +46,7 @@ public class PrestigeCommandoCommand(
     public const int MaxFreeRerolls = 100;
 
     private static readonly Regex CoinRegex = new($"^{Prefix} {CoinCommand}(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
+    private static readonly Regex CoinPreviewRegex = new($"^{Prefix} {CoinCommand} preview$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex HideoutRegex = new($"^{Prefix} {PerkCommand} hideout$", RegexOptions.IgnoreCase);
@@ -85,13 +87,18 @@ public class PrestigeCommandoCommand(
 
     private string? HandleCoin(MongoId sessionId, string? text)
     {
+        if (IsCoinPreview(text))
+        {
+            return DescribeCoinPreview(sessionId);
+        }
+
         var amount = ParseCoinAmount(text);
         if (amount is null)
         {
             return $"Invalid use of {Prefix} {CoinCommand}. Quantity must be 1-{MaxCoinAmount}. Use 'help' for more information.";
         }
 
-        return coinMailer.TrySend(sessionId, amount.Value, $"PRESTIGE COIN DELIVERY: {amount.Value}")
+        return coinMailer.TrySend(sessionId, amount.Value, $"PRESTIGE COIN DELIVERY: {amount.Value}", PrestigeCoinMailer.OneYearSeconds)
             ? null
             : "Prestige coin item is not registered. Check the server log for PrestigePerks errors.";
     }
@@ -148,6 +155,20 @@ public class PrestigeCommandoCommand(
         Unlock,
         Free,
         Reset,
+    }
+
+    /// <summary>"prestige coin preview".</summary>
+    internal static bool IsCoinPreview(string? text) => CoinPreviewRegex.IsMatch(text?.Trim() ?? "");
+
+    private string DescribeCoinPreview(MongoId sessionId)
+    {
+        if (!saveServer.ProfileExists(sessionId))
+        {
+            return "No profile.";
+        }
+
+        var (carried, cap, next) = coinService.Preview(saveServer.GetProfile(sessionId));
+        return $"prestige to P{next} now: carried over {carried} coins (inventory, scav, unclaimed mail, BTR) + transfer window converted up to {cap} coins";
     }
 
     /// <summary>"prestige coin [n]" 에서 수량을 읽는다. 생략하면 1, 범위를 벗어나면 null.</summary>

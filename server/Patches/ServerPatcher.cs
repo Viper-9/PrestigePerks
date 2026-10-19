@@ -4,7 +4,7 @@ using SPTarkov.DI.Annotations;
 
 namespace PrestigePerks.Patches;
 
-/// <summary>서버 Harmony 패치 등록 (17번 장인). 하나가 실패해도 나머지는 걸리도록 클래스마다 따로 등록한다.</summary>
+/// <summary>서버 Harmony 패치 등록 (17번 장인, 프레스티지 코인). 하나가 실패해도 나머지는 걸리도록 클래스마다 따로 등록한다.</summary>
 [Injectable(InjectionType.Singleton)]
 public class ServerPatcher(ISptLogger<ServerPatcher> logger)
 {
@@ -18,6 +18,7 @@ public class ServerPatcher(ISptLogger<ServerPatcher> logger)
         typeof(CultistCircleTimePatch),
         typeof(BitcoinFarmScopePatch),
         typeof(BitcoinElapsedPatch),
+        typeof(PrestigeCoinPatch),
     ];
 
     public void PatchAll()

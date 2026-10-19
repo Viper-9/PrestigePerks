@@ -1,3 +1,4 @@
+using PrestigePerks.Items;
 using PrestigePerks.Patches;
 using PrestigePerks.Perks;
 using PrestigePerks.Prestiges;
@@ -18,13 +19,15 @@ public class PrestigePerksMod(
     PerkDataStore perkDataStore,
     ServerPatcher serverPatcher,
     PrestigeDataLoader prestigeDataLoader,
-    PerkConfigLoader perkConfigLoader) : IOnLoad
+    PerkConfigLoader perkConfigLoader,
+    PrestigeCoinService prestigeCoinService) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         CheckProfileConverters();
         PerkArtisan.Store = perkDataStore;
         PerkArtisan.Config = perkConfigLoader.Config;
+        PrestigeCoinService.Instance = prestigeCoinService;
         prestigeDataLoader.Load();
         serverPatcher.PatchAll();
         logger.Success($"[PrestigePerks] v{ModMetadata.AssemblyVersion} loaded.");
