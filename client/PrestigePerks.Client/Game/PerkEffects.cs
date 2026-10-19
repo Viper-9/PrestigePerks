@@ -23,6 +23,9 @@ namespace PrestigePerks.Game
 
         public static bool Has(int perk) => active[perk];
 
+        /// <summary>서버가 Dev 빌드인지 (마지막으로 받은 state 기준). 개발용 로그를 남길지 정한다.</summary>
+        public static bool DevMode => dev;
+
         public static void Set(IEnumerable<int> perks, bool devMode)
         {
             active = PerkPatchMath.BuildActive(perks, Disabled);
