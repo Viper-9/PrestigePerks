@@ -30,6 +30,21 @@ public class PrestigeCommandoCommandTests
     }
 
     [Theory]
+    [InlineData("prestige coin preview", true)]
+    [InlineData("PRESTIGE COIN PREVIEW ", true)]
+    [InlineData("prestige coin preview 3", false)]
+    [InlineData("prestige coin 3", false)]
+    [InlineData(null, false)]
+    public void Parses_coin_preview(string? text, bool expected)
+    {
+        Assert.Equal(expected, PrestigeCommandoCommand.IsCoinPreview(text));
+        if (expected)
+        {
+            Assert.Null(PrestigeCommandoCommand.ParseCoinAmount(text));
+        }
+    }
+
+    [Theory]
     [InlineData("prestige perk status", PrestigeCommandoCommand.PerkAction.Status, 0)]
     [InlineData("prestige perk ROLL", PrestigeCommandoCommand.PerkAction.Roll, 0)]
     [InlineData("prestige perk lock 1", PrestigeCommandoCommand.PerkAction.Lock, 1)]
