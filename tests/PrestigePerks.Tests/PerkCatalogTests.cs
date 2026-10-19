@@ -7,9 +7,9 @@ namespace PrestigePerks.Tests;
 public class PerkCatalogTests
 {
     [Fact]
-    public void Has_the_19_fixed_perk_numbers()
+    public void Has_the_20_fixed_perk_numbers()
     {
-        Assert.Equal([1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 15, 16, 17, 24, 25, 26, 27, 28, 29], PerkCatalog.Numbers);
+        Assert.Equal([1, 2, 3, 4, 8, 9, 10, 11, 14, 15, 16, 17, 24, 25, 26, 27, 29, 30, 31, 32], PerkCatalog.Numbers);
     }
 
     [Fact]

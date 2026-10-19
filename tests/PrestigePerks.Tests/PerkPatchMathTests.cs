@@ -13,9 +13,9 @@ public class PerkPatchMathTests
         var disabled = new bool[PerkPatchMath.Size];
         disabled[10] = true;
 
-        var active = PerkPatchMath.BuildActive([9, 10, 24, 0, -1, 30, 99], disabled);
+        var active = PerkPatchMath.BuildActive([9, 10, 24, 0, -1, 32, 33, 99], disabled);
 
-        Assert.Equal([9, 24], Enumerable.Range(0, active.Length).Where(perk => active[perk]));
+        Assert.Equal([9, 24, 32], Enumerable.Range(0, active.Length).Where(perk => active[perk]));
         Assert.All(PerkPatchMath.BuildActive(null!, disabled), Assert.False);
         Assert.Equal(PerkPatchMath.Size, PerkPatchMath.BuildActive([], null!).Length);
     }
@@ -62,10 +62,10 @@ public class PerkPatchMathTests
     }
 
     [Theory]
-    [InlineData(1.0f)] // 스킬 0: 판정 cap 1 → 1.333, 확률 ×0.75
-    [InlineData(1.6f)] // 엘리트: ÷1.6 → ÷2.133 (×0.469)
-    public void Fracture_and_bleeding_cap_is_divided_by_three_quarters(float cap) =>
-        Assert.Equal(cap / 0.75f, PerkPatchMath.ChanceCap(cap), Tolerance);
+    [InlineData(1.0f)] // 스킬 0: 판정 cap 1 → 1.176, 확률 ×0.85
+    [InlineData(1.6f)] // 엘리트: ÷1.6 → ÷1.882 (×0.531)
+    public void Fracture_and_bleeding_cap_is_divided_by_0_85(float cap) =>
+        Assert.Equal(cap / 0.85f, PerkPatchMath.ChanceCap(cap), Tolerance);
 
     [Theory]
     [InlineData(0f, 0.05f)]
@@ -78,11 +78,11 @@ public class PerkPatchMathTests
     [Theory]
     [InlineData(0f)]
     [InlineData(0.25f)] // 무기 관리 엘리트
-    public void Weapon_wear_is_three_quarters_of_vanilla(float treatment)
+    public void Weapon_wear_is_eighty_percent_of_vanilla(float treatment)
     {
         var factor = PerkPatchMath.WeaponTreatmentFactor(treatment);
         // Weapon.GetDurabilityLossOnShot: 손실 × (1 − factor)
-        Assert.Equal((1f - treatment) * 0.75f, 1f - factor, Tolerance);
+        Assert.Equal((1f - treatment) * 0.8f, 1f - factor, Tolerance);
         Assert.Equal(1f, PerkPatchMath.WeaponTreatmentFactor(1f));
     }
 
@@ -101,6 +101,40 @@ public class PerkPatchMathTests
         Assert.Equal(100f / 1.55f, PerkPatchMath.SurgeryTime(100f / 1.4f, 0.4f), Tolerance);
         Assert.Equal(100f / 1.15f, PerkPatchMath.SurgeryTime(100f, 0f), Tolerance);
         Assert.Equal(-1f, PerkPatchMath.SurgeryTime(-1f, 0.4f));
+    }
+
+    [Fact]
+    public void Handling_adds_five_ergonomics_points()
+    {
+        Assert.Equal(27f, PerkPatchMath.Ergonomics(22f), Tolerance);
+        Assert.Equal(5f, PerkPatchMath.Ergonomics(0f), Tolerance); // 인체공학 0 총도 받는다
+        Assert.Equal(105f, PerkPatchMath.Ergonomics(100f), Tolerance); // 조준 속도는 바닐라가 100에서 자른다
+        Assert.Equal(-1f, PerkPatchMath.Ergonomics(-1f));
+        Assert.Equal(float.NaN, PerkPatchMath.Ergonomics(float.NaN));
+    }
+
+    [Fact]
+    public void Agility_scales_move_distance_by_1_05()
+    {
+        // 수평 이동량 성분. 뒤로 걷기(음수)도 같은 배율
+        Assert.Equal(0.1f * 1.05f, PerkPatchMath.MoveDistance(0.1f), Tolerance);
+        Assert.Equal(-0.1f * 1.05f, PerkPatchMath.MoveDistance(-0.1f), Tolerance);
+        Assert.Equal(0f, PerkPatchMath.MoveDistance(0f));
+        Assert.Equal(float.NaN, PerkPatchMath.MoveDistance(float.NaN));
+    }
+
+    [Fact]
+    public void Reliability_scales_malfunction_chances_and_heat_by_0_8()
+    {
+        Assert.Equal(0.008f, PerkPatchMath.Malfunction(0.01f), Tolerance);
+        Assert.Equal(0.0008d, PerkPatchMath.Malfunction(0.001d), 1e-9);
+        Assert.Equal(0f, PerkPatchMath.Malfunction(0f));
+        Assert.Equal(0d, PerkPatchMath.Malfunction(0d));
+        Assert.Equal(double.NaN, PerkPatchMath.Malfunction(double.NaN));
+
+        Assert.Equal(1.6f, PerkPatchMath.ShotOverheat(2f), Tolerance);
+        Assert.Equal(0f, PerkPatchMath.ShotOverheat(0f));
+        Assert.Equal(float.PositiveInfinity, PerkPatchMath.ShotOverheat(float.PositiveInfinity));
     }
 
     [Fact]
