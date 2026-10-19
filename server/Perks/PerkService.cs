@@ -261,7 +261,14 @@ public class PerkService(
                 return new PerkState { Error = "DataLoadFailed" };
             }
 
-            return action(profile, data, GetPrestigeLevel(profile));
+            // 베타: 무료 리롤을 늘 가득 채워 둔다. 화면의 프레스티지 단계는 실제 값 (PerkBeta)
+            if (PerkBeta.Enabled && data.Rerolls.FreeLeft < Config.FreeRerolls)
+            {
+                data.Rerolls.FreeLeft = Config.FreeRerolls;
+            }
+
+            var state = action(profile, data, GetPrestigeLevel(profile));
+            return PerkBeta.Enabled ? state with { PrestigeLevel = GetRealPrestigeLevel(profile) } : state;
         }
     }
 
@@ -316,5 +323,8 @@ public class PerkService(
         return profile.CharacterData?.PmcData?.Info is not null;
     }
 
-    private static int GetPrestigeLevel(SptProfile profile) => profile.CharacterData?.PmcData?.Info?.PrestigeLevel ?? 0;
+    /// <summary>슬롯·특전 계산에 쓰는 단계. 베타는 6 (<see cref="PerkBeta"/>).</summary>
+    private static int GetPrestigeLevel(SptProfile profile) => PerkBeta.Level(GetRealPrestigeLevel(profile));
+
+    private static int GetRealPrestigeLevel(SptProfile profile) => profile.CharacterData?.PmcData?.Info?.PrestigeLevel ?? 0;
 }

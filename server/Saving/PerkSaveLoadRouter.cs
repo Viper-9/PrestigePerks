@@ -41,6 +41,6 @@ public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataS
         }
 
         var data = store.Get(profileId.Value);
-        PerkBonusApplier.Apply(pmc, PerkRules.ActivePerks(data, pmc.Info.PrestigeLevel ?? 0));
+        PerkBonusApplier.Apply(pmc, PerkRules.ActivePerks(data, PerkBeta.Level(pmc.Info.PrestigeLevel ?? 0)));
     }
 }

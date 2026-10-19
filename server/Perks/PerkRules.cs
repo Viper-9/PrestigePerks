@@ -144,7 +144,11 @@ public static class PerkRules
         var cost = NextRerollCost(config, prestigeLevel, data);
         if (data.Rerolls.FreeLeft > 0)
         {
-            data.Rerolls.FreeLeft--;
+            // 베타: 무료 리롤이 줄지 않는다 (PerkBeta)
+            if (!PerkBeta.Enabled)
+            {
+                data.Rerolls.FreeLeft--;
+            }
         }
         else
         {

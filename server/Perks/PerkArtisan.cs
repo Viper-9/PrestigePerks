@@ -45,7 +45,7 @@ public static class PerkArtisan
         lock (store.GetLock(id))
         {
             var data = store.Get(id);
-            return !data.LoadFailed && PerkRules.ActivePerks(data, pmc.Info.PrestigeLevel ?? 0).Contains(Perk);
+            return !data.LoadFailed && PerkRules.ActivePerks(data, PerkBeta.Level(pmc.Info.PrestigeLevel ?? 0)).Contains(Perk);
         }
     }
 }

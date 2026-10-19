@@ -18,6 +18,11 @@
     <DefineConstants>$(DefineConstants);DEV_COMMANDS</DefineConstants>
   </PropertyGroup>
 
+  <!-- 베타 배포용 임시 규칙 (Perks\PerkBeta.cs): 슬롯 6개, 리롤 무제한. dotnet build -p:Beta=true (package.ps1 -Beta, deploy-dev.ps1 -Beta) -->
+  <PropertyGroup Condition="'$(Beta)' == 'true'">
+    <DefineConstants>$(DefineConstants);BETA</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="SPTushonka.Common" Version="4.1.5" />
     <PackageReference Include="SPTushonka.DI" Version="4.1.5" />

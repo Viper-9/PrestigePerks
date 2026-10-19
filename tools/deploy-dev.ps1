@@ -5,7 +5,8 @@
 #
 #   .\tools\deploy-dev.ps1               서버 + 클라
 #   .\tools\deploy-dev.ps1 -ServerOnly   서버만 (게임을 켜 둔 채 서버만 다시 올릴 때)
-param([switch]$ServerOnly)
+#   .\tools\deploy-dev.ps1 -Beta         베타 임시 규칙(슬롯 6개, 리롤 무제한)을 켠 서버
+param([switch]$ServerOnly, [switch]$Beta)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -20,7 +21,7 @@ if (-not $ServerOnly) { $running += @(Get-Process -Name 'EscapeFromTarkov' -Erro
 if ($running) { throw "먼저 종료하세요: $(($running | ForEach-Object ProcessName | Sort-Object -Unique) -join ', ')" }
 
 # ---------------------------------------------------------------- server
-dotnet build (Join-Path $root 'server\PrestigePerks.Server.csproj') -c Dev
+dotnet build (Join-Path $root 'server\PrestigePerks.Server.csproj') -c Dev -p:Beta=$(if ($Beta) { 'true' } else { 'false' })
 if ($LASTEXITCODE -ne 0) { throw 'server build failed' }
 $serverOut = Join-Path $root 'server\bin\Dev\PrestigePerks'
 $serverDest = Join-Path $spt 'SPT_Runtime\user\mods\PrestigePerks'

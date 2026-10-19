@@ -1,6 +1,7 @@
 ﻿# 배포 zip 만들기. SPT 설치 폴더에 그대로 풀면 되는 구조로 묶는다.
 #   .\tools\package.ps1        상용: 서버 Release (개발용 명령 없음). 명령 코드가 섞여 있으면 멈춘다
 #   .\tools\package.ps1 -Dev   테스터용: 서버 Dev (개발용 명령 포함) + 테스터 도구(PrestigePerks-dev-tools/). zip 이름 끝에 -dev
+#   .\tools\package.ps1 -Beta  베타: 서버에 임시 규칙(슬롯 6개, 리롤 무제한, server\Perks\PerkBeta.cs)을 켠다. zip 이름 끝에 -beta
 #   dist\<ModName>-<버전>.zip
 #     SPT_Runtime/user/mods/<ModName>/...   서버 모드 (DLL + Data, bundles 등)
 #     BepInEx/plugins/<ModName>/...         클라 플러그인 DLL
@@ -8,7 +9,7 @@
 # 클라 빌드에 게임 DLL 이 필요하면 SptRoot 가 잡혀 있어야 한다 (이 저장소는 PrestigePerks.local.props).
 #
 # 다른 모드에 쓸 때는 아래 설정 블록만 고친다. 경로는 모두 저장소 루트 기준.
-param([switch]$Dev)
+param([switch]$Dev, [switch]$Beta)
 $ErrorActionPreference = 'Stop'
 
 # ---------------------------------------------------------------- 설정
@@ -51,9 +52,10 @@ if ($RunTests) {
 }
 dotnet build $slnPath -c Release
 if ($LASTEXITCODE -ne 0) { throw 'build failed' }
-if ($Dev) {
-    dotnet build (Join-Path $root $ServerProject) -c Dev
-    if ($LASTEXITCODE -ne 0) { throw 'dev server build failed' }
+if ($Dev -or $Beta) {
+    # 서버만 다시 빌드한다 (-Dev: 개발용 명령, -Beta: 베타 임시 규칙)
+    dotnet build (Join-Path $root $ServerProject) -c $(if ($Dev) { 'Dev' } else { 'Release' }) -p:Beta=$(if ($Beta) { 'true' } else { 'false' })
+    if ($LASTEXITCODE -ne 0) { throw 'server build failed' }
 }
 
 # 2) 빌드 결과 검사
@@ -110,7 +112,7 @@ if ($Dev) {
 }
 
 # 4) zip (항목 경로는 '/' — PowerShell 5.1 Compress-Archive 는 '\' 를 써서 리눅스 도구가 한 파일 이름으로 읽는다)
-$zip = Join-Path $dist "$ModName-$version$(if ($Dev) { '-dev' }).zip"
+$zip = Join-Path $dist "$ModName-$version$(if ($Dev) { '-dev' })$(if ($Beta) { '-beta' }).zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::Open($zip, 'Create')
