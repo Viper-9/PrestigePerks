@@ -17,7 +17,7 @@ public sealed record PerkBonus(string Id, BonusType Type, double Value, BonusSki
 public sealed record PerkDefinition(int Number, string Key, PerkKind Kind, IReadOnlyList<PerkBonus> Bonuses);
 
 /// <summary>
-/// 특전 19개 정의 (dev-docs 2_특전.md 3절, 6절).
+/// 특전 20개 정의 (dev-docs 2_특전.md 3절, 6절).
 /// 번호와 Bonus ID 는 한 번 정하면 바꾸거나 재사용하지 않는다. 테스트가 값을 고정한다.
 /// </summary>
 public static class PerkCatalog
@@ -34,22 +34,23 @@ public static class PerkCatalog
         Bonus(8, "scav", new PerkBonus("bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -25)),
         Patch(9, "porter"),
         Patch(10, "stamina"),
-        Patch(11, "strong_bones"),
-        Patch(12, "hemostasis"),
+        Patch(11, "tough"), // 골절·출혈. 12번(출혈)을 합쳤다 (2026-10-19)
         Patch(14, "control"),
-        Patch(15, "maintenance"),
+        Patch(15, "maintenance"), // 무기·방어구 내구도. 28번(방어구)을 합쳤다 (2026-10-19)
         Patch(16, "temperance"),
         Patch(17, "artisan"),
         Patch(24, "mastery"),
         Patch(25, "loading"),
         Patch(26, "search"),
         Patch(27, "surgeon"),
-        Patch(28, "armor"),
         Patch(29, "reload"),
+        Patch(30, "handling"),
+        Patch(31, "reliability"),
+        Patch(32, "agility"),
     ];
 
     /// <summary>제외·통합한 번호. 다시 쓰지 않는다.</summary>
-    public static IReadOnlyList<int> RetiredNumbers { get; } = [5, 6, 7, 13, 18, 19, 20, 21, 22, 23];
+    public static IReadOnlyList<int> RetiredNumbers { get; } = [5, 6, 7, 12, 13, 18, 19, 20, 21, 22, 23, 28];
 
     /// <summary>삭제한 Bonus 특전의 ID. 예전 파일에 남아 있을 수 있어 저장·로드 때 계속 걸러 낸다.</summary>
     public static IReadOnlyList<string> RetiredBonusIds { get; } = [];

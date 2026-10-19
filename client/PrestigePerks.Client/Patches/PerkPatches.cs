@@ -9,6 +9,7 @@ using EFT.InventoryLogic;
 using HarmonyLib;
 using PrestigePerks.Game;
 using PrestigePerks.Model;
+using UnityEngine;
 
 namespace PrestigePerks.Patches
 {
@@ -47,7 +48,7 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>10 체력: 다리 스태미나 최대치에 <c>baseValue × 0.2</c>를 더한다 (지구력 버프 +0.2). baseValue 는 SVM 이 바꾼 Stamina.Capacity 다.</summary>
+    /// <summary>10 체력: 다리 스태미나 최대치에 <c>baseValue × 0.15</c>를 더한다 (지구력 버프 +0.15). baseValue 는 SVM 이 바꾼 Stamina.Capacity 다.</summary>
     [HarmonyPatch]
     internal static class StaminaCapacityPatch
     {
@@ -78,7 +79,7 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>16 절제: 레이드 중 에너지·수분 초당 소모 ×0.75. 소유자는 Effect.HealthController(ActiveHealthController).Player.</summary>
+    /// <summary>16 절제: 레이드 중 에너지·수분 초당 소모 ×0.85. 소유자는 Effect.HealthController(ActiveHealthController).Player.</summary>
     [HarmonyPatch]
     internal static class ExistenceDamagePatch
     {
@@ -180,7 +181,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 26 수색: 속도 ×1.3. 속도는 비동기 SearchContent 안에서 <c>1 + 주의력 (+ 수색)</c>으로 계산되어 인자로 바꿀 수 없다 (transpiler 금지).
+    /// 26 수색: 속도 ×1.2. 속도는 비동기 SearchContent 안에서 <c>1 + 주의력 (+ 수색)</c>으로 계산되어 인자로 바꿀 수 없다 (transpiler 금지).
     /// 두 값은 SearchContent 만 읽으므로(IInventoryProfileSkillInfo) getter 를 고쳐 두 식 모두 ×1.3이 되게 한다. 판정은 SkillManager == PMC.Skills (= _profile).
     /// </summary>
     [HarmonyPatch]
@@ -243,12 +244,14 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 11 강골·12 지혈 (바깥): PMC 본인이 맞는 동안 골절·출혈 판정 설정 객체를 정적 필드에 둔다. 안쪽 Try 패치는 이 객체와 같을 때만 cap 을 ÷0.75 한다.
+    /// 11 강인 (바깥): PMC 본인이 맞는 동안 골절·출혈 판정 설정 객체를 정적 필드에 둔다. 안쪽 Try 패치는 이 객체와 같을 때만 cap 을 ÷0.85 한다.
     /// 같은 설정 객체를 봇도 쓰므로 범위가 필요하다. 이벤트 안에서 다른 플레이어가 맞는 중첩 호출에 대비해 이전 값을 __state 로 되돌린다.
     /// </summary>
     [HarmonyPatch]
     internal static class ApplyDamageScopePatch
     {
+        private const int Perk = 11;
+
         internal static EffectsSettings.ProbabilitySetting FractureFall, FractureBullet, HeavyBleeding, LightBleeding;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(ActiveHealthController), nameof(ActiveHealthController.ApplyDamage));
@@ -257,9 +260,7 @@ namespace PrestigePerks.Patches
         {
             __state = new Scope(FractureFall, FractureBullet, HeavyBleeding, LightBleeding);
             FractureFall = FractureBullet = HeavyBleeding = LightBleeding = null;
-            var bones = PerkEffects.Has(11);
-            var bleed = PerkEffects.Has(12);
-            if (!bones && !bleed)
+            if (!PerkEffects.Has(Perk))
             {
                 return;
             }
@@ -272,22 +273,15 @@ namespace PrestigePerks.Patches
                 }
 
                 var effects = Singleton<GlobalConfiguration>.Instance.Health.Effects;
-                if (bones)
-                {
-                    FractureFall = effects.Fracture.FallingProbability;
-                    FractureBullet = effects.Fracture.BulletHitProbability;
-                }
-
-                if (bleed)
-                {
-                    HeavyBleeding = effects.HeavyBleeding.Probability;
-                    LightBleeding = effects.LightBleeding.Probability;
-                }
+                FractureFall = effects.Fracture.FallingProbability;
+                FractureBullet = effects.Fracture.BulletHitProbability;
+                HeavyBleeding = effects.HeavyBleeding.Probability;
+                LightBleeding = effects.LightBleeding.Probability;
             }
             catch (Exception e)
             {
                 FractureFall = FractureBullet = HeavyBleeding = LightBleeding = null;
-                PerkEffects.Disable(bones ? 11 : 12, e);
+                PerkEffects.Disable(Perk, e);
             }
         }
 
@@ -314,7 +308,7 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>11·12 (안쪽): 바깥에서 둔 골절·출혈 설정 객체의 판정이면 cap ÷0.75 (확률 ×0.75). 그 외 Try 는 그대로.</summary>
+    /// <summary>11 (안쪽): 바깥에서 둔 골절·출혈 설정 객체의 판정이면 cap ÷0.85 (확률 ×0.85). 그 외 Try 는 그대로. 둘 다 11번으로 센다.</summary>
     [HarmonyPatch]
     internal static class ProbabilityTryPatch
     {
@@ -327,17 +321,12 @@ namespace PrestigePerks.Patches
                 return;
             }
 
-            if (ReferenceEquals(__instance, ApplyDamageScopePatch.FractureBullet) || ReferenceEquals(__instance, ApplyDamageScopePatch.FractureFall))
+            if (ReferenceEquals(__instance, ApplyDamageScopePatch.FractureBullet) || ReferenceEquals(__instance, ApplyDamageScopePatch.FractureFall)
+                || ReferenceEquals(__instance, ApplyDamageScopePatch.HeavyBleeding) || ReferenceEquals(__instance, ApplyDamageScopePatch.LightBleeding))
             {
                 var before = cap;
                 cap = PerkPatchMath.ChanceCap(cap);
                 PerkEffects.Record(11, before, cap);
-            }
-            else if (ReferenceEquals(__instance, ApplyDamageScopePatch.HeavyBleeding) || ReferenceEquals(__instance, ApplyDamageScopePatch.LightBleeding))
-            {
-                var before = cap;
-                cap = PerkPatchMath.ChanceCap(cap);
-                PerkEffects.Record(12, before, cap);
             }
         }
     }
@@ -407,7 +396,113 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>15 정비: 사격 시 무기 내구도 손실 ×0.75. 손실은 <c>× (1 − skillWeaponTreatmentFactor)</c>라 인자를 바꾼다. 판정은 무기 소유자 ID.</summary>
+    /// <summary>
+    /// 30 조작: 레이드 인체공학에 고정 +5. 조준 속도·흔들림·팔 스태미나에만 쓰이고 무기 정보 화면 숫자는 바닐라처럼 그대로다.
+    /// 결과는 _deferredErgonomic 캐시 값이라 무기·장비·스킬이 바뀔 때만 다시 계산된다. 팔 부상이면 바닐라가 0을 돌려주므로 그대로 둔다.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class ErgonomicsPatch
+    {
+        private const int Perk = 30;
+
+        private const EPhysicalCondition ArmDamaged = EPhysicalCondition.LeftArmDamaged | EPhysicalCondition.RightArmDamaged;
+
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(Player.FirearmController), nameof(Player.FirearmController.TotalErgonomicsFunc));
+
+        private static void Postfix(Player.FirearmController __instance, ref float __result)
+        {
+            if (!PerkEffects.Has(Perk))
+            {
+                return;
+            }
+
+            try
+            {
+                var player = __instance._player;
+                if (PerkTarget.IsPmc(player) && !player.MovementContext.PhysicalConditionContainsAny(ArmDamaged))
+                {
+                    var before = __result;
+                    __result = PerkPatchMath.Ergonomics(__result);
+                    PerkEffects.Record(Perk, before, __result);
+                }
+            }
+            catch (Exception e)
+            {
+                PerkEffects.Disable(Perk, e);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 31 신뢰성 (고장): 사격 고장 확률 ×0.8. 합계와 원인별 확률(out)을 같이 줄여 GetMalfunctionState 의 원인·종류 분포는 바닐라와 같다.
+    /// 바닐라는 내구도 93~100% 에서 내구도·탄약·탄창 확률을 0 으로 만들므로 그때는 과열 고장만 남는다.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class MalfunctionChancePatch
+    {
+        private const int Perk = 31;
+
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(Player.FirearmController), nameof(Player.FirearmController.GetTotalMalfunctionChance));
+
+        private static void Postfix(Player.FirearmController __instance, ref double durabilityMalfChance, ref float magMalfChance, ref float ammoMalfChance, ref float overheatMalfChance, ref float __result)
+        {
+            if (!PerkEffects.Has(Perk) || !(__result > 0f))
+            {
+                return;
+            }
+
+            try
+            {
+                if (PerkTarget.IsPmc(__instance._player))
+                {
+                    var before = __result;
+                    durabilityMalfChance = PerkPatchMath.Malfunction(durabilityMalfChance);
+                    magMalfChance = PerkPatchMath.Malfunction(magMalfChance);
+                    ammoMalfChance = PerkPatchMath.Malfunction(ammoMalfChance);
+                    overheatMalfChance = PerkPatchMath.Malfunction(overheatMalfChance);
+                    __result = PerkPatchMath.Malfunction(__result);
+                    PerkEffects.Record(Perk, before, __result);
+                }
+            }
+            catch (Exception e)
+            {
+                PerkEffects.Disable(Perk, e);
+            }
+        }
+    }
+
+    /// <summary>31 신뢰성 (과열): 발당 과열 ×0.8. Weapon.OnShot 만 부른다 (그 밖은 디버그 창). 판정은 무기 소유자 ID.</summary>
+    [HarmonyPatch]
+    internal static class ShotOverheatPatch
+    {
+        private const int Perk = 31;
+
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(Weapon), nameof(Weapon.GetShotOverheat));
+
+        private static void Postfix(Weapon __instance, ref float __result)
+        {
+            if (!PerkEffects.Has(Perk))
+            {
+                return;
+            }
+
+            try
+            {
+                if (PerkTarget.IsPmcOwnerId(__instance.Owner?.ID))
+                {
+                    var before = __result;
+                    __result = PerkPatchMath.ShotOverheat(__result);
+                    PerkEffects.Record(Perk, before, __result);
+                }
+            }
+            catch (Exception e)
+            {
+                PerkEffects.Disable(Perk, e);
+            }
+        }
+    }
+
+    /// <summary>15 정비 (무기): 사격 시 무기 내구도 손실 ×0.8. 손실은 <c>× (1 − skillWeaponTreatmentFactor)</c>라 인자를 바꾼다. 판정은 무기 소유자 ID.</summary>
     [HarmonyPatch]
     internal static class WeaponShotWearPatch
     {
@@ -438,11 +533,14 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>28 방탄: 방어구 내구도 감소 ×0.8. 총탄(ApplyDamage)과 폭발(ApplyExplosionDurabilityDamage) 모두 이 함수를 지난다. 판정은 방어구 소유자 ID.</summary>
+    /// <summary>
+    /// 15 정비 (방어구): 방어구 내구도 감소 ×0.8. 총탄(ApplyDamage)과 폭발(ApplyExplosionDurabilityDamage) 모두 이 함수를 지난다. 판정은 방어구 소유자 ID.
+    /// 예전 28번(방탄)을 합쳤다 (2026-10-19).
+    /// </summary>
     [HarmonyPatch]
     internal static class ArmorWearPatch
     {
-        private const int Perk = 28;
+        private const int Perk = 15;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(ArmorComponent), nameof(ArmorComponent.ApplyDurabilityDamage));
 
@@ -460,6 +558,44 @@ namespace PrestigePerks.Patches
                     var before = armorDamage;
                     armorDamage = PerkPatchMath.ArmorDamage(armorDamage);
                     PerkEffects.Record(Perk, before, armorDamage);
+                }
+            }
+            catch (Exception e)
+            {
+                PerkEffects.Disable(Perk, e);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 32 기동: 서서 걷기(Run)·전력질주(Sprint) 중 이번 프레임 수평 이동량 ×1.05. 바닐라와 OldTarkovMovement 상태 모두 이 함수로 이동한다
+    /// (ClientPlayerMovementContext 는 base 를 부른다). 점프·넘기·엎드리기·낙하는 상태가 달라 빠진다. 수직(중력)은 그대로.
+    /// 근력처럼 애니메이터 Speed·SprintSpeed 를 올리는 방식은 값만 오르고 실제 속도는 1% 안팎이라 쓰지 않는다 (2026-10-19 은신처 측정).
+    /// 애니메이션은 그대로라 발이 5% 미끄러지지만 눈에 띄지 않는다. 게임 속도 상한(CharacterController.SpeedLimit)은 그대로 적용된다.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class MoveSpeedPatch
+    {
+        private const int Perk = 32;
+
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(MovementContext), nameof(MovementContext.ApplyMotion), new[] { typeof(Vector3), typeof(float) });
+
+        private static void Prefix(MovementContext __instance, ref Vector3 motion)
+        {
+            if (!PerkEffects.Has(Perk))
+            {
+                return;
+            }
+
+            try
+            {
+                var state = __instance.CurrentState?.Name ?? EPlayerState.None;
+                if ((state == EPlayerState.Run || state == EPlayerState.Sprint) && PerkTarget.IsPmc(__instance.SkillManager))
+                {
+                    var before = motion.x;
+                    motion.x = PerkPatchMath.MoveDistance(motion.x);
+                    motion.z = PerkPatchMath.MoveDistance(motion.z);
+                    PerkEffects.Record(Perk, before, motion.x);
                 }
             }
             catch (Exception e)
@@ -508,7 +644,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 27 군의관 (안쪽): 파괴된 부위에 수술 키트를 쓸 때(바닐라 조건과 같음) 효과 시간에 <c>(1 + s) ÷ (1 + s + 0.2)</c>.
+    /// 27 군의관 (안쪽): 파괴된 부위에 수술 키트를 쓸 때(바닐라 조건과 같음) 효과 시간에 <c>(1 + s) ÷ (1 + s + 0.15)</c>.
     /// bodyPart 인자는 DoMedEffect 가 고른 실제 부위다.
     /// </summary>
     [HarmonyPatch]
@@ -546,7 +682,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 25 장전: 삽탄·탄 빼기 1발 시간 ×0.85. 시간은 비동기 LoadMagazine/UnloadMagazine 의 지역 변수라 그 값을 받는 Process 생성자에서 바꾼다.
+    /// 25 장전: 삽탄·탄 빼기 1발 시간 ×0.9. 시간은 비동기 LoadMagazine/UnloadMagazine 의 지역 변수라 그 값을 받는 Process 생성자에서 바꾼다.
     /// ContinuousLoadAmmo 도 같은 LoadMagazine 을 불러 같이 적용된다. 판정은 인자 InventoryController.ID.
     /// </summary>
     [HarmonyPatch]

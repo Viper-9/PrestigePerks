@@ -32,8 +32,12 @@ public class Plugin : BaseUnityPlugin
         PatchOne(harmony, typeof(Patches.ProbabilityTryPatch));
         PatchOne(harmony, typeof(Patches.RecoilSuppressionPatch));
         PatchOne(harmony, typeof(Patches.ReloadSpeedPatch));
+        PatchOne(harmony, typeof(Patches.ErgonomicsPatch));
+        PatchOne(harmony, typeof(Patches.MalfunctionChancePatch));
+        PatchOne(harmony, typeof(Patches.ShotOverheatPatch));
         PatchOne(harmony, typeof(Patches.WeaponShotWearPatch));
         PatchOne(harmony, typeof(Patches.ArmorWearPatch));
+        PatchOne(harmony, typeof(Patches.MoveSpeedPatch));
         PatchOne(harmony, typeof(Patches.MagazineLoadTimePatch));
         PatchOne(harmony, typeof(Patches.MedEffectScopePatch));
         PatchOne(harmony, typeof(Patches.SurgeryTimePatch));

@@ -9,20 +9,24 @@ namespace PrestigePerks.Model
     /// </summary>
     public static class PerkPatchMath
     {
-        /// <summary>특전 번호로 찾는 배열 크기. 가장 큰 번호 29.</summary>
-        public const int Size = 30;
+        /// <summary>특전 번호로 찾는 배열 크기. 가장 큰 번호 32.</summary>
+        public const int Size = 33;
 
         public const float PorterWeight = 0.15f;      // 9: 근력 버프에 +0.15
         public const float StaminaBuff = 0.15f;       // 10: 지구력 버프에 +0.15
         public const float ConsumptionFactor = 0.85f; // 16: 에너지·수분 소모 ×0.85
         public const float MasteringFactor = 1.2f;    // 24: 숙련도 증가 ×1.2
         public const float SearchFactor = 1.2f;       // 26: 수색 속도 ×1.2
-        public const float ChanceFactor = 0.75f;      // 11·12: 골절·출혈 확률 ×0.75
+        public const float ChanceFactor = 0.85f;      // 11: 골절·출혈 확률 ×0.85
         public const float RecoilBuff = 0.05f;        // 14: 무기 종류 스킬 반동 버프 x 에 +0.05
-        public const float WeaponWearFactor = 0.75f;  // 15: 사격 시 무기 내구도 손실 ×0.75
+        public const float WeaponWearFactor = 0.8f;   // 15: 사격 시 무기 내구도 손실 ×0.8
         public const float LoadTimeFactor = 0.9f;     // 25: 삽탄·탄 빼기 1발 시간 ×0.9
-        public const float ArmorWearFactor = 0.8f;    // 28: 방어구 내구도 감소 ×0.8
+        public const float ArmorWearFactor = 0.8f;    // 15: 방어구 내구도 감소 ×0.8 (28번을 합쳤다)
         public const float ReloadFactor = 1.1f;       // 29: 재장전 애니메이션 속도 ×1.1
+        public const float ErgonomicsPoints = 5f;     // 30: 레이드 인체공학에 고정 +5
+        public const float MalfunctionFactor = 0.8f;  // 31: 사격 고장 확률 ×0.8
+        public const float OverheatFactor = 0.8f;     // 31: 발당 과열 ×0.8
+        public const float MoveSpeedFactor = 1.05f;   // 32: 걷기·전력질주 이동량 ×1.05
 
         /// <summary>14: x 상한. 반동 힘 <c>1 − x − 0.1y</c>가 0 이하로 가지 않게.</summary>
         public const float MaxRecoilBuff = 0.8f;
@@ -81,7 +85,7 @@ namespace PrestigePerks.Model
         }
 
         /// <summary>
-        /// 11·12: 바닐라 판정 <c>Random(0, cap) &lt; 확률</c>의 cap 을 ÷0.75 한다 (확률 ×0.75). cap 은 <c>1 + 스킬 버프</c>.
+        /// 11: 바닐라 판정 <c>Random(0, cap) &lt; 확률</c>의 cap 을 ÷0.85 한다 (확률 ×0.85). cap 은 <c>1 + 스킬 버프</c>.
         /// </summary>
         public static float ChanceCap(float vanilla)
         {
@@ -97,7 +101,7 @@ namespace PrestigePerks.Model
         }
 
         /// <summary>
-        /// 15: 손실은 <c>… × (1 − f)</c>다 (Weapon.GetDurabilityLossOnShot). <c>(1 − f') = (1 − f) × 0.75</c>가 되게 f 를 바꾼다.
+        /// 15: 손실은 <c>… × (1 − f)</c>다 (Weapon.GetDurabilityLossOnShot). <c>(1 − f') = (1 − f) × 0.8</c>가 되게 f 를 바꾼다.
         /// </summary>
         public static float WeaponTreatmentFactor(float vanilla)
         {
@@ -108,7 +112,7 @@ namespace PrestigePerks.Model
         /// <summary>25: 탄 1발 대기 시간 ×0.9.</summary>
         public static float LoadOneAmmoSpeed(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * LoadTimeFactor : vanilla;
 
-        /// <summary>28: 방어구 내구도 감소량 ×0.8. 바닐라가 앞에서 최소 1을 적용한다.</summary>
+        /// <summary>15: 방어구 내구도 감소량 ×0.8. 바닐라가 앞에서 최소 1을 적용한다.</summary>
         public static float ArmorDamage(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * ArmorWearFactor : vanilla;
 
         /// <summary>29: 재장전 애니메이션 속도 ×1.1.</summary>
@@ -147,6 +151,24 @@ namespace PrestigePerks.Model
 
             return MinCraftSeconds / baseTime;
         }
+
+        /// <summary>
+        /// 30: 레이드 인체공학(FirearmController.TotalErgonomicsFunc 결과, 0 이상)에 고정 +5.
+        /// 배율이면 반동을 잡으려고 인체공학을 버린 총에서 효과가 거의 없어 고정값으로 한다 (dev-docs 기록/특전_최종_검수.md 1.2절).
+        /// </summary>
+        public static float Ergonomics(float vanilla) => vanilla >= 0f && Finite(vanilla) ? vanilla + ErgonomicsPoints : vanilla;
+
+        /// <summary>31: 고장 확률 ×0.8. 합계와 원인별 확률에 같은 배율을 써서 원인 분포는 바닐라와 같다.</summary>
+        public static float Malfunction(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * MalfunctionFactor : vanilla;
+
+        /// <summary>31: 내구도 고장 확률(double) ×0.8.</summary>
+        public static double Malfunction(double vanilla) => vanilla > 0d && !double.IsNaN(vanilla) && !double.IsInfinity(vanilla) ? vanilla * MalfunctionFactor : vanilla;
+
+        /// <summary>31: 발당 과열 ×0.8.</summary>
+        public static float ShotOverheat(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * OverheatFactor : vanilla;
+
+        /// <summary>32: 걷기·전력질주 프레임 이동량(수평 성분 하나) ×1.05.</summary>
+        public static float MoveDistance(float vanilla) => Finite(vanilla) ? vanilla * MoveSpeedFactor : vanilla;
 
         private static float Positive(float value, float vanilla) => Finite(value) && value > 0f ? value : vanilla;
 

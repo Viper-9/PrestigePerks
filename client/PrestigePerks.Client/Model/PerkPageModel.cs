@@ -24,7 +24,7 @@ namespace PrestigePerks.Model
         public const int MaxSlots = 6;
 
         /// <summary>목록에 보여 줄 특전 번호 (server PerkCatalog.Numbers 와 같아야 한다. 테스트가 확인).</summary>
-        public static readonly int[] AllPerks = { 1, 2, 3, 4, 8, 9, 10, 11, 12, 14, 15, 16, 17, 24, 25, 26, 27, 28, 29 };
+        public static readonly int[] AllPerks = { 1, 2, 3, 4, 8, 9, 10, 11, 14, 15, 16, 17, 24, 25, 26, 27, 29, 30, 31, 32 };
 
         public static RollBlock CheckRoll(PerkStateDto state, int inventoryCoins, bool busy)
         {
