@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PrestigePerks.Prestiges;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Helpers.Server;
@@ -21,6 +22,8 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
 
     public PerkConfig Config => config.Value.Perks;
 
+    public PrestigeConfig Prestige => config.Value.Prestige;
+
     private static ModConfig Load(ISptLogger<PerkConfigLoader> logger, ModHelper modHelper)
     {
         var path = Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PerkConfigLoader).Assembly), "config", FileName);
@@ -42,17 +45,24 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
         return new ModConfig();
     }
 
-    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 잘못된 항목은 기본값으로 바꾼다.</summary>
+    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige)마다 검사해 잘못된 항목만 기본값으로 바꾼다.</summary>
     internal static ModConfig Validated(ModConfig config, Action<string> warn)
     {
         var perks = (config.Perks ?? new PerkConfig()).Clamped(warn);
+        var prestige = config.Prestige ?? new PrestigeConfig();
         if (perks.Validate() is { } perkError)
         {
             warn($"{perkError}. perks 항목은 기본값을 씁니다");
             perks = new PerkConfig();
         }
 
-        return config with { Perks = perks };
+        if (prestige.Validate() is { } prestigeError)
+        {
+            warn($"{prestigeError}. prestige 항목은 기본값을 씁니다");
+            prestige = new PrestigeConfig();
+        }
+
+        return config with { Perks = perks, Prestige = prestige };
     }
 
     internal static ModConfig ParseModConfig(string json) => JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig();
