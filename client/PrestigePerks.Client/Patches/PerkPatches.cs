@@ -182,7 +182,7 @@ namespace PrestigePerks.Patches
 
     /// <summary>
     /// 26 수색: 속도 ×1.2. 속도는 비동기 SearchContent 안에서 <c>1 + 주의력 (+ 수색)</c>으로 계산되어 인자로 바꿀 수 없다 (transpiler 금지).
-    /// 두 값은 SearchContent 만 읽으므로(IInventoryProfileSkillInfo) getter 를 고쳐 두 식 모두 ×1.3이 되게 한다. 판정은 SkillManager == PMC.Skills (= _profile).
+    /// 두 값은 SearchContent 만 읽으므로(IInventoryProfileSkillInfo) getter 를 고쳐 두 식 모두 ×1.2가 되게 한다. 판정은 SkillManager == PMC.Skills (= _profile).
     /// </summary>
     [HarmonyPatch]
     internal static class AttentionLootSpeedPatch
