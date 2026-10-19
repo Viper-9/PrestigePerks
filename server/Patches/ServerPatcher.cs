@@ -4,11 +4,11 @@ using SPTarkov.DI.Annotations;
 
 namespace PrestigePerks.Patches;
 
-/// <summary>17번 장인 서버 패치 등록. 하나가 실패해도 나머지는 걸리도록 클래스마다 따로 등록한다.</summary>
+/// <summary>서버 Harmony 패치 등록 (17번 장인). 하나가 실패해도 나머지는 걸리도록 클래스마다 따로 등록한다.</summary>
 [Injectable(InjectionType.Singleton)]
-public class ArtisanPatcher(ISptLogger<ArtisanPatcher> logger)
+public class ServerPatcher(ISptLogger<ServerPatcher> logger)
 {
-    private static ISptLogger<ArtisanPatcher>? log;
+    private static ISptLogger<ServerPatcher>? log;
     private static readonly HashSet<string> Failed = [];
 
     private static readonly Type[] Patches =

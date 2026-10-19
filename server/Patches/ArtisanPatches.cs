@@ -10,7 +10,7 @@ using SPTarkov.Server.Core.Services.Hideout;
 namespace PrestigePerks.Patches;
 
 // 17번 장인 서버 패치 (dev-docs 2_특전.md 6절 "17번 장인"). 요청한 PMC 프로필의 특전으로 판단한다.
-// 클라이언트처럼 패치 클래스마다 따로 등록하고 (ArtisanPatcher), 예외가 나면 바닐라 값을 그대로 둔다.
+// 클라이언트처럼 패치 클래스마다 따로 등록하고 (ServerPatcher), 예외가 나면 바닐라 값을 그대로 둔다.
 
 /// <summary>일반·연속 제작: GetAdjustedCraftTimeWithSkills 결과 ×0.8, 최소 5초. 비트코인 레시피는 바닐라처럼 제외한다.</summary>
 [HarmonyPatch]
@@ -29,7 +29,7 @@ internal static class CraftTimePatch
         }
         catch (Exception e)
         {
-            ArtisanPatcher.Fail(nameof(CraftTimePatch), e);
+            ServerPatcher.Fail(nameof(CraftTimePatch), e);
         }
     }
 }
@@ -51,7 +51,7 @@ internal static class ScavCaseTimePatch
         }
         catch (Exception e)
         {
-            ArtisanPatcher.Fail(nameof(ScavCaseTimePatch), e);
+            ServerPatcher.Fail(nameof(ScavCaseTimePatch), e);
         }
     }
 }
@@ -73,7 +73,7 @@ internal static class CultistCircleTimePatch
         }
         catch (Exception e)
         {
-            ArtisanPatcher.Fail(nameof(CultistCircleTimePatch), e);
+            ServerPatcher.Fail(nameof(CultistCircleTimePatch), e);
         }
     }
 }
@@ -100,7 +100,7 @@ internal static class BitcoinFarmScopePatch
         }
         catch (Exception e)
         {
-            ArtisanPatcher.Fail(nameof(BitcoinFarmScopePatch), e);
+            ServerPatcher.Fail(nameof(BitcoinFarmScopePatch), e);
         }
     }
 
