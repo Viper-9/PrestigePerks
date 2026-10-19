@@ -25,7 +25,7 @@
   "ui.rollFree": "{0} free left",
   "ui.rollPaid": "{0} coins",
   "ui.shake": "Shake!",
-  "ui.shakeSub": "Reel about to stop · {0}% chance of one more",
+  "ui.shakeSub": "{0}% chance of one more",
   "ui.shaken": "Shaken",
   "ui.rolling": "Rolling…",
   "ui.close": "Close",

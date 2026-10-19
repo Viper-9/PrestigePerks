@@ -11,7 +11,7 @@ using UnityEngine.UI;
 namespace PrestigePerks.UI
 {
     /// <summary>
-    /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 A안): 위 특전 19개 목록, 아래 슬롯 1~6 릴, 오른쪽 코인·리롤.
+    /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 A안): 위 특전 20개 목록, 아래 슬롯 1~6 릴, 오른쪽 코인·리롤.
     /// 그리기만 하고 서버 호출은 <see cref="PerkController"/> 가 한다. 열 때마다 화면 크기에 맞춰 다시 만든다.
     /// </summary>
     internal sealed class PerkPage : MonoBehaviour
@@ -141,11 +141,11 @@ namespace PrestigePerks.UI
 
             var top = HeaderHeight + 18;
             var leftWidth = width - 2 * Pad - RightWidth - Gap;
-            BuildCatalog(Pad, top, leftWidth);
+            BuildCatalog(Pad, top, leftWidth, ReferenceHeight - inset);
             BuildSide(Pad + leftWidth + Gap, top);
         }
 
-        private void BuildCatalog(float x, float y, float width)
+        private void BuildCatalog(float x, float y, float width, float height)
         {
             SectionHeader(x, y, width, $"{locale.Get("ui.list")} · {PerkPageModel.AllPerks.Length}",
                 $"<color=#{ColorUtility.ToHtmlStringRGB(UiKit.Gold)}>■</color> {locale.Get("ui.legendOwned")}   <color=#{ColorUtility.ToHtmlStringRGB(UiKit.Lock)}>■</color> {locale.Get("ui.legendLocked")}");
@@ -171,7 +171,8 @@ namespace PrestigePerks.UI
             var detailY = gridY + rows * (CellHeight + CellGap) + 4;
             detailLabel = UiKit.Label(root, "Detail", x, detailY, width, 26, hint, 14, UiKit.Muted, TextAlignmentOptions.Left);
 
-            var slotsY = detailY + 40;
+            // 슬롯은 화면 아래에 붙인다 (작업 표시줄 위). 화면이 낮으면 설명 줄 바로 아래
+            var slotsY = Mathf.Max(detailY + 40, height - Pad - 36 - ReelHeight);
             SectionHeader(x, slotsY, width, locale.Get("ui.slots"), "");
             var reelWidth = (width - (PerkPageModel.MaxSlots - 1) * ReelGap) / PerkPageModel.MaxSlots;
             for (var i = 0; i < PerkPageModel.MaxSlots; i++)
@@ -293,7 +294,7 @@ namespace PrestigePerks.UI
             var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
             enter.callback.AddListener(_ =>
             {
-                detailLabel.text = $"<b>{locale.PerkName(perk)}</b> — {locale.PerkEffect(perk)} · {locale.PerkDetail(perk)}";
+                detailLabel.text = $"<b>{locale.PerkName(perk)}</b> — {locale.PerkEffect(perk)}";
                 detailLabel.color = UiKit.Text;
             });
             var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };

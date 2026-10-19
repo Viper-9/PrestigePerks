@@ -25,7 +25,7 @@
   "ui.rollFree": "무료 {0}회 남음",
   "ui.rollPaid": "{0} 코인",
   "ui.shake": "흔들기!",
-  "ui.shakeSub": "멈추려는 릴 · {0}% 확률로 한 칸 더",
+  "ui.shakeSub": "{0}% 확률로 한 칸 더",
   "ui.shaken": "흔들었습니다",
   "ui.rolling": "추첨 중…",
   "ui.close": "닫기",
