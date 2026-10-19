@@ -2,7 +2,7 @@
 
 A prestige overhaul for SPT 4.1.x. Each prestige makes your next run a little stronger instead of just wiping it.
 
-Work in progress.
+**In development.** A beta of the perk system is available in [Releases](https://github.com/Viper-9/PrestigePerks/releases).
 
 ## Planned
 
@@ -18,14 +18,3 @@ Work in progress.
 - [Content Backport - Prestiges](https://github.com/ArchangelWTF/ContentBackportPrestiges) 1.1.0+
 - WTT-CommonLib 3.x (server and client)
 - WTT-ContentBackport 2.0.x (server and client)
-
-## Building
-
-1. Copy `PrestigePerks.local.props.example` to `PrestigePerks.local.props` and set `SptRoot` to your SPT folder.
-2. `dotnet build PrestigePerks.slnx`
-
-## Testing
-
-Tester builds (`tools/package.ps1 -Dev`, `PrestigePerks-<version>-dev.zip`) include dev chat commands (`prestige coin`, `prestige perk ...`) and a profile tool to set the prestige level. See [TESTING.md](TESTING.md) (Korean).
-Release builds (`tools/package.ps1`) do not contain the dev commands.
-
