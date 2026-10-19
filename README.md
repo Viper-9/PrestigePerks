@@ -18,3 +18,10 @@ A prestige overhaul for SPT 4.1.x. Each prestige makes your next run a little st
 - [Content Backport - Prestiges](https://github.com/ArchangelWTF/ContentBackportPrestiges) 1.1.0+
 - WTT-CommonLib 3.x (server and client)
 - WTT-ContentBackport 2.0.x (server and client)
+
+## Compatibility
+
+- SVM and Skills Extended work alongside. Their effects stack with the perks.
+  - Skills Extended: once Shadow Connections is elite, the Scav cooldown perk has no effect.
+  - SVM: with `WeaponHeatOff` on, the overheat half of the Reliability perk does nothing.
+- Fika and Realism are not supported.
