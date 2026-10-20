@@ -1,10 +1,13 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Comfort.Common;
 using EFT;
 using EFT.UI;
+using EFT.UI.DragAndDrop;
 using PrestigePerks.Model;
+using UnityEngine;
 
 namespace PrestigePerks.Game
 {
@@ -33,6 +36,34 @@ namespace PrestigePerks.Game
             {
                 Log.Warn($"coin count failed: {e.Message}");
                 return 0;
+            }
+        }
+
+        private static Sprite coinIcon;
+
+        /// <summary>프레스티지 코인 아이템 아이콘 (게임이 모델로 그린다). 인벤토리에 코인이 없으면 null.</summary>
+        public static async Task<Sprite> CoinIcon()
+        {
+            if (coinIcon != null)
+            {
+                return coinIcon;
+            }
+
+            try
+            {
+                var coin = Profile?.Inventory?.GetAllItemByTemplate(CoinTemplateId).FirstOrDefault();
+                if (coin == null)
+                {
+                    return null;
+                }
+
+                coinIcon = await ItemViewFactory.GetItemSpriteAsync(coin, 2);
+                return coinIcon;
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"coin icon failed: {e.Message}");
+                return null;
             }
         }
 

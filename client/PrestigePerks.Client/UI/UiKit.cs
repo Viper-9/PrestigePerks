@@ -7,22 +7,20 @@ namespace PrestigePerks.UI
     /// <summary>런타임 Unity UI 를 만드는 도우미. 좌표는 부모 왼쪽 위 기준 (x 오른쪽, y 아래쪽).</summary>
     internal static class UiKit
     {
-        // 게임은 선형 색공간이라 알파 248 도 밝은 글자가 비쳐 보인다. 불투명하게 둔다
-        public static readonly Color Screen = new Color32(12, 14, 14, 255);
-        public static readonly Color Header = new Color32(10, 12, 12, 255);
-        public static readonly Color Panel = new Color32(18, 21, 20, 255);
-        public static readonly Color Panel2 = new Color32(25, 29, 27, 255);
-        public static readonly Color ReelBg = new Color32(11, 13, 12, 255);
-        public static readonly Color Line = new Color32(42, 47, 44, 255);
-        public static readonly Color Line2 = new Color32(58, 64, 60, 255);
-        public static readonly Color Text = new Color32(217, 214, 198, 255);
-        public static readonly Color Muted = new Color32(134, 138, 128, 255);
-        public static readonly Color Dim = new Color32(85, 90, 84, 255);
-        public static readonly Color Gold = new Color32(201, 181, 124, 255);
-        public static readonly Color Lock = new Color32(126, 165, 193, 255);
-        public static readonly Color Coin = new Color32(121, 184, 134, 255);
+        // 타르코프 화면 색 (특전 페이지 목업 2안)
+        public static readonly Color Text = new Color32(214, 216, 210, 255);
+        public static readonly Color Muted = new Color32(138, 144, 146, 255);
+        public static readonly Color Dim = new Color32(88, 94, 97, 255);
+        public static readonly Color Line = new Color32(52, 60, 64, 255);
+        public static readonly Color Gold = new Color32(226, 172, 72, 255);
+        public static readonly Color GoldHi = new Color32(238, 196, 110, 255);
+
+        /// <summary>효과 수치: 장착, 미장착.</summary>
+        public static readonly Color Green = new Color32(146, 192, 84, 255);
+        public static readonly Color GreenDim = new Color32(112, 140, 80, 255);
+
         public static readonly Color Bad = new Color32(207, 106, 92, 255);
-        public static readonly Color Dark = new Color32(16, 18, 16, 255);
+        public static readonly Color Dark = new Color32(18, 20, 21, 255);
 
         /// <summary>게임 글꼴. 작업 표시줄 버튼 글자에서 가져온다 (언어별 대체 글꼴은 게임이 관리).</summary>
         public static TMP_FontAsset Font;
@@ -62,32 +60,50 @@ namespace PrestigePerks.UI
             return image;
         }
 
-        /// <summary>테두리 상자: 바깥 Image 가 테두리 색, 안쪽 Image 가 바탕. 안쪽을 돌려준다.</summary>
-        public static (Image Border, RectTransform Inner) Box(Transform parent, string name, float x, float y, float width, float height, Color border, Color fill, float thickness = 1)
+        /// <summary>스프라이트 그림. type 이 Sliced 면 스프라이트 테두리(9-slice)를, Tiled 면 바둑판으로 깐다.</summary>
+        public static Image Sprite(RectTransform rect, Sprite sprite, Color color, UnityEngine.UI.Image.Type type = UnityEngine.UI.Image.Type.Simple)
         {
-            var outer = Rect(parent, name, x, y, width, height);
-            var borderImage = Image(outer, border);
-            var inner = Fill(outer, "Inner", thickness);
-            Image(inner, fill);
-            return (borderImage, inner);
-        }
-
-        public static TextMeshProUGUI Label(Transform parent, string name, float x, float y, float width, float height, string text, float size, Color color,
-            TextAlignmentOptions align = TextAlignmentOptions.TopLeft, FontStyles style = FontStyles.Normal)
-        {
-            // 게임 한글 글꼴은 줄 높이가 커서 칸이 글자 크기의 1.6배보다 낮으면 TMP Ellipsis 가 줄을 통째로 지운다. 칸을 위아래로 넓힌다
-            var minHeight = size * 1.6f;
-            if (height < minHeight)
+            var image = Image(rect, color);
+            image.sprite = sprite;
+            image.type = type;
+            if (type == UnityEngine.UI.Image.Type.Sliced)
             {
-                y -= (minHeight - height) / 2;
-                height = minHeight;
+                image.fillCenter = true;
             }
 
-            var rect = Rect(parent, name, x, y, width, height);
-            return Label(rect, text, size, color, align, style);
+            return image;
         }
 
-        public static TextMeshProUGUI Label(RectTransform rect, string text, float size, Color color, TextAlignmentOptions align = TextAlignmentOptions.TopLeft, FontStyles style = FontStyles.Normal)
+        /// <summary>1px 테두리.</summary>
+        public static Image Outline(RectTransform parent, Color color)
+        {
+            var image = Sprite(Fill(parent, "Outline"), PerkSprites.Outline, color, UnityEngine.UI.Image.Type.Sliced);
+            image.fillCenter = false;
+            return image;
+        }
+
+        /// <summary>
+        /// 글자. y 는 글자 줄의 세로 가운데다 (목업 좌표와 같은 기준). 칸 높이는 글자 크기의 1.6배로 잡는다:
+        /// 게임 한글 글꼴은 줄 높이가 커서 칸이 그보다 낮으면 TMP Ellipsis 가 줄을 통째로 지운다.
+        /// align 은 가로만 고른다 (Left, Center, Right).
+        /// </summary>
+        public static TextMeshProUGUI Label(Transform parent, string name, float x, float centerY, float width, string text, float size, Color color,
+            TextAlignmentOptions align = TextAlignmentOptions.Left, FontStyles style = FontStyles.Normal)
+        {
+            var height = size * 1.6f;
+            if (align == TextAlignmentOptions.Right)
+            {
+                x -= width;
+            }
+            else if (align == TextAlignmentOptions.Center)
+            {
+                x -= width / 2;
+            }
+
+            return Label(Rect(parent, name, x, centerY - height / 2, width, height), text, size, color, align, style);
+        }
+
+        public static TextMeshProUGUI Label(RectTransform rect, string text, float size, Color color, TextAlignmentOptions align = TextAlignmentOptions.Left, FontStyles style = FontStyles.Normal)
         {
             var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
             if (Font != null)
@@ -101,26 +117,30 @@ namespace PrestigePerks.UI
             label.alignment = align;
             label.fontStyle = style;
             label.raycastTarget = false;
-            label.enableWordWrapping = true;
+            label.enableWordWrapping = false;
             label.overflowMode = TextOverflowModes.Ellipsis;
+            label.richText = true;
             return label;
         }
 
-        /// <summary>테두리 있는 버튼. 글자를 돌려준다.</summary>
-        public static (Button Button, Image Border, Image Fill, TextMeshProUGUI Label) Button(Transform parent, string name, float x, float y, float width, float height,
-            string text, float size, Color border, Color fill, Color textColor)
+        /// <summary>글자 폭 (한 줄).</summary>
+        public static float Width(TextMeshProUGUI label, string text) => label.GetPreferredValues(text).x;
+
+        /// <summary>그림 버튼. target 이 눌리는 그림이고, 마우스를 올리면 밝아진다.</summary>
+        public static Button Button(Image target)
         {
-            var (borderImage, inner) = Box(parent, name, x, y, width, height, border, fill);
-            borderImage.raycastTarget = true;
-            var button = borderImage.gameObject.AddComponent<Button>();
-            button.targetGraphic = borderImage;
+            target.raycastTarget = true;
+            var button = target.gameObject.AddComponent<Button>();
+            button.targetGraphic = target;
             var colors = button.colors;
-            colors.highlightedColor = new Color(1.25f, 1.25f, 1.25f, 1);
-            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1);
-            colors.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.6f);
+            colors.normalColor = new Color(0.9f, 0.9f, 0.9f, 1);
+            colors.highlightedColor = Color.white;
+            colors.selectedColor = new Color(0.9f, 0.9f, 0.9f, 1);
+            colors.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1);
+            colors.disabledColor = Color.white;
+            colors.fadeDuration = 0.08f;
             button.colors = colors;
-            var label = Label(Fill(inner, "Label", 2), text, size, textColor, TextAlignmentOptions.Center, FontStyles.Bold);
-            return (button, borderImage, inner.GetComponent<Image>(), label);
+            return button;
         }
     }
 }
