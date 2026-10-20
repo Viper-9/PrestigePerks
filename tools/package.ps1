@@ -27,6 +27,12 @@ $ServerRequired    = @('bundles\prestige_coin.bundle')            # 출력에 �
 # 클라 플러그인. 클라가 없으면 @()
 $ClientDlls = @('client\PrestigePerks.Client\bin\Release\netstandard2.1\PrestigePerks.Client.dll')
 
+# 클라 DLL 에 리소스로 넣는 그림 (특전 페이지). 폴더의 PNG 마다 DLL 에 '<앞부분><파일 이름>' 리소스가 있어야 한다. 없으면 @{}
+$ClientResources = @{
+    'client\PrestigePerks.Client\Assets\Icons'   = 'PrestigePerks.Icons.'
+    'client\PrestigePerks.Client\Assets\Sprites' = 'PrestigePerks.Sprites.'
+}
+
 # 상용 빌드 서버 DLL 에 있으면 안 되는 형식 이름 (개발용 명령)
 $DevOnlyTypes = @('PrestigeCommandoCommand')
 
@@ -80,6 +86,16 @@ if ($ServerOut) {
 $clientPaths = @($ClientDlls | ForEach-Object { Join-Path $root $_ })
 foreach ($dll in $clientPaths) {
     if (-not (Test-Path $dll)) { throw "클라 DLL 이 없습니다: $dll" }
+}
+if ($ClientResources.Count -gt 0) {
+    # 그림은 파일로 따로 배포하지 않고 DLL 에 넣는다. 빠진 그림이 없는지 리소스 이름으로 확인한다
+    $clientText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($clientPaths[0]))
+    foreach ($folder in $ClientResources.Keys) {
+        foreach ($png in Get-ChildItem (Join-Path $root $folder) -Filter *.png) {
+            $name = $ClientResources[$folder] + $png.Name
+            if (-not $clientText.Contains($name)) { throw "클라 DLL 에 그림 리소스가 없습니다: $name" }
+        }
+    }
 }
 
 # 3) zip 내용 모으기
