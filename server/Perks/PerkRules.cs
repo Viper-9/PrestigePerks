@@ -22,7 +22,7 @@ public enum PerkError
     CostChanged,
     /// <summary>개발용 무료 리롤 명령인데 무료 횟수가 없다.</summary>
     NoFreeRerolls,
-    /// <summary>흔들 리롤이 없다 (이미 흔들었거나, 시간이 지났거나, 리롤하지 않았다).</summary>
+    /// <summary>흔들 리롤이 없다 (이미 흔들었거나, 시간이 지났거나, 리롤하지 않았거나, 슬롯을 여러 개 돌렸다).</summary>
     NoShake,
     /// <summary>모르는 특전 번호 (개발용 set 명령).</summary>
     UnknownPerk,
@@ -158,6 +158,13 @@ public static class PerkRules
         // 단계보다 뒤의 슬롯(단계가 내려간 경우)은 효과가 없지만 겹치지 않게 후보에서 뺀다
         Redraw(data.Slots.Take(prestigeLevel).ToList(), random, data.Slots.Skip(prestigeLevel).Select(slot => slot.Perk));
         return new RollOutcome(PerkError.None, cost);
+    }
+
+    /// <summary>흔들 수 있는 슬롯: 리롤에서 돌린(잠그지 않은) 슬롯이 하나뿐일 때 그 슬롯. 둘 이상이면 흔들 수 없다 (null).</summary>
+    public static int? ShakeSlot(PerkData data, int prestigeLevel)
+    {
+        var rolled = ActiveSlots(data, prestigeLevel).Select((slot, index) => (slot, index)).Where(pair => !pair.slot.Locked).Select(pair => pair.index).ToList();
+        return rolled.Count == 1 ? rolled[0] : null;
     }
 
     /// <summary>잠그지 않은 슬롯을 다시 뽑는다. 잠근 특전은 빠지고, 잠그지 않은 이전 특전은 다시 나올 수 있다.</summary>

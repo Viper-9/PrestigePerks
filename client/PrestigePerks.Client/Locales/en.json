@@ -19,6 +19,7 @@
   "ui.shake": "Shake!",
   "ui.shakeSub": "{0}% chance of one more",
   "ui.shaken": "Shaken",
+  "ui.shakeOneSlot": "Only when rolling one slot",
   "ui.rolling": "Rolling…",
   "ui.close": "Back",
   "ui.loading": "Loading…",

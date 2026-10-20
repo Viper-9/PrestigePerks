@@ -64,6 +64,8 @@ namespace PrestigePerks.UI
         private readonly Dictionary<int, Spin> spinning = new Dictionary<int, Spin>();
         private readonly System.Random random = new System.Random();
         private bool shakeReady, shakeUsed, shakeShown;
+        // 슬롯 하나만 돌린 리롤만 흔들 수 있다 (서버도 같은 규칙)
+        private bool shakeAllowed;
         private double shakeChance;
 
         private enum SpinPhase
@@ -408,7 +410,7 @@ namespace PrestigePerks.UI
                 }
 
                 var target = ShakeTarget();
-                if (!shakeReady || shakeUsed || target < 0)
+                if (!CanShake || target < 0)
                 {
                     return;
                 }
@@ -667,13 +669,16 @@ namespace PrestigePerks.UI
             return best;
         }
 
+        private bool CanShake => shakeAllowed && shakeReady && !shakeUsed;
+
         private void RenderShake()
         {
-            var available = shakeReady && !shakeUsed && ShakeTarget() >= 0;
+            var available = CanShake && ShakeTarget() >= 0;
             shakeShown = available;
             SetRollLook(available ? ButtonLook.Shake : ButtonLook.Disabled);
             rollLabel.text = locale.Get("ui.shake");
-            rollSub.text = shakeUsed ? locale.Get("ui.shaken")
+            rollSub.text = !shakeAllowed ? locale.Get("ui.shakeOneSlot")
+                : shakeUsed ? locale.Get("ui.shaken")
                 : shakeReady ? locale.Format("ui.shakeSub", Mathf.RoundToInt((float)(shakeChance * 100)))
                 : locale.Get("ui.rolling");
         }
@@ -761,7 +766,8 @@ namespace PrestigePerks.UI
         public void StartSpin(IEnumerable<int> slots)
         {
             var now = Time.unscaledTime;
-            foreach (var slot in slots)
+            var list = slots.ToList();
+            foreach (var slot in list)
             {
                 var reel = reels[slot];
                 var spin = new Spin { Started = now };
@@ -773,6 +779,7 @@ namespace PrestigePerks.UI
                 DrawStrip(reel, spin);
             }
 
+            shakeAllowed = list.Count == 1;
             shakeReady = false;
             shakeUsed = false;
             RenderShake();
@@ -826,7 +833,7 @@ namespace PrestigePerks.UI
                 }
             }
 
-            if (spinning.Count > 0 && shakeShown != (shakeReady && !shakeUsed && ShakeTarget() >= 0))
+            if (spinning.Count > 0 && shakeShown != (CanShake && ShakeTarget() >= 0))
             {
                 RenderShake();
             }

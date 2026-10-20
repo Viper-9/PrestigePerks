@@ -37,10 +37,10 @@ public class PerkService(
 #endif
 
     /// <summary>
-    /// 흔들 수 있는 리롤: 리롤한 시각과 돌린(잠기지 않은) 슬롯. 리롤마다 한 번, <see cref="PerkConfig.ShakeWindowSeconds"/> 안에만.
+    /// 흔들 수 있는 리롤: 리롤한 시각과 돌린 슬롯 (하나만 돌린 리롤만, <see cref="PerkRules.ShakeSlot"/>). 리롤마다 한 번, <see cref="PerkConfig.ShakeWindowSeconds"/> 안에만.
     /// 릴이 도는 몇 초 동안만 의미가 있어 저장하지 않는다 (서버를 다시 켜면 사라진다).
     /// </summary>
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<MongoId, (DateTime At, HashSet<int> Slots)> pendingShakes = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<MongoId, (DateTime At, int Slot)> pendingShakes = new();
 
     private PerkConfig Config => configLoader.Config;
 
@@ -136,7 +136,7 @@ public class PerkService(
     }
 
     /// <summary>
-    /// 흔들기: 직전 리롤에서 돌린 슬롯 하나(멈추려는 릴)를 확률로 한 칸 더(다음 칸 특전) 보내거나, 드물게 리버스(다른 특전)한다.
+    /// 흔들기: 직전 리롤에서 하나만 돌린 슬롯(멈추려는 릴)을 확률로 한 칸 더(다음 칸 특전) 보내거나, 드물게 리버스(다른 특전)한다.
     /// 리롤마다 한 번, <see cref="PerkConfig.ShakeWindowSeconds"/> 안에만.
     /// </summary>
     public PerkState Shake(MongoId sessionId, int slotIndex, int nextPerk) =>
@@ -144,7 +144,7 @@ public class PerkService(
         {
             if (!pendingShakes.TryRemove(sessionId, out var pending)
                 || DateTime.UtcNow - pending.At > TimeSpan.FromSeconds(Config.ShakeWindowSeconds)
-                || !pending.Slots.Contains(slotIndex))
+                || pending.Slot != slotIndex)
             {
                 return BuildState(data, level, PerkError.NoShake);
             }
@@ -161,10 +161,17 @@ public class PerkService(
             return BuildState(data, level) with { ShakeOutcome = outcome.ToString() };
         });
 
+    // 슬롯 하나만 돌린 리롤만 흔들 수 있다. 여러 개 돌렸으면 직전 리롤의 흔들기도 지운다
     private void OfferShake(MongoId sessionId, PerkData data, int level)
     {
-        var rolled = PerkRules.ActiveSlots(data, level).Select((slot, index) => (slot, index)).Where(pair => !pair.slot.Locked).Select(pair => pair.index).ToHashSet();
-        pendingShakes[sessionId] = (DateTime.UtcNow, rolled);
+        if (PerkRules.ShakeSlot(data, level) is int slot)
+        {
+            pendingShakes[sessionId] = (DateTime.UtcNow, slot);
+        }
+        else
+        {
+            pendingShakes.TryRemove(sessionId, out _);
+        }
     }
 
     /// <summary>개발용: 슬롯에 특전을 직접 넣는다 (특전 효과를 비교해 보려고). 다른 슬롯에 있던 특전이면 서로 바꾼다.</summary>

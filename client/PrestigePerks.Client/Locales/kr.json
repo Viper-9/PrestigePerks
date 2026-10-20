@@ -19,6 +19,7 @@
   "ui.shake": "흔들기!",
   "ui.shakeSub": "{0}% 확률로 한 칸 더",
   "ui.shaken": "흔들었습니다",
+  "ui.shakeOneSlot": "슬롯 1개만 돌릴 때 가능",
   "ui.rolling": "추첨 중…",
   "ui.close": "뒤로",
   "ui.loading": "불러오는 중…",
