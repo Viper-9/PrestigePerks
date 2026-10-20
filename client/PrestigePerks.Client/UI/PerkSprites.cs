@@ -24,14 +24,6 @@ namespace PrestigePerks.UI
 
         public static Sprite Lock => Load("Sprites.Seasons_PerkTemplate_Icon-lock", true);
 
-        /// <summary>슬롯 카드 틀과 리롤 대상 틀 (9-slice, 테두리 40).</summary>
-        /// <summary>RewardFrame 은 아래 그림자 때문에 오른쪽 아래 사선이 아래에서 46px 위부터 시작한다. 사선이 가운데 조각으로 늘어나 휘지 않게 아래 테두리를 50 으로 잡는다.</summary>
-        public static Sprite RewardFrame => Load("Sprites.Prestige_RewardFrame", false, border: new Vector4(40, 50, 40, 40));
-        public static Sprite RewardSelected => Load("Sprites.Prestige_RewardSelected", false, border: new Vector4(40, 40, 40, 40));
-
-        /// <summary>카드 틀 안쪽 모양 (잘린 모서리 포함, RewardSelected 와 같은 크기). 카드 바탕을 이 모양으로 가린다.</summary>
-        public static Sprite RewardFill => Load("Sprites.Prestige_RewardFill", false, border: new Vector4(40, 40, 40, 40));
-
         /// <summary>
         /// 슬롯 육각 배지: 안쪽 바탕, 한 겹 틀(흰색, 색을 입혀 쓴다), 틀 바깥 빛(흰색, 틀보다 1.3배). 목업 1안 모양을
         /// 게임 그림(94px)을 늘리면 흐려서 4배 크기로 다시 그렸다 (tools/draw-hex-badge.py).
