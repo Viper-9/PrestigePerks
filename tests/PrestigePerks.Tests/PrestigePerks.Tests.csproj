@@ -28,6 +28,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Compile Include="..\..\client\PrestigePerks.Client\Model\*.cs" Link="ClientModel\%(Filename)%(Extension)" />
     <None Include="..\..\client\PrestigePerks.Client\Locales\*.json" Link="ClientLocales\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\client\PrestigePerks.Client\Assets\Icons\*.png" Link="ClientIcons\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- 개발용 명령은 서버 Dev 빌드에만 들어가므로 (상용 Release 에는 없음) 소스를 직접 가져와 이 테스트 어셈블리에서 컴파일한다 -->

@@ -146,6 +146,15 @@ public class ClientModelTests
     }
 
     [Fact]
+    public void Every_perk_has_an_icon()
+    {
+        foreach (var perk in PerkCatalog.Numbers)
+        {
+            Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "ClientIcons", $"perk_{perk}.png")), $"perk_{perk}.png");
+        }
+    }
+
+    [Fact]
     public void Locale_files_have_the_same_keys()
     {
         Assert.Equal(LocaleFile("en").Keys.Order(), LocaleFile("kr").Keys.Order());
