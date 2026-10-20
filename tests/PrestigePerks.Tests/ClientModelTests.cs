@@ -75,6 +75,22 @@ public class ClientModelTests
     }
 
     [Fact]
+    public void Reads_the_slot_and_shake_flags()
+    {
+        // SPT JsonUtil 은 정적 옵션을 고쳐 다른 테스트와 겹치므로 System.Text.Json 으로 직접 쓴다
+        var server = new PerkState { PrestigeLevel = 2, ShakeEnabled = false, SlotOpensAt = new PerkConfig().SlotOpensAt(2) };
+        var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(server))!;
+        Assert.False(state.ShakeEnabled);
+        Assert.Null(PerkPageModel.OpensAt(state, 1));
+        Assert.Equal(3, PerkPageModel.OpensAt(state, 2));
+        Assert.Equal(6, PerkPageModel.OpensAt(state, 5));
+        Assert.Null(PerkPageModel.OpensAt(state, 6));
+
+        // 값이 없으면 흔들기는 켜진 것으로 본다
+        Assert.True(PerkStateDto.Parse("""{ "prestigeLevel": 1 }""")!.ShakeEnabled);
+    }
+
+    [Fact]
     public void Error_responses_parse()
     {
         var state = PerkStateDto.Parse("""{ "prestigeLevel": 0, "slots": null, "error": "NoSlots" }""")!;

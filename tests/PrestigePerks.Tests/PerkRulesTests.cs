@@ -382,4 +382,148 @@ public class PerkRulesTests
         Assert.NotNull((Config with { ShakeChance = 0.6, ShakeReverseChance = 0.5 }).Validate());
         Assert.NotNull((Config with { ShakeWindowSeconds = 0 }).Validate());
     }
+
+    [Fact]
+    public void Slot_flags_set_the_slot_count_per_prestige_level()
+    {
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 6], Enumerable.Range(0, 8).Select(Config.Slots));
+        var allSix = Config with { PrestigeLevel1Slots = 6 };
+        Assert.Equal(6, allSix.Slots(1));
+        Assert.Equal(2, allSix.Slots(2));
+    }
+
+    [Fact]
+    public void Slot_flags_open_that_many_slots_on_entering_a_level()
+    {
+        var config = Config with { PrestigeLevel1Slots = 6 };
+        var data = new PerkData();
+        PerkRules.EnterLevel(data, 1, config, new Random(3));
+        Assert.Equal(6, data.Slots.Count);
+        Assert.Equal(6, data.Slots.Select(slot => slot.Perk).Distinct().Count());
+        Assert.Equal(6, PerkRules.ActivePerks(data, config.Slots(1)).Count);
+    }
+
+    [Fact]
+    public void Fewer_slots_keep_the_extra_perks_but_only_the_open_ones_count_and_reroll()
+    {
+        var config = Config with { PrestigeLevel3Slots = 1 };
+        var data = WithSlots(1, 4, 8);
+        data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 1 };
+        Assert.Equal([1], PerkRules.ActivePerks(data, config.Slots(3)));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetLock(data, config.Slots(3), 1, true));
+
+        Assert.True(PerkRules.Roll(data, 3, config, new Random(5)).Success);
+        Assert.DoesNotContain(data.Slots[0].Perk, new[] { 4, 8 });
+        Assert.Equal([4, 8], data.Slots.Skip(1).Select(slot => slot.Perk));
+    }
+
+    [Fact]
+    public void Zero_slots_block_the_roll()
+    {
+        var data = WithSlots(1, 4);
+        data.Rerolls = new PerkRerolls { Level = 2, FreeLeft = 3 };
+        Assert.Equal(PerkError.NoSlots, PerkRules.Roll(data, 2, Config with { PrestigeLevel2Slots = 0 }, new Random(1)).Error);
+    }
+
+    [Fact]
+    public void Free_rerolls_flag_refills_on_a_new_level_and_zero_means_paid_from_the_start()
+    {
+        var data = new PerkData();
+        PerkRules.EnterLevel(data, 1, Config with { FreeRerolls = 10 }, new Random(1));
+        Assert.Equal(10, data.Rerolls.FreeLeft);
+
+        var paid = new PerkData();
+        var config = Config with { FreeRerolls = 0 };
+        PerkRules.EnterLevel(paid, 1, config, new Random(1));
+        Assert.Equal(0, paid.Rerolls.FreeLeft);
+        Assert.Equal(25, PerkRules.NextRerollCost(config, 1, paid));
+    }
+
+    [Fact]
+    public void Out_of_range_slot_and_free_reroll_flags_clamp_to_the_nearest_end()
+    {
+        var warnings = new List<string>();
+        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig("""
+            { "perks": { "freeRerolls": 150, "prestigeLevel1Slots": -3, "prestigeLevel2Slots": 0, "prestigeLevel6Slots": 10 } }
+            """), warnings.Add).Perks;
+
+        Assert.Equal(99, config.FreeRerolls);
+        Assert.Equal([0, 0, 3, 4, 5, 6], Enumerable.Range(1, 6).Select(config.Slots));
+        Assert.Equal(3, warnings.Count);
+        Assert.Equal(0, (Config with { FreeRerolls = -1 }).Clamped(_ => { }).FreeRerolls);
+        Assert.Null(config.Validate());
+    }
+
+    [Fact]
+    public void Closed_slots_show_the_next_level_that_opens_them()
+    {
+        Assert.Equal([null, null, 3, 4, 5, 6], Config.SlotOpensAt(2));
+        Assert.Equal([1, 2, 3, 4, 5, 6], Config.SlotOpensAt(0));
+        Assert.All(Config.SlotOpensAt(6), Assert.Null);
+
+        // P1 6슬롯, P2 3슬롯: P2 의 뒤 3칸은 더 높은 단계에서 열린다. P3~ 도 3이면 열리지 않는다
+        var config = Config with { PrestigeLevel1Slots = 6, PrestigeLevel2Slots = 3, PrestigeLevel3Slots = 3, PrestigeLevel4Slots = 3, PrestigeLevel5Slots = 3, PrestigeLevel6Slots = 5 };
+        Assert.Equal([null, null, null, 6, 6, null], config.SlotOpensAt(2));
+    }
+
+    [Fact]
+    public void Shipped_config_keeps_the_default_slot_and_shake_flags()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "config", PerkConfigLoader.FileName);
+        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(File.ReadAllText(path)), warning => Assert.Fail(warning)).Perks;
+        Assert.Equal([1, 2, 3, 4, 5, 6], Enumerable.Range(1, 6).Select(config.Slots));
+        Assert.Equal(3, config.FreeRerolls);
+        Assert.True(config.ShakeEnabled);
+    }
+
+    [Fact]
+    public void Raising_free_rerolls_in_the_same_level_adds_only_the_difference()
+    {
+        var data = new PerkData();
+        PerkRules.EnterLevel(data, 2, Config, new Random(1));
+        data.Rerolls.FreeLeft = 0; // 3회를 다 썼다
+
+        Assert.True(PerkRules.EnterLevel(data, 2, Config with { FreeRerolls = 99 }, new Random(1)).Changed);
+        Assert.Equal(96, data.Rerolls.FreeLeft);
+        Assert.Equal(99, data.Rerolls.FreeGranted);
+        // 같은 설정이면 다시 늘지 않는다
+        Assert.False(PerkRules.EnterLevel(data, 2, Config with { FreeRerolls = 99 }, new Random(1)).Changed);
+        Assert.Equal(96, data.Rerolls.FreeLeft);
+    }
+
+    [Fact]
+    public void Lowering_then_raising_free_rerolls_never_gives_more_than_the_setting_minus_used()
+    {
+        var data = new PerkData();
+        PerkRules.EnterLevel(data, 1, Config, new Random(1));
+        data.Rerolls.FreeLeft = 2; // 3회 중 1회 썼다
+
+        PerkRules.EnterLevel(data, 1, Config with { FreeRerolls = 1 }, new Random(1));
+        Assert.Equal(0, data.Rerolls.FreeLeft);
+        PerkRules.EnterLevel(data, 1, Config, new Random(1));
+        Assert.Equal(2, data.Rerolls.FreeLeft); // 3회 중 1회 쓴 그대로
+    }
+
+    [Fact]
+    public void Data_without_free_granted_counts_as_the_default_three()
+    {
+        var data = WithSlots(1, 4);
+        data.Rerolls = new PerkRerolls { Level = 2, FreeLeft = 0 };
+        Assert.False(PerkRules.EnterLevel(data, 2, Config, new Random(1)).Changed);
+        Assert.Null(data.Rerolls.FreeGranted);
+
+        PerkRules.EnterLevel(data, 2, Config with { FreeRerolls = 5 }, new Random(1));
+        Assert.Equal(2, data.Rerolls.FreeLeft);
+    }
+
+    [Fact]
+    public void A_new_level_refills_to_the_setting_and_records_it()
+    {
+        var data = WithSlots(1);
+        data.Rerolls = new PerkRerolls { Level = 1, FreeLeft = 0, FreeGranted = 3, Paid = 4 };
+        PerkRules.EnterLevel(data, 2, Config with { FreeRerolls = 7 }, new Random(1));
+        Assert.Equal(7, data.Rerolls.FreeLeft);
+        Assert.Equal(7, data.Rerolls.FreeGranted);
+        Assert.Equal(0, data.Rerolls.Paid);
+    }
 }
