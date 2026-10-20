@@ -57,6 +57,9 @@ namespace PrestigePerks.Model
         /// <summary>슬롯 칸 상태: 열림(보유 특전), 아직 닫힘(다음 단계에서 열림).</summary>
         public static bool IsSlotOpen(PerkStateDto state, int index) => state != null && index >= 0 && index < state.Slots.Count;
 
+        /// <summary>닫힌 칸이 열리는 단계 (서버 config 의 단계별 슬롯 수로 정한다). 더 높은 단계에서도 열리지 않으면 null.</summary>
+        public static int? OpensAt(PerkStateDto state, int index) =>
+            state?.SlotOpensAt != null && index >= 0 && index < state.SlotOpensAt.Count ? state.SlotOpensAt[index] : null;
         /// <summary>특전 번호 → 들어 있는 슬롯 번호 (0 부터). 없으면 -1.</summary>
         public static int SlotOf(PerkStateDto state, int perk)
         {

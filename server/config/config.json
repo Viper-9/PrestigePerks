@@ -7,9 +7,19 @@
     "paidCostGrowth": 2,
     // 이 회차부터 유료 비용이 고정된다
     "paidCostCapRound": 3,
-    // 프레스티지 단계마다 주는 무료 리롤 횟수 (잠금 개수와 상관없이 무료). 프레스티지하면 다시 채운다
+    // 프레스티지 단계마다 주는 무료 리롤 횟수 (0~99, 잠금 개수와 상관없이 무료). 프레스티지하면 다시 채운다. 0 이면 처음부터 코인 리롤
     "freeRerolls": 3,
-    // 흔들기: 리롤 중 멈추려는 릴에 한 번 누를 수 있다. 이 확률로 한 칸 더 가서 다음 칸 특전이 된다 (0~1)
+    // 프레스티지 단계마다 열리는 특전 슬롯 수 (0~6). 예: prestigeLevel1Slots 를 6 으로 하면 P1 부터 6슬롯
+    // 범위를 벗어나면 가까운 끝값으로 맞춘다 (음수 → 0, 7 이상 → 6). 슬롯을 줄이면 뒤 슬롯의 특전은 남아 있고 효과만 꺼진다
+    "prestigeLevel1Slots": 1,
+    "prestigeLevel2Slots": 2,
+    "prestigeLevel3Slots": 3,
+    "prestigeLevel4Slots": 4,
+    "prestigeLevel5Slots": 5,
+    "prestigeLevel6Slots": 6,
+    // 흔들기 켜기/끄기 (true/false). 끄면 리롤 중 흔들기 버튼이 나오지 않는다
+    "shakeEnabled": true,
+    // 흔들기: 슬롯 하나만 돌리는 리롤에서 멈추려는 릴에 한 번 누를 수 있다. 이 확률로 한 칸 더 가서 다음 칸 특전이 된다 (0~1)
     "shakeChance": 0.3,
     // 흔들기 리버스: 이 확률로 멈춘 뒤 거꾸로 돌아 다른 특전이 된다. 나머지 확률은 그대로 멈춘다
     "shakeReverseChance": 0.05,

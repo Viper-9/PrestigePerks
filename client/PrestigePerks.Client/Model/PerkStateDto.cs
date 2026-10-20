@@ -20,6 +20,12 @@ namespace PrestigePerks.Model
         [JsonProperty("rollCost")] public int? RollCost;
         [JsonProperty("shakeChance")] public double ShakeChance;
 
+        /// <summary>흔들기를 켰는지 (서버 config shakeEnabled).</summary>
+        [JsonProperty("shakeEnabled")] public bool ShakeEnabled = true;
+
+        /// <summary>슬롯 칸마다 더 높은 어느 단계에서 열리는지. 열렸거나 열리지 않는 칸은 null.</summary>
+        [JsonProperty("slotOpensAt")] public List<int?> SlotOpensAt = new List<int?>();
+
         /// <summary>서버가 개발용 빌드다. 개발용 진단 로그를 남긴다.</summary>
         [JsonProperty("dev")] public bool Dev;
 

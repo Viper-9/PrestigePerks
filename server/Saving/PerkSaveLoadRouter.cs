@@ -11,7 +11,7 @@ namespace PrestigePerks.Saving;
 /// SaveServer 가 이 라우터를 주입받으므로 SaveServer 를 쓰는 서비스에 의존하면 안 된다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
-public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataStore store) : SaveLoadRouter
+public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataStore store, PerkConfigLoader configLoader) : SaveLoadRouter
 {
     protected override IEnumerable<HandledRoute> GetHandledRoutes() => [new HandledRoute("prestigeperks-profile", false)];
 
@@ -19,7 +19,7 @@ public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataS
     {
         try
         {
-            ApplyPerkBonuses(profile, store);
+            ApplyPerkBonuses(profile, store, configLoader.Config);
         }
         catch (Exception ex)
         {
@@ -30,7 +30,7 @@ public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataS
     }
 
     /// <summary>PMC 에 현재 특전 Bonus 를 넣는다 (멱등). 새 단계 진입·리롤·게임 시작 때도 부른다.</summary>
-    public static void ApplyPerkBonuses(SptProfile profile, PerkDataStore store)
+    public static void ApplyPerkBonuses(SptProfile profile, PerkDataStore store, PerkConfig config)
     {
         var profileId = profile.ProfileInfo?.ProfileId;
         var pmc = profile.CharacterData?.PmcData;
@@ -41,6 +41,6 @@ public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataS
         }
 
         var data = store.Get(profileId.Value);
-        PerkBonusApplier.Apply(pmc, PerkRules.ActivePerks(data, PerkBeta.Level(pmc.Info.PrestigeLevel ?? 0)));
+        PerkBonusApplier.Apply(pmc, PerkRules.ActivePerks(data, config.Slots(pmc.Info.PrestigeLevel ?? 0)));
     }
 }

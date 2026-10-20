@@ -64,8 +64,8 @@ namespace PrestigePerks.UI
         private readonly Dictionary<int, Spin> spinning = new Dictionary<int, Spin>();
         private readonly System.Random random = new System.Random();
         private bool shakeReady, shakeUsed, shakeShown;
-        // 슬롯 하나만 돌린 리롤만 흔들 수 있다 (서버도 같은 규칙)
-        private bool shakeAllowed;
+        // 흔들기를 켰고(config shakeEnabled) 슬롯 하나만 돌린 리롤만 흔들 수 있다 (서버도 같은 규칙)
+        private bool shakeEnabled = true, shakeAllowed;
         private double shakeChance;
 
         private enum SpinPhase
@@ -529,6 +529,7 @@ namespace PrestigePerks.UI
             SetDots(lockedDots, lockedDotsStart, lockedValue);
 
             shakeChance = state.ShakeChance;
+            shakeEnabled = state.ShakeEnabled;
             rollLabel.text = locale.Get("ui.roll");
             var block = PerkPageModel.CheckRoll(state, coins, busy);
             SetRollLook(block == RollBlock.None ? ButtonLook.Roll : ButtonLook.Disabled);
@@ -575,7 +576,7 @@ namespace PrestigePerks.UI
                 reel.Frame.color = new Color(1, 1, 1, 0.35f);
                 reel.Fill.color = new Color(1, 1, 1, 0.6f);
                 reel.FaceIcon.gameObject.SetActive(false);
-                reel.Closed.text = locale.Format("ui.opensAt", index + 1);
+                reel.Closed.text = PerkPageModel.OpensAt(state, index) is int level ? locale.Format("ui.opensAt", level) : locale.Get("ui.slotClosed");
                 reel.Name.text = "";
                 reel.Effect.text = "";
                 return;
@@ -676,6 +677,14 @@ namespace PrestigePerks.UI
             var available = CanShake && ShakeTarget() >= 0;
             shakeShown = available;
             SetRollLook(available ? ButtonLook.Shake : ButtonLook.Disabled);
+            if (!shakeEnabled)
+            {
+                // 흔들기를 끈 설정: 도는 동안 꺼진 리롤 버튼만
+                rollLabel.text = locale.Get("ui.roll");
+                rollSub.text = locale.Get("ui.rolling");
+                return;
+            }
+
             rollLabel.text = locale.Get("ui.shake");
             rollSub.text = !shakeAllowed ? locale.Get("ui.shakeOneSlot")
                 : shakeUsed ? locale.Get("ui.shaken")
@@ -779,7 +788,7 @@ namespace PrestigePerks.UI
                 DrawStrip(reel, spin);
             }
 
-            shakeAllowed = list.Count == 1;
+            shakeAllowed = shakeEnabled && list.Count == 1;
             shakeReady = false;
             shakeUsed = false;
             RenderShake();

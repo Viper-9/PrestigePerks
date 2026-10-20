@@ -17,38 +17,45 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
         AllowTrailingCommas = true,
     };
 
-    private readonly Lazy<PerkConfig> config = new(() => Load(logger, modHelper));
+    private readonly Lazy<ModConfig> config = new(() => Load(logger, modHelper));
 
-    public PerkConfig Config => config.Value;
+    public PerkConfig Config => config.Value.Perks;
 
-    private static PerkConfig Load(ISptLogger<PerkConfigLoader> logger, ModHelper modHelper)
+    private static ModConfig Load(ISptLogger<PerkConfigLoader> logger, ModHelper modHelper)
     {
         var path = Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PerkConfigLoader).Assembly), "config", FileName);
         if (!File.Exists(path))
         {
             logger.Warning($"[PrestigePerks] config/{FileName} 이 없어 기본값을 씁니다");
-            return new PerkConfig();
+            return new ModConfig();
         }
 
         try
         {
-            var perks = Parse(File.ReadAllText(path));
-            var error = perks.Validate();
-            if (error is null)
-            {
-                return perks;
-            }
-
-            logger.Warning($"[PrestigePerks] config/{FileName}: {error}. 기본값을 씁니다");
+            return Validated(ParseModConfig(File.ReadAllText(path)), warning => logger.Warning($"[PrestigePerks] config/{FileName}: {warning}"));
         }
         catch (JsonException ex)
         {
             logger.Warning($"[PrestigePerks] config/{FileName} 을 읽지 못해 기본값을 씁니다: {ex.Message}");
         }
 
-        return new PerkConfig();
+        return new ModConfig();
     }
 
-    internal static PerkConfig Parse(string json) =>
-        (JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig()).Perks ?? new PerkConfig();
+    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 잘못된 항목은 기본값으로 바꾼다.</summary>
+    internal static ModConfig Validated(ModConfig config, Action<string> warn)
+    {
+        var perks = (config.Perks ?? new PerkConfig()).Clamped(warn);
+        if (perks.Validate() is { } perkError)
+        {
+            warn($"{perkError}. perks 항목은 기본값을 씁니다");
+            perks = new PerkConfig();
+        }
+
+        return config with { Perks = perks };
+    }
+
+    internal static ModConfig ParseModConfig(string json) => JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig();
+
+    internal static PerkConfig Parse(string json) => ParseModConfig(json).Perks ?? new PerkConfig();
 }

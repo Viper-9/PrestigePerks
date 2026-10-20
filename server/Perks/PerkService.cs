@@ -55,7 +55,7 @@ public class PerkService(
         lock (store.GetLock(sessionId))
         {
             EnterLevel(sessionId, profile);
-            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
         }
     }
 
@@ -77,7 +77,7 @@ public class PerkService(
     public PerkState SetLock(MongoId sessionId, int slotIndex, bool locked) =>
         Run(sessionId, (_, data, level) =>
         {
-            var error = PerkRules.SetLock(data, level, slotIndex, locked);
+            var error = PerkRules.SetLock(data, Config.Slots(level), slotIndex, locked);
             if (error == PerkError.None)
             {
                 store.Save(sessionId, data);
@@ -95,7 +95,7 @@ public class PerkService(
         var state = Run(sessionId, (profile, data, level) =>
         {
             EnterLevel(sessionId, profile);
-            var error = PerkRules.CheckRoll(data, level);
+            var error = PerkRules.CheckRoll(data, Config.Slots(level));
             if (error != PerkError.None)
             {
                 return BuildState(data, level, error);
@@ -121,9 +121,9 @@ public class PerkService(
 
             var outcome = PerkRules.Roll(data, level, Config, random);
             store.Save(sessionId, data);
-            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
             OfferShake(sessionId, data, level);
-            logger.Info($"[PrestigePerks] {sessionId}: 리롤 ({(cost == 0 ? "무료" : $"코인 {cost}")}) → [{string.Join(", ", PerkRules.ActivePerks(data, level))}]");
+            logger.Info($"[PrestigePerks] {sessionId}: 리롤 ({(cost == 0 ? "무료" : $"코인 {cost}")}) → [{string.Join(", ", PerkRules.ActivePerks(data, Config.Slots(level)))}]");
             return BuildState(data, level) with { RollCost = outcome.Cost };
         });
 
@@ -142,7 +142,8 @@ public class PerkService(
     public PerkState Shake(MongoId sessionId, int slotIndex, int nextPerk) =>
         Run(sessionId, (profile, data, level) =>
         {
-            if (!pendingShakes.TryRemove(sessionId, out var pending)
+            if (!Config.ShakeEnabled
+                || !pendingShakes.TryRemove(sessionId, out var pending)
                 || DateTime.UtcNow - pending.At > TimeSpan.FromSeconds(Config.ShakeWindowSeconds)
                 || pending.Slot != slotIndex)
             {
@@ -150,21 +151,21 @@ public class PerkService(
             }
 
             var before = data.Slots[slotIndex].Perk;
-            var outcome = PerkRules.Shake(data, level, slotIndex, nextPerk, Config.ShakeChance, Config.ShakeReverseChance, random);
+            var outcome = PerkRules.Shake(data, Config.Slots(level), slotIndex, nextPerk, Config.ShakeChance, Config.ShakeReverseChance, random);
             if (outcome != ShakeOutcome.Stay)
             {
                 store.Save(sessionId, data);
-                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
             }
 
             logger.Info($"[PrestigePerks] {sessionId}: 흔들기 슬롯 {slotIndex + 1} → {outcome} ({before} → {data.Slots[slotIndex].Perk})");
             return BuildState(data, level) with { ShakeOutcome = outcome.ToString() };
         });
 
-    // 슬롯 하나만 돌린 리롤만 흔들 수 있다. 여러 개 돌렸으면 직전 리롤의 흔들기도 지운다
+    // 슬롯 하나만 돌린 리롤만 흔들 수 있다 (흔들기를 켰을 때). 아니면 직전 리롤의 흔들기도 지운다
     private void OfferShake(MongoId sessionId, PerkData data, int level)
     {
-        if (PerkRules.ShakeSlot(data, level) is int slot)
+        if (Config.ShakeEnabled && PerkRules.ShakeSlot(data, Config.Slots(level)) is int slot)
         {
             pendingShakes[sessionId] = (DateTime.UtcNow, slot);
         }
@@ -179,12 +180,12 @@ public class PerkService(
         Run(sessionId, (profile, data, level) =>
         {
             EnterLevel(sessionId, profile);
-            var error = PerkRules.SetPerk(data, level, slotIndex, perk);
+            var error = PerkRules.SetPerk(data, Config.Slots(level), slotIndex, perk);
             if (error == PerkError.None)
             {
                 store.Save(sessionId, data);
-                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
-                logger.Info($"[PrestigePerks] {sessionId}: 개발용 set 슬롯 {slotIndex + 1} → {perk}, [{string.Join(", ", PerkRules.ActivePerks(data, level))}]");
+                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+                logger.Info($"[PrestigePerks] {sessionId}: 개발용 set 슬롯 {slotIndex + 1} → {perk}, [{string.Join(", ", PerkRules.ActivePerks(data, Config.Slots(level)))}]");
             }
 
             return BuildState(data, level, error);
@@ -197,8 +198,8 @@ public class PerkService(
             EnterLevel(sessionId, profile);
             data.DevAllPerks = on;
             store.Save(sessionId, data);
-            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
-            logger.Info($"[PrestigePerks] {sessionId}: 개발용 all {(on ? "on" : "off")} → [{string.Join(", ", PerkRules.ActivePerks(data, level))}]");
+            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+            logger.Info($"[PrestigePerks] {sessionId}: 개발용 all {(on ? "on" : "off")} → [{string.Join(", ", PerkRules.ActivePerks(data, Config.Slots(level)))}]");
             return BuildState(data, level);
         });
 
@@ -216,7 +217,7 @@ public class PerkService(
             if (outcome.Success)
             {
                 store.Save(sessionId, data);
-                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
                 OfferShake(sessionId, data, level);
             }
 
@@ -238,8 +239,8 @@ public class PerkService(
         Run(sessionId, (profile, _, level) =>
         {
             store.Delete(sessionId);
-            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
-            // 바로 지금 단계로 다시 들어가 슬롯을 뽑는다 (무료 리롤 3회, 새 특전은 다음 state 에서 알림)
+            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+            // 바로 지금 단계로 다시 들어가 슬롯을 뽑는다 (무료 리롤 freeRerolls 회, 새 특전은 다음 state 에서 알림)
             EnterLevel(sessionId, profile);
             return BuildState(store.Get(sessionId), level);
         });
@@ -268,14 +269,7 @@ public class PerkService(
                 return new PerkState { Error = "DataLoadFailed" };
             }
 
-            // 베타: 무료 리롤을 늘 가득 채워 둔다. 화면의 프레스티지 단계는 실제 값 (PerkBeta)
-            if (PerkBeta.Enabled && data.Rerolls.FreeLeft < Config.FreeRerolls)
-            {
-                data.Rerolls.FreeLeft = Config.FreeRerolls;
-            }
-
-            var state = action(profile, data, GetPrestigeLevel(profile));
-            return PerkBeta.Enabled ? state with { PrestigeLevel = GetRealPrestigeLevel(profile) } : state;
+            return action(profile, data, GetPrestigeLevel(profile));
         }
     }
 
@@ -296,7 +290,7 @@ public class PerkService(
         }
 
         store.Save(sessionId, data);
-        PerkSaveLoadRouter.ApplyPerkBonuses(profile, store);
+        PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
         logger.Info($"[PrestigePerks] {sessionId}: P{level} 진입 (무료 리롤 {data.Rerolls.FreeLeft}회){(newPerks.Count > 0 ? $", 새 특전 [{string.Join(", ", newPerks)}]" : "")}");
     }
 
@@ -304,16 +298,18 @@ public class PerkService(
         new()
         {
             PrestigeLevel = level,
-            Slots = PerkRules.ActiveSlots(data, level).Select(slot => new PerkSlot { Perk = slot.Perk, Locked = slot.Locked }).ToList(),
-            ActivePerks = PerkRules.ActivePerks(data, level),
+            Slots = PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot => new PerkSlot { Perk = slot.Perk, Locked = slot.Locked }).ToList(),
+            ActivePerks = PerkRules.ActivePerks(data, Config.Slots(level)),
             FreeRerollsLeft = data.Rerolls.FreeLeft,
             PaidRerolls = data.Rerolls.Paid,
             NextRerollCost = PerkRules.NextRerollCost(Config, level, data),
             CostFixed = data.Rerolls.FreeLeft <= 0 && data.Rerolls.Paid + 1 >= Config.PaidCostCapRound,
             NewPerks = data.UnseenNewPerks.ToList(),
-            Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActivePerks(data, level)),
+            Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActivePerks(data, Config.Slots(level))),
             BonusIds = BonusIds,
             ShakeChance = Config.ShakeChance,
+            ShakeEnabled = Config.ShakeEnabled,
+            SlotOpensAt = Config.SlotOpensAt(level),
             Dev = DevBuild,
             Error = error == PerkError.None ? null : error.ToString(),
         };
@@ -330,8 +326,5 @@ public class PerkService(
         return profile.CharacterData?.PmcData?.Info is not null;
     }
 
-    /// <summary>슬롯·특전 계산에 쓰는 단계. 베타는 6 (<see cref="PerkBeta"/>).</summary>
-    private static int GetPrestigeLevel(SptProfile profile) => PerkBeta.Level(GetRealPrestigeLevel(profile));
-
-    private static int GetRealPrestigeLevel(SptProfile profile) => profile.CharacterData?.PmcData?.Info?.PrestigeLevel ?? 0;
+    private static int GetPrestigeLevel(SptProfile profile) => profile.CharacterData?.PmcData?.Info?.PrestigeLevel ?? 0;
 }

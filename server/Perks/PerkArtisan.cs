@@ -18,6 +18,9 @@ public static class PerkArtisan
     /// <summary>서버 시작 때 넣는다 (<see cref="PrestigePerksMod"/>). 없으면 특전 없음으로 본다.</summary>
     internal static PerkDataStore? Store { get; set; }
 
+    /// <summary>단계별 슬롯 수를 읽는다. 서버 시작 때 넣는다 (<see cref="PrestigePerksMod"/>).</summary>
+    internal static PerkConfig Config { get; set; } = new();
+
     /// <summary>생산 시간 ×0.8, 최소 5초. 바닐라가 이미 5초 아래면 그대로.</summary>
     public static double? CraftTime(double? vanilla)
     {
@@ -33,7 +36,7 @@ public static class PerkArtisan
     public static long? BitcoinElapsed(long? vanilla) =>
         vanilla is { } elapsed && elapsed > 0 ? (long)Math.Round(elapsed / TimeFactor, MidpointRounding.AwayFromZero) : vanilla;
 
-    /// <summary>이 PMC 가 17번을 적용받는가. 특전 데이터의 활성 특전(단계 수만큼 슬롯, 개발용 all)으로 판단한다.</summary>
+    /// <summary>이 PMC 가 17번을 적용받는가. 특전 데이터의 활성 특전(단계별 슬롯 수만큼, 개발용 all)으로 판단한다.</summary>
     public static bool Has(PmcData? pmc)
     {
         var store = Store;
@@ -45,7 +48,7 @@ public static class PerkArtisan
         lock (store.GetLock(id))
         {
             var data = store.Get(id);
-            return !data.LoadFailed && PerkRules.ActivePerks(data, PerkBeta.Level(pmc.Info.PrestigeLevel ?? 0)).Contains(Perk);
+            return !data.LoadFailed && PerkRules.ActivePerks(data, Config.Slots(pmc.Info.PrestigeLevel ?? 0)).Contains(Perk);
         }
     }
 }

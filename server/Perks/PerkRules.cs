@@ -57,21 +57,21 @@ public static class PerkRules
     public static int NextRerollCost(PerkConfig config, int prestigeLevel, PerkData data) =>
         data.Rerolls.FreeLeft > 0
             ? 0
-            : RerollCost(config, prestigeLevel, ActiveSlots(data, prestigeLevel).Count(slot => slot.Locked), data.Rerolls.Paid + 1);
+            : RerollCost(config, prestigeLevel, ActiveSlots(data, config.Slots(prestigeLevel)).Count(slot => slot.Locked), data.Rerolls.Paid + 1);
 
-    /// <summary>효과가 적용되는 슬롯: 앞에서부터 단계 수만큼.</summary>
-    public static IReadOnlyList<PerkSlot> ActiveSlots(PerkData data, int prestigeLevel) =>
-        data.Slots.Take(Math.Max(prestigeLevel, 0)).ToList();
+    /// <summary>효과가 적용되는 슬롯: 앞에서부터 slotCount 개 (단계별 슬롯 수, <see cref="PerkConfig.Slots"/>).</summary>
+    public static IReadOnlyList<PerkSlot> ActiveSlots(PerkData data, int slotCount) =>
+        data.Slots.Take(Math.Max(slotCount, 0)).ToList();
 
     /// <summary>효과를 적용할 특전. 개발용 <see cref="PerkData.DevAllPerks"/> 면 슬롯과 상관없이 전부.</summary>
-    public static IReadOnlyList<int> ActivePerks(PerkData data, int prestigeLevel) =>
+    public static IReadOnlyList<int> ActivePerks(PerkData data, int slotCount) =>
         data.DevAllPerks
             ? PerkCatalog.Numbers
-            : ActiveSlots(data, prestigeLevel).Select(slot => slot.Perk).Where(PerkCatalog.IsKnown).Distinct().ToList();
+            : ActiveSlots(data, slotCount).Select(slot => slot.Perk).Where(PerkCatalog.IsKnown).Distinct().ToList();
 
     /// <summary>
     /// 새 단계 진입 처리. 단계가 기록보다 높으면 무료 횟수를 다시 채우고 유료 회차를 0 으로 되돌린다.
-    /// 슬롯이 단계보다 적으면 빈 슬롯을 "전체 − 보유 특전"에서 자동 추첨한다 (무료 횟수 차감 없음). 새 프레스티지와 소급 유저가 같은 규칙이다.
+    /// 슬롯이 단계의 슬롯 수보다 적으면 빈 슬롯을 "전체 − 보유 특전"에서 자동 추첨한다 (무료 횟수 차감 없음). 새 프레스티지와 소급 유저가 같은 규칙이다.
     /// </summary>
     /// <returns>데이터가 바뀌었는지와 새로 뽑은 특전.</returns>
     public static (bool Changed, IReadOnlyList<int> NewPerks) EnterLevel(PerkData data, int prestigeLevel, PerkConfig config, Random random)
@@ -90,7 +90,7 @@ public static class PerkRules
 
         var newPerks = new List<int>();
         var pool = PerkCatalog.Numbers.Except(data.Slots.Select(slot => slot.Perk)).ToList();
-        while (data.Slots.Count < prestigeLevel && Take(pool, random) is { } perk)
+        while (data.Slots.Count < config.Slots(prestigeLevel) && Take(pool, random) is { } perk)
         {
             data.Slots.Add(new PerkSlot { Perk = perk });
             newPerks.Add(perk);
@@ -106,9 +106,9 @@ public static class PerkRules
     }
 
     /// <summary>슬롯 잠금. slotIndex 는 0 부터.</summary>
-    public static PerkError SetLock(PerkData data, int prestigeLevel, int slotIndex, bool locked)
+    public static PerkError SetLock(PerkData data, int slotCount, int slotIndex, bool locked)
     {
-        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, prestigeLevel).Count)
+        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, slotCount).Count)
         {
             return PerkError.InvalidSlot;
         }
@@ -118,9 +118,9 @@ public static class PerkRules
     }
 
     /// <summary>리롤할 수 있는지 (코인 제외).</summary>
-    public static PerkError CheckRoll(PerkData data, int prestigeLevel)
+    public static PerkError CheckRoll(PerkData data, int slotCount)
     {
-        var slots = ActiveSlots(data, prestigeLevel);
+        var slots = ActiveSlots(data, slotCount);
         if (slots.Count == 0)
         {
             return PerkError.NoSlots;
@@ -135,7 +135,8 @@ public static class PerkRules
     /// </summary>
     public static RollOutcome Roll(PerkData data, int prestigeLevel, PerkConfig config, Random random)
     {
-        var error = CheckRoll(data, prestigeLevel);
+        var slotCount = config.Slots(prestigeLevel);
+        var error = CheckRoll(data, slotCount);
         if (error != PerkError.None)
         {
             return new RollOutcome(error, 0);
@@ -144,26 +145,22 @@ public static class PerkRules
         var cost = NextRerollCost(config, prestigeLevel, data);
         if (data.Rerolls.FreeLeft > 0)
         {
-            // 베타: 무료 리롤이 줄지 않는다 (PerkBeta)
-            if (!PerkBeta.Enabled)
-            {
-                data.Rerolls.FreeLeft--;
-            }
+            data.Rerolls.FreeLeft--;
         }
         else
         {
             data.Rerolls.Paid++;
         }
 
-        // 단계보다 뒤의 슬롯(단계가 내려간 경우)은 효과가 없지만 겹치지 않게 후보에서 뺀다
-        Redraw(data.Slots.Take(prestigeLevel).ToList(), random, data.Slots.Skip(prestigeLevel).Select(slot => slot.Perk));
+        // 열린 슬롯보다 뒤의 슬롯(단계가 내려갔거나 슬롯 수를 줄인 경우)은 효과가 없지만 겹치지 않게 후보에서 뺀다
+        Redraw(data.Slots.Take(slotCount).ToList(), random, data.Slots.Skip(slotCount).Select(slot => slot.Perk));
         return new RollOutcome(PerkError.None, cost);
     }
 
     /// <summary>흔들 수 있는 슬롯: 리롤에서 돌린(잠그지 않은) 슬롯이 하나뿐일 때 그 슬롯. 둘 이상이면 흔들 수 없다 (null).</summary>
-    public static int? ShakeSlot(PerkData data, int prestigeLevel)
+    public static int? ShakeSlot(PerkData data, int slotCount)
     {
-        var rolled = ActiveSlots(data, prestigeLevel).Select((slot, index) => (slot, index)).Where(pair => !pair.slot.Locked).Select(pair => pair.index).ToList();
+        var rolled = ActiveSlots(data, slotCount).Select((slot, index) => (slot, index)).Where(pair => !pair.slot.Locked).Select(pair => pair.index).ToList();
         return rolled.Count == 1 ? rolled[0] : null;
     }
 
@@ -173,9 +170,9 @@ public static class PerkRules
     /// reverseChance 확률로 리버스(다른 특전), nextChance 확률로 다음 칸 특전, 나머지는 그대로.
     /// 다음 칸 특전이 다른 슬롯과 겹치거나 모르는 특전이면 한 칸 더 가지 않는다 (그대로).
     /// </summary>
-    public static ShakeOutcome Shake(PerkData data, int prestigeLevel, int slotIndex, int nextPerk, double nextChance, double reverseChance, Random random)
+    public static ShakeOutcome Shake(PerkData data, int slotCount, int slotIndex, int nextPerk, double nextChance, double reverseChance, Random random)
     {
-        var active = ActiveSlots(data, prestigeLevel);
+        var active = ActiveSlots(data, slotCount);
         if (slotIndex < 0 || slotIndex >= active.Count || active[slotIndex].Locked)
         {
             return ShakeOutcome.Stay;
@@ -207,9 +204,9 @@ public static class PerkRules
     /// <summary>
     /// 개발용: 슬롯에 특전을 직접 넣는다. 다른 슬롯이 그 특전을 갖고 있으면 서로 바꾼다 (겹치지 않게). 잠금은 그대로 둔다.
     /// </summary>
-    public static PerkError SetPerk(PerkData data, int prestigeLevel, int slotIndex, int perk)
+    public static PerkError SetPerk(PerkData data, int slotCount, int slotIndex, int perk)
     {
-        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, prestigeLevel).Count)
+        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, slotCount).Count)
         {
             return PerkError.InvalidSlot;
         }

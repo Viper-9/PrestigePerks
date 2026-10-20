@@ -59,6 +59,14 @@ public sealed record PerkState
     [JsonPropertyName("shakeChance")]
     public double ShakeChance { get; init; }
 
+    /// <summary>흔들기를 켰는지 (config shakeEnabled). 끄면 화면에 흔들기 버튼이 나오지 않는다.</summary>
+    [JsonPropertyName("shakeEnabled")]
+    public bool ShakeEnabled { get; init; }
+
+    /// <summary>슬롯 칸(6칸)마다 더 높은 어느 단계에서 열리는지. 열렸거나 열리지 않는 칸은 null (<see cref="PerkConfig.SlotOpensAt"/>).</summary>
+    [JsonPropertyName("slotOpensAt")]
+    public IReadOnlyList<int?> SlotOpensAt { get; init; } = [];
+
     /// <summary>흔들기 응답: 결과 (<see cref="ShakeOutcome"/> 이름). 흔들기 응답이 아니면 null.</summary>
     [JsonPropertyName("shakeOutcome")]
     public string? ShakeOutcome { get; init; }
