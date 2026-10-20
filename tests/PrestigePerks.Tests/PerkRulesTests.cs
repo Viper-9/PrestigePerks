@@ -304,6 +304,21 @@ public class PerkRulesTests
     }
 
     [Fact]
+    public void Shake_is_offered_only_when_a_single_slot_is_rolled()
+    {
+        var data = WithSlots(1, 4, 8);
+        Assert.Null(PerkRules.ShakeSlot(data, 3));
+        data.Slots[0].Locked = true;
+        Assert.Null(PerkRules.ShakeSlot(data, 3));
+        data.Slots[2].Locked = true;
+        Assert.Equal(1, PerkRules.ShakeSlot(data, 3));
+        data.Slots[1].Locked = true;
+        Assert.Null(PerkRules.ShakeSlot(data, 3));
+        // 단계가 낮으면 앞 슬롯만 돈다
+        Assert.Equal(0, PerkRules.ShakeSlot(WithSlots(1, 4, 8), 1));
+    }
+
+    [Fact]
     public void Shake_next_takes_the_perk_shown_in_the_next_cell()
     {
         var data = WithSlots(1, 4, 8);
