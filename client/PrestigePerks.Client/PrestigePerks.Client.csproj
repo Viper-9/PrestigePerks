@@ -14,6 +14,7 @@
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Managed)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(Managed)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UIModule"><HintPath>$(Managed)\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(Managed)\UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Managed)\UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Managed)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Sirenix.Serialization"><HintPath>$(Managed)\Sirenix.Serialization.dll</HintPath><Private>false</Private></Reference>
@@ -25,6 +26,9 @@
   <ItemGroup>
     <!-- 특전 이름·화면 문구. DLL 에 넣어 파일 하나로 배포한다 -->
     <EmbeddedResource Include="Locales\*.json" LogicalName="PrestigePerks.Locales.%(Filename)%(Extension)" />
+    <!-- 특전 페이지 그림 (특전 아이콘 128px, 5.0 시즌 특전·프레스티지 화면 스프라이트). 같은 이유로 DLL 에 넣는다 -->
+    <EmbeddedResource Include="Assets\Icons\*.png" LogicalName="PrestigePerks.Icons.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\Sprites\*.png" LogicalName="PrestigePerks.Sprites.%(Filename)%(Extension)" />
   </ItemGroup>
   <!-- BepInPlugin 버전을 Directory.Build.props 의 <Version> 하나로 맞추려고 빌드 때 상수 파일을 만든다. -->
   <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
