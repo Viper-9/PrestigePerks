@@ -125,11 +125,12 @@ public static class PerkDataFile
         data.UnseenNewPerks = data.UnseenNewPerks.Where(seen.Contains).Distinct().ToList();
 
         var rerolls = data.Rerolls;
-        if (rerolls.Level < 0 || rerolls.FreeLeft < 0 || rerolls.Paid < 0)
+        if (rerolls.Level < 0 || rerolls.FreeLeft < 0 || rerolls.Paid < 0 || rerolls.FreeGranted < 0)
         {
-            warnings.Add($"음수 리롤 값을 0 으로 바꿨습니다 (level {rerolls.Level}, freeLeft {rerolls.FreeLeft}, paid {rerolls.Paid})");
+            warnings.Add($"음수 리롤 값을 0 으로 바꿨습니다 (level {rerolls.Level}, freeLeft {rerolls.FreeLeft}, freeGranted {rerolls.FreeGranted}, paid {rerolls.Paid})");
             rerolls.Level = Math.Max(rerolls.Level, 0);
             rerolls.FreeLeft = Math.Max(rerolls.FreeLeft, 0);
+            rerolls.FreeGranted = rerolls.FreeGranted is int granted ? Math.Max(granted, 0) : null;
             rerolls.Paid = Math.Max(rerolls.Paid, 0);
         }
 

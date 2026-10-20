@@ -23,9 +23,9 @@ public sealed record PerkConfig
 
     /// <summary>프레스티지 단계마다 주는 무료 리롤 횟수 (0~99). 프레스티지하면 이 값으로 다시 채운다.</summary>
     [JsonPropertyName("freeRerolls")]
-    public int FreeRerolls { get; init; } = 3;
+    public int FreeRerolls { get; init; } = DefaultFreeRerolls;
 
-    public const int MaxSlots = 6, MaxLevel = 6, MaxFreeRerolls = 99;
+    public const int MaxSlots = 6, MaxLevel = 6, MaxFreeRerolls = 99, DefaultFreeRerolls = 3;
 
     /// <summary>P1 ~ P6 에서 열리는 슬롯 수 (0~6). 앞에서부터 이 수만큼 특전 효과가 난다.</summary>
     [JsonPropertyName("prestigeLevel1Slots")]

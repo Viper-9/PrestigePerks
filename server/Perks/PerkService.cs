@@ -273,7 +273,7 @@ public class PerkService(
         }
     }
 
-    /// <summary>새 단계면 횟수를 되돌리고 빈 슬롯을 뽑는다. 바뀌었으면 저장하고 Bonus 를 다시 넣는다. 잠금 안에서 부른다.</summary>
+    /// <summary>새 단계면 횟수를 되돌리고(같은 단계에서 freeRerolls 를 바꿨으면 차이만큼 고치고) 빈 슬롯을 뽑는다. 바뀌었으면 저장하고 Bonus 를 다시 넣는다. 잠금 안에서 부른다.</summary>
     private void EnterLevel(MongoId sessionId, SptProfile profile)
     {
         var data = store.Get(sessionId);
@@ -291,7 +291,7 @@ public class PerkService(
 
         store.Save(sessionId, data);
         PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
-        logger.Info($"[PrestigePerks] {sessionId}: P{level} 진입 (무료 리롤 {data.Rerolls.FreeLeft}회){(newPerks.Count > 0 ? $", 새 특전 [{string.Join(", ", newPerks)}]" : "")}");
+        logger.Info($"[PrestigePerks] {sessionId}: P{level} 특전 데이터 갱신 (무료 리롤 {data.Rerolls.FreeLeft}/{data.Rerolls.FreeGranted}회){(newPerks.Count > 0 ? $", 새 특전 [{string.Join(", ", newPerks)}]" : "")}");
     }
 
     private PerkState BuildState(PerkData data, int level, PerkError error = PerkError.None) =>

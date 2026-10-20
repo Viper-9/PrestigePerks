@@ -56,6 +56,14 @@ public sealed class PerkRerolls
     [JsonPropertyName("freeLeft")]
     public int FreeLeft { get; set; }
 
+    /// <summary>
+    /// 이 단계에 준 무료 리롤 횟수 (그때의 config freeRerolls). 설정이 바뀌면 그 차이만큼 남은 횟수를 늘리거나 줄인다 (<see cref="PerkRules.EnterLevel"/>).
+    /// 없으면(이 값이 생기기 전 데이터) 기본값 <see cref="PerkConfig.DefaultFreeRerolls"/> 를 준 것으로 본다.
+    /// </summary>
+    [JsonPropertyName("freeGranted")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? FreeGranted { get; set; }
+
     /// <summary>이 단계에서 한 유료 리롤 횟수.</summary>
     [JsonPropertyName("paid")]
     public int Paid { get; set; }
