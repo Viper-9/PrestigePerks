@@ -7,7 +7,6 @@
   "ui.slotN": "Slot {0}",
   "ui.opensAt": "Opens at P{0}",
   "ui.coins": "Coins held",
-  "ui.coinsSub": "prestige coins",
   "ui.free": "Free rerolls",
   "ui.lockedSlots": "Locked slots",
   "ui.next": "Next reroll cost",

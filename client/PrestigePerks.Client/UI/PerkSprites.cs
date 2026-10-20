@@ -45,7 +45,6 @@ namespace PrestigePerks.UI
 
         public static Sprite Emblem => Load("Sprites.Frame_Seasons", false);
         public static Sprite Vignette => Load("Sprites.Spectator_ShadingVignette", false);
-        public static Sprite Glow => Load("Sprites.PvE_Glow", true);
 
         /// <summary>1px 테두리 (Sliced, 가운데 비움). 색은 Image.color 로 준다.</summary>
         public static Sprite Outline

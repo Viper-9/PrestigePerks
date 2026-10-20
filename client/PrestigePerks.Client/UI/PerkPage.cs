@@ -19,7 +19,7 @@ namespace PrestigePerks.UI
     internal sealed class PerkPage : MonoBehaviour
     {
         private const float ReferenceHeight = 1080f;
-        private const float Margin = 16, PanelGap = 12, HeaderHeight = 56, PanelHead = 46, SideWidth = 452;
+        private const float Margin = 16, PanelGap = 12, HeaderTop = 12, PanelHead = 46, SideWidth = 452;
         private const float SlotsTop = 68, SlotsHeight = 238, ListTop = 318;
         private const float CardHeight = 168, CardGap = 12;
 
@@ -184,19 +184,20 @@ namespace PrestigePerks.UI
 
         private void BuildHeader(float width)
         {
-            var header = UiKit.Rect(root, "Header", 0, 0, width, HeaderHeight);
-            UiKit.Sprite(header, PerkSprites.Gradient(new Color32(40, 48, 52, 255), new Color32(20, 25, 27, 255)), Color.white);
-            UiKit.Image(UiKit.Rect(header, "Line", 0, HeaderHeight, width, 1), new Color32(70, 80, 86, 255));
-            UiKit.Sprite(UiKit.Rect(header, "Glow", 18, 5, 44, 46), PerkSprites.Glow, Color.white);
-            var title = UiKit.Label(header, "Title", 74, 28, 300, locale.Get("ui.title"), 30, UiKit.Text);
+            // 아래 패널 머리띠와 같은 모양·폭 (좌우 여백, 가로 그라데이션, 테두리)
+            var barWidth = width - 2 * Margin;
+            var header = UiKit.Rect(root, "Header", Margin, HeaderTop, barWidth, PanelHead);
+            UiKit.Sprite(header, PerkSprites.Gradient(new Color32(46, 56, 62, 240), new Color32(24, 29, 32, 240), true), Color.white);
+            UiKit.Outline(header, UiKit.Line);
+            var title = UiKit.Label(header, "Title", 16, 23, 300, locale.Get("ui.title"), 26, UiKit.Text);
             var titleWidth = UiKit.Width(title, title.text);
-            levelLabel = UiKit.Label(header, "Level", 74 + titleWidth + 28, 30, 700, "", 16, UiKit.Muted);
+            levelLabel = UiKit.Label(header, "Level", 16 + titleWidth + 24, 24, 700, "", 16, UiKit.Muted);
             // 프레스티지 숫자를 크게 넣으므로 칸을 넘어도 지우지 않는다
             levelLabel.overflowMode = TextOverflowModes.Overflow;
 
-            var close = UiKit.Rect(header, "Close", width - 30 - 200, 4, 200, 48);
+            var close = UiKit.Rect(header, "Close", barWidth - 16 - 200, 0, 200, PanelHead);
             var closeHit = UiKit.Image(close, Color.clear);
-            var closeLabel = UiKit.Label(close, "Label", 200, 24, 200, locale.Get("ui.close"), 30, UiKit.Text, TextAlignmentOptions.Right);
+            var closeLabel = UiKit.Label(close, "Label", 200, 23, 200, locale.Get("ui.close"), 26, UiKit.Text, TextAlignmentOptions.Right);
             var closeButton = UiKit.Button(closeHit);
             closeButton.targetGraphic = closeLabel;
             closeButton.onClick.AddListener(() => CloseClicked?.Invoke());
@@ -373,8 +374,9 @@ namespace PrestigePerks.UI
             coinIcon = UiKit.Sprite(UiKit.Rect(art, "Coin", 12, 16, 100, 100), PerkSprites.CoinFallback, Color.white);
             coinIcon.preserveAspect = true;
             LoadCoinIcon();
-            UiKit.Label(art, "Key", 120, 46, w - 140, locale.Get("ui.coins"), 16, UiKit.Muted);
-            coinsValue = UiKit.Label(art, "Value", 120, 90, w - 140, "", 46, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            // 이름과 수치를 코인 그림(세로 가운데 66)에 맞춰 위아래로 둔다
+            UiKit.Label(art, "Key", 128, 44, w - 148, locale.Get("ui.coins"), 16, UiKit.Muted);
+            coinsValue = UiKit.Label(art, "Value", 126, 84, w - 146, "", 46, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             UiKit.Image(UiKit.Rect(panel, "Line1", 1, 179, w - 2, 1), UiKit.Line);
 
             (freeValue, freeDots, freeDotsStart) = KeyValue(panel, 216, "ui.free");
@@ -490,9 +492,9 @@ namespace PrestigePerks.UI
                 return;
             }
 
-            var level = $"<size=28><b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Gold)}>{state.PrestigeLevel}</color></b></size>";
+            var level = $"<size=24><b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Gold)}>{state.PrestigeLevel}</color></b></size>";
             levelLabel.text = locale.Format("ui.level", level, state.Slots.Count);
-            coinsValue.text = $"{coins}<size=14><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Dim)}>   {locale.Get("ui.coinsSub")}</color></size>";
+            coinsValue.text = coins.ToString();
 
             foreach (var pair in rows)
             {
