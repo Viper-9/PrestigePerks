@@ -301,6 +301,7 @@ public class PerkService(
             Slots = PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot => new PerkSlot { Perk = slot.Perk, Locked = slot.Locked }).ToList(),
             ActivePerks = PerkRules.ActivePerks(data, Config.Slots(level)),
             FreeRerollsLeft = data.Rerolls.FreeLeft,
+            FreeRerolls = Config.FreeRerolls,
             PaidRerolls = data.Rerolls.Paid,
             NextRerollCost = PerkRules.NextRerollCost(Config, level, data),
             CostFixed = data.Rerolls.FreeLeft <= 0 && data.Rerolls.Paid + 1 >= Config.PaidCostCapRound,

@@ -508,7 +508,7 @@ namespace PrestigePerks.UI
                 RenderReel(i, state, busy);
             }
 
-            freeValue.text = $"{state.FreeRerollsLeft} / 3";
+            freeValue.text = $"{state.FreeRerollsLeft} / {state.FreeRerolls}";
 
             if (state.NextRerollCost == 0)
             {

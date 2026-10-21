@@ -20,6 +20,10 @@ public sealed record PerkState
     [JsonPropertyName("freeRerollsLeft")]
     public int FreeRerollsLeft { get; init; }
 
+    /// <summary>단계마다 주는 무료 리롤 수 (config freeRerolls). 화면 "남은 / 이 값" 표시용.</summary>
+    [JsonPropertyName("freeRerolls")]
+    public int FreeRerolls { get; init; }
+
     [JsonPropertyName("paidRerolls")]
     public int PaidRerolls { get; init; }
 

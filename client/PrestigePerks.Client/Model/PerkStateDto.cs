@@ -10,6 +10,9 @@ namespace PrestigePerks.Model
         [JsonProperty("slots")] public List<PerkSlotDto> Slots = new List<PerkSlotDto>();
         [JsonProperty("activePerks")] public List<int> ActivePerks = new List<int>();
         [JsonProperty("freeRerollsLeft")] public int FreeRerollsLeft;
+
+        /// <summary>단계마다 주는 무료 리롤 수 (서버 config freeRerolls). 화면 "남은 / 이 값".</summary>
+        [JsonProperty("freeRerolls")] public int FreeRerolls = 3;
         [JsonProperty("paidRerolls")] public int PaidRerolls;
         [JsonProperty("nextRerollCost")] public int NextRerollCost;
         [JsonProperty("costFixed")] public bool CostFixed;
