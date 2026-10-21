@@ -471,7 +471,7 @@ public class PerkRulesTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "config", PerkConfigLoader.FileName);
         var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(File.ReadAllText(path)), warning => Assert.Fail(warning)).Perks;
-        Assert.Equal([1, 2, 3, 4, 5, 6], Enumerable.Range(1, 6).Select(config.Slots));
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6], Enumerable.Range(0, 7).Select(config.Slots));
         Assert.Equal(3, config.FreeRerolls);
         Assert.True(config.ShakeEnabled);
     }
@@ -526,4 +526,52 @@ public class PerkRulesTests
         Assert.Equal(7, data.Rerolls.FreeGranted);
         Assert.Equal(0, data.Rerolls.Paid);
     }
+    [Fact]
+    public void Prestige_zero_has_no_perks_by_default()
+    {
+        var data = new PerkData();
+        Assert.False(PerkRules.EnterLevel(data, 0, Config, new Random(1)).Changed);
+        Assert.Empty(data.Slots);
+        Assert.Equal(0, data.Rerolls.FreeLeft);
+    }
+
+    [Fact]
+    public void Prestige_zero_slots_flag_draws_slots_and_gives_free_rerolls_once()
+    {
+        var config = Config with { PrestigeLevel0Slots = 2 };
+        var data = new PerkData();
+        var (changed, newPerks) = PerkRules.EnterLevel(data, 0, config, new Random(1));
+
+        Assert.True(changed);
+        Assert.Equal(2, newPerks.Count);
+        Assert.Equal(2, PerkRules.ActivePerks(data, config.Slots(0)).Count);
+        Assert.Equal(3, data.Rerolls.FreeLeft);
+        Assert.Equal(0, data.Rerolls.Level);
+
+        // 다 쓰고 다시 들어와도 P0 에서는 다시 채우지 않는다
+        data.Rerolls.FreeLeft = 0;
+        Assert.False(PerkRules.EnterLevel(data, 0, config, new Random(1)).Changed);
+        Assert.Equal(0, data.Rerolls.FreeLeft);
+        Assert.True(PerkRules.Roll(data, 0, config, new Random(2)) is { Success: true, Cost: 25 }); // P0 유료 비용은 P1 기본가
+    }
+
+    [Fact]
+    public void Prestige_zero_perks_carry_into_prestige_one()
+    {
+        var config = Config with { PrestigeLevel0Slots = 2, PrestigeLevel1Slots = 3 };
+        var data = new PerkData();
+        PerkRules.EnterLevel(data, 0, config, new Random(1));
+        var before = data.Slots.Select(slot => slot.Perk).ToList();
+        data.Rerolls.FreeLeft = 0;
+
+        var (_, newPerks) = PerkRules.EnterLevel(data, 1, config, new Random(1));
+        Assert.Equal(before, data.Slots.Take(2).Select(slot => slot.Perk));
+        Assert.Single(newPerks);
+        Assert.Equal(3, data.Rerolls.FreeLeft);
+        Assert.Equal(1, data.Rerolls.Level);
+    }
+
+    [Fact]
+    public void Prestige_zero_closed_slots_point_to_the_first_level_that_opens_them() =>
+        Assert.Equal([null, null, 3, 4, 5, 6], (Config with { PrestigeLevel0Slots = 2 }).SlotOpensAt(0));
 }
