@@ -41,7 +41,10 @@ namespace PrestigePerks.Game
 
         private static Sprite coinIcon;
 
-        /// <summary>프레스티지 코인 아이템 아이콘 (게임이 모델로 그린다). 인벤토리에 코인이 없으면 null.</summary>
+        /// <summary>
+        /// 프레스티지 코인 아이템 아이콘 (게임이 모델로 그린다). 인벤토리에 코인이 없으면 템플릿으로 화면용 아이템을 만들어 그린다
+        /// (인벤토리에 넣지 않는다). 그래도 못 그리면 null.
+        /// </summary>
         public static async Task<Sprite> CoinIcon()
         {
             if (coinIcon != null)
@@ -51,7 +54,8 @@ namespace PrestigePerks.Game
 
             try
             {
-                var coin = Profile?.Inventory?.GetAllItemByTemplate(CoinTemplateId).FirstOrDefault();
+                var coin = Profile?.Inventory?.GetAllItemByTemplate(CoinTemplateId).FirstOrDefault()
+                           ?? (Singleton<ItemFactory>.Instantiated ? Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), CoinTemplateId, null) : null);
                 if (coin == null)
                 {
                     return null;
