@@ -22,6 +22,7 @@ public class Plugin : BaseUnityPlugin
         PatchOne(harmony, typeof(Patches.MenuScreenShowPatch));
         // 패치 특전 (3차). 하나가 실패해도 나머지 특전은 동작한다
         PatchOne(harmony, typeof(Patches.CarryingWeightPatch));
+        PatchOne(harmony, typeof(Patches.OverweightLimitsPatch));
         PatchOne(harmony, typeof(Patches.StaminaCapacityPatch));
         PatchOne(harmony, typeof(Patches.ExistenceDamagePatch));
         PatchOne(harmony, typeof(Patches.ShotSkillScopePatch));

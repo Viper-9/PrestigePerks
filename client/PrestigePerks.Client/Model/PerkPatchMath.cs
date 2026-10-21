@@ -54,6 +54,21 @@ namespace PrestigePerks.Model
         /// <summary>9: <c>1 + 근력 버프</c> → <c>+ 0.2</c>.</summary>
         public static float CarryingWeight(float vanilla) => Positive(vanilla + PorterWeight, vanilla);
 
+        /// <summary>
+        /// 9: 과적 한도 하나 (<c>설정 × 배율 + 고정</c>). 게임이 짐꾼 없는 배율로 계산한 값이면 짐꾼 배율로 다시 계산하고, 이미 짐꾼이 들어갔거나
+        /// 다른 값(다른 모드가 바꿈)이면 그대로 둔다. 배율 getter 가 호출하는 쪽에 인라인되면 getter 패치를 거치지 않아 이렇게 고친다.
+        /// </summary>
+        /// <param name="current">게임이 계산한 한도.</param>
+        /// <param name="config">전역 설정 한도 (배율 전).</param>
+        /// <param name="vanillaModifier">짐꾼 없는 배율 (근력 × 체력 효과).</param>
+        /// <param name="perkModifier">짐꾼을 넣은 배율.</param>
+        /// <param name="absolute">고정 보너스 (체력 효과).</param>
+        public static float OverweightLimit(float current, float config, float vanillaModifier, float perkModifier, float absolute)
+        {
+            var vanilla = config * vanillaModifier + absolute;
+            return Math.Abs(current - vanilla) <= 0.01f * Math.Max(1f, Math.Abs(vanilla)) ? config * perkModifier + absolute : current;
+        }
+
         /// <summary>10: <c>max(1, base × (1 + 지구력 버프) + 자극제)</c>에 <c>base × 0.15</c>를 더한다. 지구력 버프에 +0.15와 같다.</summary>
         public static float StaminaCapacity(float vanilla, float baseValue)
         {

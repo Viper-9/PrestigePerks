@@ -48,6 +48,56 @@ namespace PrestigePerks.Patches
         }
     }
 
+    /// <summary>
+    /// 9 짐꾼 (레이드 과적 한도): 배율 getter 는 한 줄이라 호출하는 쪽에 인라인될 수 있다. 다른 모드(SAIN)가 UpdateWeightLimits 를 패치하면
+    /// 다시 컴파일된 본문이 getter 패치를 거치지 않아 짐꾼 없이 한도를 계산한다 (2026-10-21 실측: 33.8 = 26 × 1.3).
+    /// 계산이 끝난 뒤 짐꾼 없는 값이면 짐꾼 배율로 다시 계산한다. 근력 버프는 getter 를 거치지 않고 직접 읽는다.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class OverweightLimitsPatch
+    {
+        private const int Perk = 9;
+
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(PhysicalBase), nameof(PhysicalBase.UpdateWeightLimits));
+
+        private static void Postfix(PhysicalBase __instance)
+        {
+            if (!PerkEffects.Has(Perk))
+            {
+                return;
+            }
+
+            try
+            {
+                if (!(__instance._playerBridge?.iPlayer is Player player) || !PerkTarget.IsPmc(player))
+                {
+                    return;
+                }
+
+                var health = player.HealthController;
+                var vanilla = (1f + (float)player.Skills.StrengthBuffLiftWeightInc) * health.CarryingWeightRelativeModifier;
+                var perk = PerkPatchMath.CarryingWeight(1f + (float)player.Skills.StrengthBuffLiftWeightInc) * health.CarryingWeightRelativeModifier;
+                var absolute = health.CarryingWeightAbsoluteModifier;
+                var stamina = Singleton<GlobalConfiguration>.Instance.Stamina;
+                var before = __instance.BaseOverweightLimits.x;
+                __instance.BaseOverweightLimits = Fix(__instance.BaseOverweightLimits, stamina.BaseOverweightLimits, vanilla, perk, absolute);
+                __instance.WalkOverweightLimits = Fix(__instance.WalkOverweightLimits, stamina.WalkOverweightLimits, vanilla, perk, absolute);
+                __instance.SprintOverweightLimits = Fix(__instance.SprintOverweightLimits, stamina.SprintOverweightLimits, vanilla, perk, absolute);
+                __instance.WalkSpeedOverweightLimits = Fix(__instance.WalkSpeedOverweightLimits, stamina.WalkSpeedOverweightLimits, vanilla, perk, absolute);
+                PerkEffects.Record(Perk, before, __instance.BaseOverweightLimits.x);
+            }
+            catch (Exception e)
+            {
+                PerkEffects.Disable(Perk, e);
+            }
+        }
+
+        private static Vector2 Fix(Vector2 current, Vector2 config, float vanilla, float perk, float absolute) =>
+            new Vector2(
+                PerkPatchMath.OverweightLimit(current.x, config.x, vanilla, perk, absolute),
+                PerkPatchMath.OverweightLimit(current.y, config.y, vanilla, perk, absolute));
+    }
+
     /// <summary>10 체력: 다리 스태미나 최대치에 <c>baseValue × 0.15</c>를 더한다 (지구력 버프 +0.15). baseValue 는 SVM 이 바꾼 Stamina.Capacity 다.</summary>
     [HarmonyPatch]
     internal static class StaminaCapacityPatch
