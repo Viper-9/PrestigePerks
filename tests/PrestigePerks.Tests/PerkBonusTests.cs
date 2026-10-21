@@ -42,7 +42,7 @@ public class PerkBonusTests
 
         Assert.Equal(["64f5b9e5fa34f11b380756f8", "8bcbeb65b78be907af6ee2b0", "26b6ac04721b710794837e2c", "24656f22d00ab74d124b8174", "bfa913d120f3845fffd516e0"], Ids(pmc));
         var scav = pmc.Bonuses!.Single(bonus => bonus.Type == BonusType.ScavCooldownTimer);
-        Assert.Equal(-25, scav.Value);
+        Assert.Equal(-30, scav.Value);
         Assert.True(scav.IsPassive);
         Assert.False(scav.IsProduction);
     }

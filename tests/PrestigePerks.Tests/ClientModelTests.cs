@@ -52,13 +52,13 @@ public class ClientModelTests
         Assert.Equal(4, state.Bonuses.Count);
         var experience = state.Bonuses.Single(bonus => bonus.Id == "8bcbeb65b78be907af6ee2b0");
         Assert.Equal("ExperienceRate", experience.Type);
-        Assert.Equal(20, experience.Value);
+        Assert.Equal(30, experience.Value);
         // 서버는 BonusSkillType 을 숫자로 보낸다. 클라이언트 ESkillClass 도 Physical, Combat, Special, Practical, Mental 순이라 Enum.TryParse 가 맞게 읽는다
         Assert.Equal([((int)BonusSkillType.Practical).ToString(), ((int)BonusSkillType.Mental).ToString()],
             state.Bonuses.Where(bonus => bonus.Type == "SkillGroupLevelingBoost").Select(bonus => bonus.SkillType));
         Assert.Equal(["Physical", "Combat", "Special", "Practical", "Mental"], Enum.GetNames<BonusSkillType>());
         var scav = state.Bonuses.Single(bonus => bonus.Type == "ScavCooldownTimer");
-        Assert.Equal(-25, scav.Value);
+        Assert.Equal(-30, scav.Value);
         Assert.True(scav.Passive);
         Assert.False(scav.Production);
         Assert.True(scav.Visible);
@@ -78,8 +78,9 @@ public class ClientModelTests
     public void Reads_the_slot_and_shake_flags()
     {
         // SPT JsonUtil 은 정적 옵션을 고쳐 다른 테스트와 겹치므로 System.Text.Json 으로 직접 쓴다
-        var server = new PerkState { PrestigeLevel = 2, ShakeEnabled = false, SlotOpensAt = new PerkConfig().SlotOpensAt(2) };
+        var server = new PerkState { PrestigeLevel = 2, FreeRerolls = 99, ShakeEnabled = false, SlotOpensAt = new PerkConfig().SlotOpensAt(2) };
         var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(server))!;
+        Assert.Equal(99, state.FreeRerolls);
         Assert.False(state.ShakeEnabled);
         Assert.Null(PerkPageModel.OpensAt(state, 1));
         Assert.Equal(3, PerkPageModel.OpensAt(state, 2));

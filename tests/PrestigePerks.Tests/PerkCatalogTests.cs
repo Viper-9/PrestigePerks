@@ -20,12 +20,12 @@ public class PerkCatalogTests
 
     // 프로필 메모리와 저장 필터가 이 값으로 찾는다. 바뀌면 이전 Bonus 가 남으므로 값 자체를 고정한다
     [Theory]
-    [InlineData(1, "8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 20.0, null)]
-    [InlineData(2, "5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 20.0, BonusSkillType.Physical)]
-    [InlineData(3, "f1360d70ed3bb18289339797", BonusType.SkillGroupLevelingBoost, 20.0, BonusSkillType.Combat)]
-    [InlineData(4, "26b6ac04721b710794837e2c", BonusType.SkillGroupLevelingBoost, 20.0, BonusSkillType.Practical)]
-    [InlineData(4, "24656f22d00ab74d124b8174", BonusType.SkillGroupLevelingBoost, 20.0, BonusSkillType.Mental)]
-    [InlineData(8, "bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -25.0, null)]
+    [InlineData(1, "8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 30.0, null)]
+    [InlineData(2, "5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 30.0, BonusSkillType.Physical)]
+    [InlineData(3, "f1360d70ed3bb18289339797", BonusType.SkillGroupLevelingBoost, 30.0, BonusSkillType.Combat)]
+    [InlineData(4, "26b6ac04721b710794837e2c", BonusType.SkillGroupLevelingBoost, 30.0, BonusSkillType.Practical)]
+    [InlineData(4, "24656f22d00ab74d124b8174", BonusType.SkillGroupLevelingBoost, 30.0, BonusSkillType.Mental)]
+    [InlineData(8, "bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -30.0, null)]
     public void Bonus_ids_and_values_are_pinned(int number, string id, BonusType type, double value, BonusSkillType? skill)
     {
         Assert.True(PerkCatalog.TryGet(number, out var perk));
