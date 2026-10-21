@@ -25,7 +25,6 @@
   "ui.close": "Back",
   "ui.loading": "Loading…",
   "ui.noSlots": "No perk slots are open",
-  "ui.allLocked": "Every slot is locked",
   "ui.notEnoughCoins": "Not enough coins (need {0}, have {1})",
   "ui.costChanged": "The cost changed. Press again",
   "ui.network": "Could not reach the server",

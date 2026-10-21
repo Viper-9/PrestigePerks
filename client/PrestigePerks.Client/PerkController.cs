@@ -423,11 +423,6 @@ namespace PrestigePerks
 
         private string RollError(string error)
         {
-            if (error != null && error.Contains(nameof(RollBlock.AllLocked)))
-            {
-                return Locale.Get("ui.allLocked");
-            }
-
             if (error != null && error.Contains("CostChanged"))
             {
                 return Locale.Get("ui.costChanged");

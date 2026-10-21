@@ -756,8 +756,6 @@ namespace PrestigePerks.UI
             {
                 case RollBlock.NoSlots:
                     return locale.Get("ui.noSlots");
-                case RollBlock.AllLocked:
-                    return locale.Get("ui.allLocked");
                 case RollBlock.NotEnoughCoins:
                     return locale.Format("ui.notEnoughCoins", state.NextRerollCost, coins);
                 default:
