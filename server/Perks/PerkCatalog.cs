@@ -24,14 +24,14 @@ public static class PerkCatalog
 {
     public static IReadOnlyList<PerkDefinition> All { get; } =
     [
-        Bonus(1, "experience", new PerkBonus("8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 20)),
-        Bonus(2, "conditioning", new PerkBonus("5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 20, BonusSkillType.Physical)),
-        Bonus(3, "combat", new PerkBonus("f1360d70ed3bb18289339797", BonusType.SkillGroupLevelingBoost, 20, BonusSkillType.Combat)),
+        Bonus(1, "experience", new PerkBonus("8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 30)),
+        Bonus(2, "conditioning", new PerkBonus("5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Physical)),
+        Bonus(3, "combat", new PerkBonus("f1360d70ed3bb18289339797", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Combat)),
         Bonus(4, "learning",
-            new PerkBonus("26b6ac04721b710794837e2c", BonusType.SkillGroupLevelingBoost, 20, BonusSkillType.Practical),
-            new PerkBonus("24656f22d00ab74d124b8174", BonusType.SkillGroupLevelingBoost, 20, BonusSkillType.Mental)),
+            new PerkBonus("26b6ac04721b710794837e2c", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Practical),
+            new PerkBonus("24656f22d00ab74d124b8174", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Mental)),
         // 음수 값 타입은 음수일 때 은신처 관리 증폭이 걸린다. 반드시 음수로 넣는다
-        Bonus(8, "scav", new PerkBonus("bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -25)),
+        Bonus(8, "scav", new PerkBonus("bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -30)),
         Patch(9, "porter"),
         Patch(10, "stamina"),
         Patch(11, "tough"), // 골절·출혈. 12번(출혈)을 합쳤다 (2026-10-19)

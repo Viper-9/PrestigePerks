@@ -17,7 +17,7 @@ namespace PrestigePerks.Patches
     // 공통 규칙: PerkEffects.Has → PerkTarget.IsPmc 순서로 거르고, 본문은 계수만 곱한다 (LINQ·문자열·로그·new 금지).
     // 원래 함수를 건너뛰지 않는다. 예외가 나면 그 특전만 끈다. 패치 클래스마다 Plugin.PatchOne 으로 따로 등록한다.
 
-    /// <summary>9 짐꾼: 소지 무게 한도 배율 <c>1 + 근력 버프</c>에 +0.15. 장비 화면·체력 패널 표시도 같은 값을 읽는다.</summary>
+    /// <summary>9 짐꾼: 소지 무게 한도 배율 <c>1 + 근력 버프</c>에 +0.2. 장비 화면·체력 패널 표시도 같은 값을 읽는다.</summary>
     [HarmonyPatch]
     internal static class CarryingWeightPatch
     {
@@ -149,7 +149,7 @@ namespace PrestigePerks.Patches
         private static void Finalizer() => PmcShot = false;
     }
 
-    /// <summary>24 숙련 (안쪽): 플래그가 켜져 있고 숙련도면 증가량 ×1.2. Mastering 은 OnTrigger 를 재정의하지 않아 여기를 지난다.</summary>
+    /// <summary>24 숙련 (안쪽): 플래그가 켜져 있고 숙련도면 증가량 ×1.3. Mastering 은 OnTrigger 를 재정의하지 않아 여기를 지난다.</summary>
     [HarmonyPatch]
     internal static class MasteringTriggerPatch
     {
@@ -181,8 +181,8 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 26 수색: 속도 ×1.2. 속도는 비동기 SearchContent 안에서 <c>1 + 주의력 (+ 수색)</c>으로 계산되어 인자로 바꿀 수 없다 (transpiler 금지).
-    /// 두 값은 SearchContent 만 읽으므로(IInventoryProfileSkillInfo) getter 를 고쳐 두 식 모두 ×1.2가 되게 한다. 판정은 SkillManager == PMC.Skills (= _profile).
+    /// 26 수색: 속도 ×1.3. 속도는 비동기 SearchContent 안에서 <c>1 + 주의력 (+ 수색)</c>으로 계산되어 인자로 바꿀 수 없다 (transpiler 금지).
+    /// 두 값은 SearchContent 만 읽으므로(IInventoryProfileSkillInfo) getter 를 고쳐 두 식 모두 ×1.3이 되게 한다. 판정은 SkillManager == PMC.Skills (= _profile).
     /// </summary>
     [HarmonyPatch]
     internal static class AttentionLootSpeedPatch
@@ -244,7 +244,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 11 강인 (바깥): PMC 본인이 맞는 동안 골절·출혈 판정 설정 객체를 정적 필드에 둔다. 안쪽 Try 패치는 이 객체와 같을 때만 cap 을 ÷0.85 한다.
+    /// 11 강인 (바깥): PMC 본인이 맞는 동안 골절·출혈 판정 설정 객체를 정적 필드에 둔다. 안쪽 Try 패치는 이 객체와 같을 때만 cap 을 ÷0.8 한다.
     /// 같은 설정 객체를 봇도 쓰므로 범위가 필요하다. 이벤트 안에서 다른 플레이어가 맞는 중첩 호출에 대비해 이전 값을 __state 로 되돌린다.
     /// </summary>
     [HarmonyPatch]
@@ -308,7 +308,7 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>11 (안쪽): 바깥에서 둔 골절·출혈 설정 객체의 판정이면 cap ÷0.85 (확률 ×0.85). 그 외 Try 는 그대로. 둘 다 11번으로 센다.</summary>
+    /// <summary>11 (안쪽): 바깥에서 둔 골절·출혈 설정 객체의 판정이면 cap ÷0.8 (확률 ×0.8). 그 외 Try 는 그대로. 둘 다 11번으로 센다.</summary>
     [HarmonyPatch]
     internal static class ProbabilityTryPatch
     {
@@ -331,7 +331,7 @@ namespace PrestigePerks.Patches
         }
     }
 
-    /// <summary>14 제어: 무기 종류 스킬 반동 버프 x 에 +0.05. 무기를 들 때와 스킬 동기화 때만 불린다.</summary>
+    /// <summary>14 제어: 무기 종류 스킬 반동 버프 x 에 +0.1. 무기를 들 때와 스킬 동기화 때만 불린다.</summary>
     [HarmonyPatch]
     internal static class RecoilSuppressionPatch
     {
@@ -397,7 +397,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 30 조작: 레이드 인체공학에 고정 +5. 조준 속도·흔들림·팔 스태미나에만 쓰이고 무기 정보 화면 숫자는 바닐라처럼 그대로다.
+    /// 30 조작: 레이드 인체공학에 고정 +10. 조준 속도·흔들림·팔 스태미나에만 쓰이고 무기 정보 화면 숫자는 바닐라처럼 그대로다.
     /// 결과는 _deferredErgonomic 캐시 값이라 무기·장비·스킬이 바뀔 때만 다시 계산된다. 팔 부상이면 바닐라가 0을 돌려주므로 그대로 둔다.
     /// </summary>
     [HarmonyPatch]
@@ -644,7 +644,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 27 군의관 (안쪽): 파괴된 부위에 수술 키트를 쓸 때(바닐라 조건과 같음) 효과 시간에 <c>(1 + s) ÷ (1 + s + 0.15)</c>.
+    /// 27 군의관 (안쪽): 파괴된 부위에 수술 키트를 쓸 때(바닐라 조건과 같음) 효과 시간에 <c>(1 + s) ÷ (1 + s + 0.2)</c>.
     /// bodyPart 인자는 DoMedEffect 가 고른 실제 부위다.
     /// </summary>
     [HarmonyPatch]
@@ -682,7 +682,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 25 장전: 삽탄·탄 빼기 1발 시간 ×0.9. 시간은 비동기 LoadMagazine/UnloadMagazine 의 지역 변수라 그 값을 받는 Process 생성자에서 바꾼다.
+    /// 25 장전: 삽탄·탄 빼기 1발 시간 ×0.8. 시간은 비동기 LoadMagazine/UnloadMagazine 의 지역 변수라 그 값을 받는 Process 생성자에서 바꾼다.
     /// ContinuousLoadAmmo 도 같은 LoadMagazine 을 불러 같이 적용된다. 판정은 인자 InventoryController.ID.
     /// </summary>
     [HarmonyPatch]

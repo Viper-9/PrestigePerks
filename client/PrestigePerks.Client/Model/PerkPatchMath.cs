@@ -12,18 +12,18 @@ namespace PrestigePerks.Model
         /// <summary>특전 번호로 찾는 배열 크기. 가장 큰 번호 32.</summary>
         public const int Size = 33;
 
-        public const float PorterWeight = 0.15f;      // 9: 근력 버프에 +0.15
+        public const float PorterWeight = 0.2f;       // 9: 근력 버프에 +0.2
         public const float StaminaBuff = 0.15f;       // 10: 지구력 버프에 +0.15
         public const float ConsumptionFactor = 0.85f; // 16: 에너지·수분 소모 ×0.85
-        public const float MasteringFactor = 1.2f;    // 24: 숙련도 증가 ×1.2
-        public const float SearchFactor = 1.2f;       // 26: 수색 속도 ×1.2
-        public const float ChanceFactor = 0.85f;      // 11: 골절·출혈 확률 ×0.85
-        public const float RecoilBuff = 0.05f;        // 14: 무기 종류 스킬 반동 버프 x 에 +0.05
+        public const float MasteringFactor = 1.3f;    // 24: 숙련도 증가 ×1.3
+        public const float SearchFactor = 1.3f;       // 26: 수색 속도 ×1.3
+        public const float ChanceFactor = 0.8f;       // 11: 골절·출혈 확률 ×0.8
+        public const float RecoilBuff = 0.1f;         // 14: 무기 종류 스킬 반동 버프 x 에 +0.1
         public const float WeaponWearFactor = 0.8f;   // 15: 사격 시 무기 내구도 손실 ×0.8
-        public const float LoadTimeFactor = 0.9f;     // 25: 삽탄·탄 빼기 1발 시간 ×0.9
+        public const float LoadTimeFactor = 0.8f;     // 25: 삽탄·탄 빼기 1발 시간 ×0.8
         public const float ArmorWearFactor = 0.8f;    // 15: 방어구 내구도 감소 ×0.8 (28번을 합쳤다)
         public const float ReloadFactor = 1.1f;       // 29: 재장전 애니메이션 속도 ×1.1
-        public const float ErgonomicsPoints = 5f;     // 30: 레이드 인체공학에 고정 +5
+        public const float ErgonomicsPoints = 10f;    // 30: 레이드 인체공학에 고정 +10
         public const float MalfunctionFactor = 0.8f;  // 31: 사격 고장 확률 ×0.8
         public const float OverheatFactor = 0.8f;     // 31: 발당 과열 ×0.8
         public const float MoveSpeedFactor = 1.05f;   // 32: 걷기·전력질주 이동량 ×1.05
@@ -51,7 +51,7 @@ namespace PrestigePerks.Model
             return active;
         }
 
-        /// <summary>9: <c>1 + 근력 버프</c> → <c>+ 0.15</c>.</summary>
+        /// <summary>9: <c>1 + 근력 버프</c> → <c>+ 0.2</c>.</summary>
         public static float CarryingWeight(float vanilla) => Positive(vanilla + PorterWeight, vanilla);
 
         /// <summary>10: <c>max(1, base × (1 + 지구력 버프) + 자극제)</c>에 <c>base × 0.15</c>를 더한다. 지구력 버프에 +0.15와 같다.</summary>
@@ -64,12 +64,12 @@ namespace PrestigePerks.Model
         /// <summary>16: 초당 소모량 ×0.85. 음수(회복)는 바닐라에 없지만 들어오면 그대로 둔다.</summary>
         public static float Consumption(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * ConsumptionFactor : vanilla;
 
-        /// <summary>24: 숙련도 증가량 ×1.2. 0 이하(감소)는 그대로.</summary>
+        /// <summary>24: 숙련도 증가량 ×1.3. 0 이하(감소)는 그대로.</summary>
         public static float Mastering(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * MasteringFactor : vanilla;
 
         /// <summary>
         /// 26: 수색 속도는 장비면 <c>1 + 주의력 + 수색</c>, 아니면 <c>1 + 주의력</c>이다 (ActiveSearchContentOperation.SearchContent).
-        /// 주의력을 <c>1.2a + 0.2</c>, 수색을 <c>1.2s</c>로 바꾸면 두 식 모두 정확히 ×1.2가 된다.
+        /// 주의력을 <c>1.3a + 0.3</c>, 수색을 <c>1.3s</c>로 바꾸면 두 식 모두 정확히 ×1.3이 된다.
         /// </summary>
         public static float AttentionLootSpeed(float vanilla)
         {
@@ -85,7 +85,7 @@ namespace PrestigePerks.Model
         }
 
         /// <summary>
-        /// 11: 바닐라 판정 <c>Random(0, cap) &lt; 확률</c>의 cap 을 ÷0.85 한다 (확률 ×0.85). cap 은 <c>1 + 스킬 버프</c>.
+        /// 11: 바닐라 판정 <c>Random(0, cap) &lt; 확률</c>의 cap 을 ÷0.8 한다 (확률 ×0.8). cap 은 <c>1 + 스킬 버프</c>.
         /// </summary>
         public static float ChanceCap(float vanilla)
         {
@@ -93,7 +93,7 @@ namespace PrestigePerks.Model
             return vanilla > 0f && Finite(value) ? value : vanilla;
         }
 
-        /// <summary>14: 반동 버프 x 에 +0.05. <see cref="MaxRecoilBuff"/>를 넘기지 않고, 바닐라보다 작아지지 않는다.</summary>
+        /// <summary>14: 반동 버프 x 에 +0.1. <see cref="MaxRecoilBuff"/>를 넘기지 않고, 바닐라보다 작아지지 않는다.</summary>
         public static float RecoilSuppression(float vanilla)
         {
             var value = Math.Min(vanilla + RecoilBuff, MaxRecoilBuff);
@@ -109,7 +109,7 @@ namespace PrestigePerks.Model
             return vanilla < 1f && Finite(value) ? value : vanilla;
         }
 
-        /// <summary>25: 탄 1발 대기 시간 ×0.9.</summary>
+        /// <summary>25: 탄 1발 대기 시간 ×0.8.</summary>
         public static float LoadOneAmmoSpeed(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * LoadTimeFactor : vanilla;
 
         /// <summary>15: 방어구 내구도 감소량 ×0.8. 바닐라가 앞에서 최소 1을 적용한다.</summary>
@@ -118,11 +118,11 @@ namespace PrestigePerks.Model
         /// <summary>29: 재장전 애니메이션 속도 ×1.1.</summary>
         public static float ReloadSpeed(float vanilla) => vanilla > 0f && Finite(vanilla * ReloadFactor) ? vanilla * ReloadFactor : vanilla;
 
-        public const float SurgeryBuff = 0.15f;       // 27: 수술 속도 버프에 +0.15 (효과 시간만)
+        public const float SurgeryBuff = 0.2f;        // 27: 수술 속도 버프에 +0.2 (효과 시간만)
 
         /// <summary>
         /// 27: 바닐라는 파괴된 부위 수술 효과 시간을 <c>÷ (1 + 수술 속도)</c> 한다 (ActiveHealthController.DoMedEffect).
-        /// 그 결과에 <c>(1 + s) ÷ (1 + s + 0.15)</c>를 곱해 버프 +0.15와 같게 한다.
+        /// 그 결과에 <c>(1 + s) ÷ (1 + s + 0.2)</c>를 곱해 버프 +0.2와 같게 한다.
         /// </summary>
         public static float SurgeryTime(float vanilla, float surgerySpeed)
         {
@@ -153,7 +153,7 @@ namespace PrestigePerks.Model
         }
 
         /// <summary>
-        /// 30: 레이드 인체공학(FirearmController.TotalErgonomicsFunc 결과, 0 이상)에 고정 +5.
+        /// 30: 레이드 인체공학(FirearmController.TotalErgonomicsFunc 결과, 0 이상)에 고정 +10.
         /// 배율이면 반동을 잡으려고 인체공학을 버린 총에서 효과가 거의 없어 고정값으로 한다 (dev-docs 기록/특전_최종_검수.md 1.2절).
         /// </summary>
         public static float Ergonomics(float vanilla) => vanilla >= 0f && Finite(vanilla) ? vanilla + ErgonomicsPoints : vanilla;
