@@ -72,18 +72,20 @@ public static class PerkRules
     /// <summary>
     /// 새 단계 진입 처리. 단계가 기록보다 높으면 무료 횟수를 다시 채우고 유료 회차를 0 으로 되돌린다.
     /// 같은 단계에서 config freeRerolls 가 이 단계에 준 값과 다르면 차이만큼 남은 무료 횟수를 고친다 (0 아래로는 내리지 않는다).
+    /// P0(프레스티지 전)은 prestigeLevel0Slots 가 1 이상일 때만 처리하고, 무료 횟수는 처음 한 번 준다 (P1 로 올라가면 다시 채운다).
     /// 슬롯이 단계의 슬롯 수보다 적으면 빈 슬롯을 "전체 − 보유 특전"에서 자동 추첨한다 (무료 횟수 차감 없음). 새 프레스티지와 소급 유저가 같은 규칙이다.
     /// </summary>
     /// <returns>데이터가 바뀌었는지와 새로 뽑은 특전.</returns>
     public static (bool Changed, IReadOnlyList<int> NewPerks) EnterLevel(PerkData data, int prestigeLevel, PerkConfig config, Random random)
     {
-        if (prestigeLevel <= 0)
+        if (prestigeLevel < 0 || (prestigeLevel == 0 && config.Slots(0) == 0))
         {
             return (false, []);
         }
 
         var changed = false;
-        if (prestigeLevel > data.Rerolls.Level)
+        // P0 은 기록 단계(0)보다 높아질 수 없어 처음 한 번(아직 준 적 없음)을 따로 본다
+        if (prestigeLevel > data.Rerolls.Level || (prestigeLevel == 0 && data.Rerolls.FreeGranted is null))
         {
             data.Rerolls = new PerkRerolls { Level = prestigeLevel, FreeLeft = config.FreeRerolls, FreeGranted = config.FreeRerolls, Paid = 0 };
             changed = true;

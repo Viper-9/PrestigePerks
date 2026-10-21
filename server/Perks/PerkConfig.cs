@@ -27,7 +27,10 @@ public sealed record PerkConfig
 
     public const int MaxSlots = 6, MaxLevel = 6, MaxFreeRerolls = 99, DefaultFreeRerolls = 3;
 
-    /// <summary>P1 ~ P6 에서 열리는 슬롯 수 (0~6). 앞에서부터 이 수만큼 특전 효과가 난다.</summary>
+    /// <summary>P0(프레스티지 전) ~ P6 에서 열리는 슬롯 수 (0~6). 앞에서부터 이 수만큼 특전 효과가 난다. P0 은 기본 0 (특전 없음).</summary>
+    [JsonPropertyName("prestigeLevel0Slots")]
+    public int PrestigeLevel0Slots { get; init; }
+
     [JsonPropertyName("prestigeLevel1Slots")]
     public int PrestigeLevel1Slots { get; init; } = 1;
 
@@ -66,10 +69,10 @@ public sealed record PerkConfig
     public int BasePrice(int prestigeLevel) =>
         RerollBasePrice[Math.Clamp(prestigeLevel, 1, RerollBasePrice.Count) - 1];
 
-    /// <summary>이 단계에서 열리는 슬롯 수. P0 은 0, P6 보다 높으면 P6 값.</summary>
-    public int Slots(int prestigeLevel) => prestigeLevel <= 0 ? 0 : LevelSlots[Math.Min(prestigeLevel, MaxLevel) - 1];
+    /// <summary>이 단계에서 열리는 슬롯 수. 음수 단계는 0, P6 보다 높으면 P6 값.</summary>
+    public int Slots(int prestigeLevel) => prestigeLevel < 0 ? 0 : LevelSlots[Math.Min(prestigeLevel, MaxLevel)];
 
-    private int[] LevelSlots => [PrestigeLevel1Slots, PrestigeLevel2Slots, PrestigeLevel3Slots, PrestigeLevel4Slots, PrestigeLevel5Slots, PrestigeLevel6Slots];
+    private int[] LevelSlots => [PrestigeLevel0Slots, PrestigeLevel1Slots, PrestigeLevel2Slots, PrestigeLevel3Slots, PrestigeLevel4Slots, PrestigeLevel5Slots, PrestigeLevel6Slots];
 
     /// <summary>
     /// 슬롯 칸마다 지금 단계보다 높은 어느 단계에서 열리는지 (닫힌 칸 안내용). 이미 열렸거나 더 높은 단계에서도 열리지 않으면 null.
@@ -111,6 +114,7 @@ public sealed record PerkConfig
         return this with
         {
             FreeRerolls = Clamp("freeRerolls", FreeRerolls, MaxFreeRerolls),
+            PrestigeLevel0Slots = Clamp("prestigeLevel0Slots", PrestigeLevel0Slots, MaxSlots),
             PrestigeLevel1Slots = Clamp("prestigeLevel1Slots", PrestigeLevel1Slots, MaxSlots),
             PrestigeLevel2Slots = Clamp("prestigeLevel2Slots", PrestigeLevel2Slots, MaxSlots),
             PrestigeLevel3Slots = Clamp("prestigeLevel3Slots", PrestigeLevel3Slots, MaxSlots),
