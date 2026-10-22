@@ -108,11 +108,11 @@ public class PerkPatchMathTests
         Assert.Equal(0.8f, PerkPatchMath.ArmorDamage(1f), Tolerance); // 바닐라 최소 1 → 0.8
         Assert.Equal(0f, PerkPatchMath.ArmorDamage(0f));
 
-        Assert.Equal(1.32f, PerkPatchMath.ReloadSpeed(1.2f), Tolerance);
+        Assert.Equal(1.38f, PerkPatchMath.ReloadSpeed(1.2f), Tolerance);
 
-        // 엘리트 수술 0.4: 효과 시간 ÷1.4 → ÷1.6
-        Assert.Equal(100f / 1.6f, PerkPatchMath.SurgeryTime(100f / 1.4f, 0.4f), Tolerance);
-        Assert.Equal(100f / 1.2f, PerkPatchMath.SurgeryTime(100f, 0f), Tolerance);
+        // 엘리트 수술 0.4: 효과 시간 ÷1.4 → ÷1.65
+        Assert.Equal(100f / 1.65f, PerkPatchMath.SurgeryTime(100f / 1.4f, 0.4f), Tolerance);
+        Assert.Equal(100f / 1.25f, PerkPatchMath.SurgeryTime(100f, 0f), Tolerance);
         Assert.Equal(-1f, PerkPatchMath.SurgeryTime(-1f, 0.4f));
     }
 
