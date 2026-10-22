@@ -22,7 +22,7 @@ namespace PrestigePerks.Model
         public const float WeaponWearFactor = 0.8f;   // 15: 사격 시 무기 내구도 손실 ×0.8
         public const float LoadTimeFactor = 0.8f;     // 25: 삽탄·탄 빼기 1발 시간 ×0.8
         public const float ArmorWearFactor = 0.8f;    // 15: 방어구 내구도 감소 ×0.8 (28번을 합쳤다)
-        public const float ReloadFactor = 1.1f;       // 29: 재장전 애니메이션 속도 ×1.1
+        public const float ReloadFactor = 1.15f;      // 29: 재장전 애니메이션 속도 ×1.15
         public const float ErgonomicsPoints = 10f;    // 30: 레이드 인체공학에 고정 +10
         public const float MalfunctionFactor = 0.8f;  // 31: 사격 고장 확률 ×0.8
         public const float OverheatFactor = 0.8f;     // 31: 발당 과열 ×0.8
@@ -130,10 +130,10 @@ namespace PrestigePerks.Model
         /// <summary>15: 방어구 내구도 감소량 ×0.8. 바닐라가 앞에서 최소 1을 적용한다.</summary>
         public static float ArmorDamage(float vanilla) => vanilla > 0f && Finite(vanilla) ? vanilla * ArmorWearFactor : vanilla;
 
-        /// <summary>29: 재장전 애니메이션 속도 ×1.1.</summary>
+        /// <summary>29: 재장전 애니메이션 속도 ×1.15.</summary>
         public static float ReloadSpeed(float vanilla) => vanilla > 0f && Finite(vanilla * ReloadFactor) ? vanilla * ReloadFactor : vanilla;
 
-        public const float SurgeryBuff = 0.2f;        // 27: 수술 속도 버프에 +0.2 (효과 시간만)
+        public const float SurgeryBuff = 0.25f;       // 27: 수술 속도 버프에 +0.25 (효과 시간만)
 
         /// <summary>
         /// 27: 바닐라는 파괴된 부위 수술 효과 시간을 <c>÷ (1 + 수술 속도)</c> 한다 (ActiveHealthController.DoMedEffect).

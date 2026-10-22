@@ -413,7 +413,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 29 재장전: 재장전 애니메이션 속도 ×1.1. WeaponBuffsInfo 는 클래스라 결과 필드를 바로 고친다.
+    /// 29 재장전: 재장전 애니메이션 속도 ×1.15. WeaponBuffsInfo 는 클래스라 결과 필드를 바로 고친다.
     /// 팔 부상 때 바닐라는 이 값을 쓰지 않고 1로 되돌리므로(SetAnimatorAndProceduralValues) 그 규칙은 그대로다.
     /// </summary>
     [HarmonyPatch]
