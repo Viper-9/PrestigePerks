@@ -174,8 +174,9 @@ def main():
     if server_running():
         fail("SPT 서버가 켜져 있습니다. 서버를 끄고 다시 실행하세요")
 
+    # 배포된 모드 설정을 먼저 쓴다. 프레스티지 조건이 없는 빌드가 배포돼 있으면 저장소 설정을 쓴다
     config_path = runtime / "user" / "mods" / "PrestigePerks" / "config" / "config.json"
-    if not config_path.exists():
+    if not config_path.exists() or "prestige" not in read_jsonc(config_path):
         config_path = REPO / "server" / "config" / "config.json"
     stage = read_jsonc(config_path)["prestige"]["stages"][args.target - 1]
     exp_table = json.loads((runtime / "SPT_Data" / "database" / "globals.json").read_text(encoding="utf-8"))["config"]["exp"]["level"]["exp_table"]
