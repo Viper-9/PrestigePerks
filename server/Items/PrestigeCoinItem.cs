@@ -1,3 +1,4 @@
+using PrestigePerks.Perks;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
@@ -17,7 +18,8 @@ namespace PrestigePerks.Items;
 public class PrestigeCoinItem(
     ISptLogger<PrestigeCoinItem> logger,
     CustomItemService customItemService,
-    ModHelper modHelper) : IOnLoad
+    ModHelper modHelper,
+    PerkConfigLoader configLoader) : IOnLoad
 {
     /// <summary>프레스티지 코인 템플릿 ID. 한 번 정하면 바꾸지 않는다 (플레이어 프로필에 저장됨).</summary>
     public const string TemplateId = "9fc8dc52dd7dbf55fc27ac09";
@@ -39,7 +41,7 @@ public class PrestigeCoinItem(
         var bundlePath = System.IO.Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PrestigeCoinItem).Assembly), "bundles", BundleKey);
         var bundleAvailable = File.Exists(bundlePath);
 
-        var result = customItemService.CreateItemFromClone(BuildDetails(bundleAvailable));
+        var result = customItemService.CreateItemFromClone(BuildDetails(bundleAvailable, configLoader.SafeCoins));
         if (result.Success != true)
         {
             logger.Error($"[PrestigePerks] 프레스티지 코인 생성 실패: {string.Join(", ", result.Errors ?? [])}");
@@ -58,7 +60,7 @@ public class PrestigeCoinItem(
         return Task.CompletedTask;
     }
 
-    internal static NewItemFromCloneDetails BuildDetails(bool bundleAvailable) =>
+    internal static NewItemFromCloneDetails BuildDetails(bool bundleAvailable, SafeCoinConfig? safeCoins = null) =>
         new()
         {
             ItemTplToClone = TarCoinTemplateId,
@@ -75,6 +77,9 @@ public class PrestigeCoinItem(
                 InsuranceDisabled = true,
                 IsUnsaleable = true,
                 CanSellOnRagfair = false,
+                // 금고에서 나올 때 스택 수 (화폐는 맵 루트 생성 때 이 범위에서 고른다, PrestigeCoinLoot)
+                StackMinRandom = (safeCoins ?? new SafeCoinConfig()).MinStack,
+                StackMaxRandom = (safeCoins ?? new SafeCoinConfig()).MaxStack,
             },
             HandbookParentId = HandbookValuablesId,
             HandbookPriceRoubles = PriceRoubles,

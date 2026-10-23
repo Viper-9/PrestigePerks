@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using PrestigePerks.Items;
 using PrestigePerks.Prestiges;
 
 namespace PrestigePerks.Perks;
@@ -159,4 +160,7 @@ public sealed record ModConfig
 
     [JsonPropertyName("prestige")]
     public PrestigeConfig Prestige { get; init; } = new();
+
+    [JsonPropertyName("safeCoins")]
+    public SafeCoinConfig SafeCoins { get; init; } = new();
 }

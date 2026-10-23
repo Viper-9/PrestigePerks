@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PrestigePerks.Items;
 using PrestigePerks.Prestiges;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -24,6 +25,8 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
 
     public PrestigeConfig Prestige => config.Value.Prestige;
 
+    public SafeCoinConfig SafeCoins => config.Value.SafeCoins;
+
     private static ModConfig Load(ISptLogger<PerkConfigLoader> logger, ModHelper modHelper)
     {
         var path = Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PerkConfigLoader).Assembly), "config", FileName);
@@ -45,7 +48,7 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
         return new ModConfig();
     }
 
-    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige)마다 검사해 잘못된 항목만 기본값으로 바꾼다.</summary>
+    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige, safeCoins)마다 검사해 잘못된 항목만 기본값으로 바꾼다.</summary>
     internal static ModConfig Validated(ModConfig config, Action<string> warn)
     {
         var perks = (config.Perks ?? new PerkConfig()).Clamped(warn);
@@ -62,7 +65,14 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
             prestige = new PrestigeConfig();
         }
 
-        return config with { Perks = perks, Prestige = prestige };
+        var safeCoins = config.SafeCoins ?? new SafeCoinConfig();
+        if (safeCoins.Validate() is { } safeCoinError)
+        {
+            warn($"{safeCoinError}. safeCoins 항목은 기본값을 씁니다");
+            safeCoins = new SafeCoinConfig();
+        }
+
+        return config with { Perks = perks, Prestige = prestige, SafeCoins = safeCoins };
     }
 
     internal static ModConfig ParseModConfig(string json) => JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig();

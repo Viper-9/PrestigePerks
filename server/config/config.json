@@ -62,5 +62,10 @@
         "extraQuests": []
       }
     ]
+  },
+  "safeCoins": {
+    "chance": 0.2,
+    "minStack": 5,
+    "maxStack": 10
   }
 }
