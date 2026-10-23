@@ -20,6 +20,7 @@ public class Plugin : BaseUnityPlugin
         PerkController.Create();
         PatchOne(harmony, typeof(Patches.MenuTaskBarAwakePatch));
         PatchOne(harmony, typeof(Patches.MenuScreenShowPatch));
+        PatchOne(harmony, typeof(Patches.PrestigeStatusRecheckPatch));
         PatchOne(harmony, typeof(Patches.PrestigeClaimDiagnosticPatch));
         PatchOne(harmony, typeof(Patches.PrestigeTransferHeaderPatch));
         // 패치 특전 (3차). 하나가 실패해도 나머지 특전은 동작한다
