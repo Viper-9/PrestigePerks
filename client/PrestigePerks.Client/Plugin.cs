@@ -21,6 +21,7 @@ public class Plugin : BaseUnityPlugin
         PatchOne(harmony, typeof(Patches.MenuTaskBarAwakePatch));
         PatchOne(harmony, typeof(Patches.MenuScreenShowPatch));
         PatchOne(harmony, typeof(Patches.PrestigeClaimDiagnosticPatch));
+        PatchOne(harmony, typeof(Patches.PrestigeTransferHeaderPatch));
         // 패치 특전 (3차). 하나가 실패해도 나머지 특전은 동작한다
         PatchOne(harmony, typeof(Patches.CarryingWeightPatch));
         PatchOne(harmony, typeof(Patches.OverweightLimitsPatch));
