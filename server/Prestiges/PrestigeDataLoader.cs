@@ -59,9 +59,9 @@ public class PrestigeDataLoader(ISptLogger<PrestigeDataLoader> logger, TemplateT
 
                 return data;
             });
-            applied.Add(language);
+            applied.Add($"{language} {texts.Count}");
         }
 
-        logger.Info($"[PrestigePerks] prestige transfer window texts set for: {string.Join(", ", applied)} ({string.Join(", ", PrestigeLocales.Texts["en"].Keys)})");
+        logger.Info($"[PrestigePerks] prestige texts set for: {string.Join(", ", applied)}");
     }
 }
