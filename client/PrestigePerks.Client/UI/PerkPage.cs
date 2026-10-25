@@ -54,6 +54,17 @@ namespace PrestigePerks.UI
         private static readonly Color32 TierOffLine = new Color32(40, 46, 49, 255), TierOnLine = new Color32(176, 182, 184, 255);
         private static readonly Color TierOffText = new Color32(64, 70, 73, 255), TierOnText = new Color32(240, 242, 238, 255);
 
+        // 화면 제목은 패널 제목보다 조금 밝게
+        private static readonly Color TitleText = new Color32(232, 234, 230, 255);
+
+        // 버튼 모양: 타르코프 기본 버튼(밝은 회색 그라데이션), 꺼진 버튼·보조 버튼(어두운 그라데이션)
+        private static readonly Color32 ButtonTop = new Color32(158, 162, 158, 255), ButtonBottom = new Color32(98, 102, 102, 255);
+        private static readonly Color ButtonLine = new Color32(186, 190, 186, 255);
+        private static readonly Color32 DarkTop = new Color32(50, 56, 60, 255), DarkBottom = new Color32(32, 36, 39, 255);
+
+        // 버튼 색 틴트 평소 값 (마우스를 올리면 1.0): 기본 버튼 0.9, 보조 버튼 0.87 (≈ ×1.15 밝아짐)
+        private const float ButtonTint = 0.9f, DarkTint = 0.87f;
+
         public event Action<int> LockClicked;
         public event Action RollClicked;
         public event Action CloseClicked;
@@ -251,18 +262,42 @@ namespace PrestigePerks.UI
             var header = UiKit.Rect(content, "Header", Margin, HeaderTop, barWidth, PanelHead);
             UiKit.Sprite(header, PerkSprites.Gradient(new Color32(46, 56, 62, 240), new Color32(24, 29, 32, 240), true), Color.white);
             UiKit.Outline(header, UiKit.Line);
-            var title = UiKit.Label(header, "Title", 16, 23, 300, locale.Get("ui.title"), 26, UiKit.Text);
+            var title = UiKit.Label(header, "Title", 16, 23, 300, locale.Get("ui.title"), 26, TitleText);
             var titleWidth = UiKit.Width(title, title.text);
             levelLabel = UiKit.Label(header, "Level", 16 + titleWidth + 24, 24, 900, "", 16, UiKit.Muted);
             // 프레스티지 숫자를 크게 넣으므로 칸을 넘어도 지우지 않는다
             levelLabel.overflowMode = TextOverflowModes.Overflow;
 
-            var close = UiKit.Rect(header, "Close", barWidth - 16 - 200, 0, 200, PanelHead);
-            var closeHit = UiKit.Image(close, Color.clear);
-            var closeLabel = UiKit.Label(close, "Label", 200, 23, 200, locale.Get("ui.close"), 26, UiKit.Text, TextAlignmentOptions.Right);
-            var closeButton = UiKit.Button(closeHit);
-            closeButton.targetGraphic = closeLabel;
-            closeButton.onClick.AddListener(() => CloseClicked?.Invoke());
+            // 작은 BACK 버튼. 제목과 같은 크기 글자였을 때는 두 번째 제목처럼 보였다
+            var close = SmallButton(header, "Close", barWidth - 8 - 104, 8, 104, 30, locale.Get("ui.close"), 16);
+            close.Label.color = UiKit.Text;
+            OnHover(close.Fill.gameObject, on => close.Outline.color = on ? HoverLine : UiKit.Line);
+            close.Button.onClick.AddListener(() => CloseClicked?.Invoke());
+        }
+
+        /// <summary>
+        /// 작은 버튼 (BACK, 목록 탭): 어두운 보조 버튼 모양으로 만든다. 마우스를 올리면 색 틴트로 바탕이 밝아진다 (테두리는 부르는 쪽이 OnHover 로).
+        /// 눌러도 선택 상태로 남지 않게 내비게이션을 끈다 (선택 상태면 마우스를 올려도 밝아지지 않는다).
+        /// </summary>
+        private static (Button Button, Image Fill, Image Outline, TextMeshProUGUI Label) SmallButton(RectTransform parent, string name, float x, float y,
+            float width, float height, string text, float size)
+        {
+            var rect = UiKit.Rect(parent, name, x, y, width, height);
+            var fill = UiKit.Sprite(rect, PerkSprites.Gradient(DarkTop, DarkBottom), Color.white);
+            var outline = UiKit.Outline(rect, UiKit.Line);
+            var label = UiKit.Label(rect, "Label", width / 2, height / 2, width, text, size, UiKit.Muted, TextAlignmentOptions.Center, FontStyles.Bold);
+            var button = UiKit.Button(fill);
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            SetTint(button, DarkTint);
+            return (button, fill, outline, label);
+        }
+
+        /// <summary>버튼 색 틴트의 평소 값 (마우스를 올리면 1.0).</summary>
+        private static void SetTint(Button button, float normal)
+        {
+            var colors = button.colors;
+            colors.normalColor = colors.selectedColor = new Color(normal, normal, normal, 1);
+            button.colors = colors;
         }
 
         /// <summary>프레스티지 화면 패널: 왼쪽이 밝은 청회색 머리띠 + 평평한 본문.</summary>
@@ -693,7 +728,7 @@ namespace PrestigePerks.UI
             var level = $"<size=24><b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Gold)}>{state.PrestigeLevel}</color></b></size>";
             var tierCap = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{TierName(PerkPageModel.TierCap(state))}</color></b>";
             var collection = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{PerkPageModel.OwnedCount(state)}</color></b>";
-            levelLabel.text = locale.Format("ui.level", level, state.Slots.Count, tierCap, collection, PerkPageModel.AllPerks.Length);
+            levelLabel.text = locale.Format("ui.level", level, tierCap, collection, PerkPageModel.AllPerks.Length);
             coinsValue.text = coins.ToString();
 
             foreach (var pair in rows)
@@ -925,13 +960,13 @@ namespace PrestigePerks.UI
             {
                 case ButtonLook.Roll:
                     // 타르코프 기본 버튼: 조금 어두운 회색 그라데이션에 어두운 글자
-                    fill.sprite = PerkSprites.Gradient(new Color32(158, 162, 158, 255), new Color32(98, 102, 102, 255));
-                    outline.color = new Color32(186, 190, 186, 255);
+                    fill.sprite = PerkSprites.Gradient(ButtonTop, ButtonBottom);
+                    outline.color = ButtonLine;
                     label.color = UiKit.Dark;
                     sub.color = new Color32(30, 34, 36, 255);
                     break;
                 default:
-                    fill.sprite = PerkSprites.Gradient(new Color32(50, 56, 60, 255), new Color32(32, 36, 39, 255));
+                    fill.sprite = PerkSprites.Gradient(DarkTop, DarkBottom);
                     outline.color = UiKit.Line;
                     label.color = sub.color = UiKit.Dim;
                     break;

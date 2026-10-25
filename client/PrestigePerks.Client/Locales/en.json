@@ -1,7 +1,7 @@
 {
   "taskbar": "PERKS",
-  "ui.title": "Perks",
-  "ui.level": "Prestige {0}  ·  Slots {1} / 6  ·  Tier cap {2}  ·  Collection {3} / {4}",
+  "ui.title": "PERKS",
+  "ui.level": "Prestige {0}  ·  Tier cap {1}  ·  Collection {2} / {3}",
   "ui.list": "Perk list",
   "ui.slots": "Equipped slots",
   "ui.slotN": "Slot {0}",
@@ -18,7 +18,7 @@
   "ui.rollFree": "{0} free left",
   "ui.rollPaid": "{0} coins",
   "ui.rolling": "Rolling…",
-  "ui.close": "Back",
+  "ui.close": "BACK",
   "ui.loading": "Loading…",
   "ui.noSlots": "No perk slots are open",
   "ui.notEnoughCoins": "Not enough coins (need {0}, have {1})",
