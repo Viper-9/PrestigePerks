@@ -216,8 +216,9 @@ namespace PrestigePerks.Model
             return state?.TierPrices != null && state.TierPrices.Count > index ? state.TierPrices[index] : DefaultPrices[index];
         }
 
-        /// <summary>효과 수치 문구 (그 단계 값).</summary>
-        public static string EffectValue(PerkStateDto state, int perk, int tier) => PerkAmounts.Format(perk, PerkAmounts.Ratio(state?.TierEffectRatio, tier));
+        /// <summary>효과 수치 문구 (그 단계 값). pointUnit 은 더해지는 특전의 단위 (<see cref="PerkAmounts.Format"/>).</summary>
+        public static string EffectValue(PerkStateDto state, int perk, int tier, string pointUnit = "%") =>
+            PerkAmounts.Format(perk, PerkAmounts.Ratio(state?.TierEffectRatio, tier), pointUnit);
 
         /// <summary>목록에서 끌 수 있는 특전: 장착 안 된 보유 특전.</summary>
         public static bool CanDragRow(PerkStateDto state, int perk) => OwnedTier(state, perk) > 0 && SlotOf(state, perk) < 0;

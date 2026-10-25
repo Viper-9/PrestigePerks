@@ -805,6 +805,9 @@ namespace PrestigePerks.UI
 
         internal static string TierName(int tier) => tier == 1 ? "I" : tier == 2 ? "II" : tier == 3 ? "III" : "";
 
+        // 효과 수치. 게임 보너스에 더해지는 특전은 언어의 %p 단위로 (한국어 "+22.5%p", 영어 "+22.5%")
+        private string EffectValue(PerkStateDto state, int perk, int tier) => PerkPageModel.EffectValue(state, perk, tier, locale.Get("ui.percentPoint"));
+
         /// <summary>
         /// 상태를 그린다. 돌고 있는 릴의 아이콘·이름은 연출이 맡는다.
         /// message 는 리롤 버튼 아래 (리롤·잠금·넣기/빼기·통신), buyMessage 는 선택한 특전 칸 구매 버튼 아래 (구매 실패).
@@ -923,7 +926,7 @@ namespace PrestigePerks.UI
             RefreshOutline(row);
 
             var shown = PerkPageModel.ShownTier(state, perk);
-            row.Effect.text = locale.PerkEffect(perk, PerkPageModel.EffectValue(state, perk, shown));
+            row.Effect.text = locale.PerkEffect(perk, EffectValue(state, perk, shown));
             // 단계 칸: 흐림 = 미보유, 밝음 = 보유, 초록 테두리 = 지금 적용 중
             var owned = PerkPageModel.OwnedTier(state, perk);
             var applied = equipped ? shown : 0;
@@ -1062,12 +1065,12 @@ namespace PrestigePerks.UI
             picked.StatusMark.gameObject.SetActive(fixedSlot);
             picked.StatusMark.rectTransform.anchoredPosition = new Vector2(textRight + 10, picked.StatusMark.rectTransform.anchoredPosition.y);
 
-            picked.Value.text = PerkPageModel.EffectValue(state, perk, pick.Tier);
+            picked.Value.text = EffectValue(state, perk, pick.Tier);
             picked.Value.color = equipped ? UiKit.Green : UiKit.GreenDim;
             picked.Tier.text = locale.Format("ui.tier", TierName(pick.Tier));
             picked.Tier.rectTransform.anchoredPosition = new Vector2(16 + UiKit.Width(picked.Value, picked.Value.text) + 10, picked.Tier.rectTransform.anchoredPosition.y);
             // 다음 단계 값 (II·III 구매가 남았을 때)
-            picked.Next.text = pick.NextTier > 1 ? locale.Format("ui.nextTier", PerkPageModel.EffectValue(state, perk, pick.NextTier)) : "";
+            picked.Next.text = pick.NextTier > 1 ? locale.Format("ui.nextTier", EffectValue(state, perk, pick.NextTier)) : "";
 
             // 안내 줄은 보유 여부만 보인다
             var owned = pick.Kind == SelectionKind.Fixed || pick.Kind == SelectionKind.Owned;
@@ -1239,7 +1242,7 @@ namespace PrestigePerks.UI
             var (_, _, icon) = IconSquare(ghost, "Square", 7, 7, 38);
             icon.sprite = PerkSprites.Icon(perk);
             UiKit.Label(ghost, "Name", 54, 17, 150, locale.PerkName(perk), 15, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
-            UiKit.Label(ghost, "Value", 54, 36, 150, $"{PerkPageModel.EffectValue(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
+            UiKit.Label(ghost, "Value", 54, 36, 150, $"{EffectValue(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
             GameSounds(EUISoundType.MenuInstallModFunc);
             // 끌기 시작하면 바로 끄는 표시로 (슬롯 ↔ 줄 연결 테두리도 끈다)
             RenderDragMarks();

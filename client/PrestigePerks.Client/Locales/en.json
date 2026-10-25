@@ -37,6 +37,7 @@
   "ui.notOwned": "Not owned",
   "ui.tier": "Tier {0}",
   "ui.nextTier": "Next {0}",
+  "ui.percentPoint": "%",
   "ui.newTierCap": "Tier cap {0}",
   "ui.nothingToRoll": "No slots to reroll",
   "ui.collectionComplete": "Collection complete",

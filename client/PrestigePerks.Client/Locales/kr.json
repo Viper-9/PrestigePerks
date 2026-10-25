@@ -37,6 +37,7 @@
   "ui.notOwned": "미보유",
   "ui.tier": "{0} 단계",
   "ui.nextTier": "다음 {0}",
+  "ui.percentPoint": "%p",
   "ui.newTierCap": "단계 상한 {0}",
   "ui.nothingToRoll": "리롤할 슬롯이 없습니다",
   "ui.collectionComplete": "도감을 모두 모았습니다",
