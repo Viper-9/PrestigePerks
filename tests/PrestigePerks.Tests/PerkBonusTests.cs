@@ -35,6 +35,17 @@ public class PerkBonusTests
     private static List<string> Ids(PmcData pmc) => pmc.Bonuses!.Select(bonus => bonus.Id.ToString()).ToList();
 
     [Fact]
+    public void Bonus_values_scale_with_the_tier_ratio()
+    {
+        var bonuses = PerkBonusApplier.CreateBonuses(new Dictionary<int, double> { [1] = 0.5, [8] = 0.75, [24] = 1.0, [2] = 0 });
+
+        Assert.Equal(15, bonuses.Single(bonus => bonus.Type == BonusType.ExperienceRate).Value);
+        Assert.Equal(-22.5, bonuses.Single(bonus => bonus.Type == BonusType.ScavCooldownTimer).Value);
+        // 비율 0 인 특전(2)은 넣지 않는다. 24 는 패치 특전이라 Bonus 가 없다
+        Assert.Equal(2, bonuses.Count);
+    }
+
+    [Fact]
     public void Apply_adds_the_bonuses_of_bonus_perks_only()
     {
         var pmc = Pmc(HideoutBonus());

@@ -120,7 +120,10 @@ public class PrestigeCommandoCommandTests
         {
             PrestigeLevel = 3,
             ActivePerks = [1, 24, 8],
-            Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24 }, new PerkSlot { Perk = 8 }],
+            ActiveTiers = new Dictionary<int, int> { [1] = 1, [24] = 2, [8] = 1 },
+            Owned = new Dictionary<int, int> { [24] = 3 },
+            TierCap = 2,
+            Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24, Fixed = true }, new PerkSlot { Perk = 8 }, new PerkSlot()],
             NewPerks = [8],
             FreeRerollsLeft = 0,
             PaidRerolls = 1,
@@ -128,10 +131,28 @@ public class PrestigeCommandoCommandTests
         });
 
         Assert.Equal(
-            "P3 | active: experience(1), mastery(24), scav(8)\n" +
+            "P3 | tier cap II | active: experience(1) I, mastery(24) II, scav(8) I\n" +
             "new perks: scav(8)\n" +
-            "slots:  [1] experience(1) (locked)  [2] mastery(24)  [3] scav(8)\n" +
+            "slots:  [1] experience(1) I (locked)  [2] mastery(24) II (fixed)  [3] scav(8) I  [4] empty\n" +
+            "collection 1 / 20: mastery(24) III\n" +
             "free rerolls 0 | paid rerolls 1 | next reroll: 90 coins",
             text);
+    }
+
+    [Theory]
+    [InlineData("prestige perk tier 14 2", 14, 2)]
+    [InlineData("prestige perk tier 1 0", 1, 0)]
+    public void Parses_tier_commands(string text, int perk, int tier)
+    {
+        Assert.Equal((perk, tier), PrestigeCommandoCommand.ParseTierCommand(text));
+    }
+
+    [Theory]
+    [InlineData("prestige perk tier 14 4")]
+    [InlineData("prestige perk tier 999 1")]
+    [InlineData("prestige perk tier 14")]
+    public void Rejects_invalid_tier_commands(string text)
+    {
+        Assert.Null(PrestigeCommandoCommand.ParseTierCommand(text));
     }
 }

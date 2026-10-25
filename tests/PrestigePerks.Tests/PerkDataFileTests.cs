@@ -59,14 +59,56 @@ public sealed class PerkDataFileTests : IDisposable
     public void Json_uses_the_documented_field_names()
     {
         var json = PerkDataFile.Serialize(Sample());
-        foreach (var name in new[] { "schemaVersion", "slots", "perk", "locked", "rerolls", "level", "freeLeft", "paid", "unseenNewPerks" })
+        foreach (var name in new[] { "schemaVersion", "slots", "perk", "locked", "fixed", "owned", "rerolls", "level", "freeLeft", "paid", "unseenNewPerks" })
         {
             Assert.Contains($"\"{name}\"", json);
         }
 
         Assert.DoesNotContain("LoadFailed", json);
         Assert.DoesNotContain("\"perks\"", json);
-        Assert.Contains("\"schemaVersion\": 2", json);
+        Assert.Contains("\"schemaVersion\": 3", json);
+        Assert.DoesNotContain("IsEmpty", json);
+        Assert.DoesNotContain("Rollable", json);
+    }
+
+    [Fact]
+    public void Schema_two_reads_as_nothing_owned_and_nothing_fixed()
+    {
+        var data = PerkDataFile.Normalize(PerkDataFile.Deserialize("""
+            { "schemaVersion": 2, "slots": [ { "perk": 1, "locked": true }, { "perk": 24 } ], "rerolls": { "level": 2, "freeLeft": 1, "paid": 0 } }
+            """), []);
+
+        Assert.Equal(PerkData.CurrentSchemaVersion, data.SchemaVersion);
+        Assert.Empty(data.Owned);
+        Assert.Equal([1, 24], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal([true, false], data.Slots.Select(slot => slot.Locked));
+        Assert.All(data.Slots, slot => Assert.False(slot.Fixed));
+    }
+
+    [Fact]
+    public void Owned_tiers_and_slot_states_are_cleaned_up()
+    {
+        var warnings = new List<string>();
+        var data = PerkDataFile.Normalize(PerkDataFile.Deserialize("""
+            {
+              "schemaVersion": 3,
+              "owned": { "1": 5, "24": 0, "999": 1, "8": 2 },
+              "slots": [
+                { "perk": 1, "locked": true, "fixed": true },
+                { "perk": 0, "locked": true },
+                { "perk": 24, "fixed": true },
+                { "perk": 8, "fixed": true }
+              ],
+              "unseenTierCap": 7
+            }
+            """), warnings);
+
+        Assert.Equal(new Dictionary<int, int> { [1] = 3, [8] = 2 }, data.Owned);
+        Assert.Equal([1, 0, 24, 8], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal([true, false, false, true], data.Slots.Select(slot => slot.Fixed));
+        Assert.All(data.Slots, slot => Assert.False(slot.Locked));
+        Assert.Null(data.UnseenTierCap);
+        Assert.Equal(2, warnings.Count);
     }
 
     [Fact]

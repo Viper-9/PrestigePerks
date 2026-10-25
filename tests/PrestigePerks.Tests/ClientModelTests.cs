@@ -65,30 +65,52 @@ public class ClientModelTests
     }
 
     [Fact]
-    public void Reads_the_shake_response()
+    public void Reads_the_collection_and_tier_fields()
     {
-        var server = new PerkState { PrestigeLevel = 2, Slots = [new PerkSlot { Perk = 3 }, new PerkSlot { Perk = 9 }], ShakeChance = 0.5, ShakeOutcome = nameof(ShakeOutcome.Next) };
-        var state = PerkStateDto.Parse(new JsonUtil([new SptJsonConverterRegistrator()]).Serialize(server)!)!;
-        Assert.Equal("Next", state.ShakeOutcome);
-        Assert.Equal(0.5, state.ShakeChance);
-        Assert.Null(PerkStateDto.Parse("""{ "prestigeLevel": 1 }""")!.ShakeOutcome);
+        // SPT JsonUtil 은 정적 옵션을 고쳐 다른 테스트와 겹치므로 System.Text.Json 으로 직접 쓴다
+        var config = new PerkConfig();
+        var server = new PerkState
+        {
+            PrestigeLevel = 3,
+            Slots = [new PerkSlot { Perk = 14, Fixed = true }, new PerkSlot(), new PerkSlot { Perk = 29, Locked = true }],
+            ActiveTiers = new Dictionary<int, int> { [14] = 2, [29] = 1 },
+            Owned = new Dictionary<int, int> { [14] = 3, [26] = 1 },
+            TierCap = 2,
+            TierOpensAt = [config.TierOpensAt(3, 2), config.TierOpensAt(3, 3)],
+            TierPrices = config.TierPrices,
+            TierEffectRatio = config.TierEffectRatio,
+            NewTierCap = 2,
+            BuyCost = 100,
+        };
+        var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(server))!;
+
+        Assert.Equal([true, false, false], state.Slots.Select(slot => slot.Fixed));
+        Assert.True(state.Slots[1].IsEmpty);
+        Assert.Equal(2, state.ActiveTiers[14]);
+        Assert.Equal(3, state.Owned[14]);
+        Assert.Equal(2, state.TierCap);
+        Assert.Equal([null, 5], state.TierOpensAt);
+        Assert.Equal([40, 100, 200], state.TierPrices);
+        Assert.Equal([0.5, 0.75, 1.0], state.TierEffectRatio);
+        Assert.Equal(2, state.NewTierCap);
+        Assert.Equal(100, state.BuyCost);
     }
 
     [Fact]
-    public void Reads_the_slot_and_shake_flags()
+    public void Reads_the_slot_flags()
     {
-        // SPT JsonUtil 은 정적 옵션을 고쳐 다른 테스트와 겹치므로 System.Text.Json 으로 직접 쓴다
-        var server = new PerkState { PrestigeLevel = 2, FreeRerolls = 99, ShakeEnabled = false, SlotOpensAt = new PerkConfig().SlotOpensAt(2) };
+        var server = new PerkState { PrestigeLevel = 2, FreeRerolls = 99, SlotOpensAt = new PerkConfig().SlotOpensAt(2) };
         var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(server))!;
         Assert.Equal(99, state.FreeRerolls);
-        Assert.False(state.ShakeEnabled);
         Assert.Null(PerkPageModel.OpensAt(state, 1));
         Assert.Equal(3, PerkPageModel.OpensAt(state, 2));
         Assert.Equal(6, PerkPageModel.OpensAt(state, 5));
         Assert.Null(PerkPageModel.OpensAt(state, 6));
 
-        // 값이 없으면 흔들기는 켜진 것으로 본다
-        Assert.True(PerkStateDto.Parse("""{ "prestigeLevel": 1 }""")!.ShakeEnabled);
+        // 예전 서버 응답(단계 필드 없음)도 비어 있는 것으로 읽는다
+        var old = PerkStateDto.Parse("""{ "prestigeLevel": 1, "owned": null }""")!;
+        Assert.Empty(old.Owned);
+        Assert.Equal(1, old.TierCap);
     }
 
     [Fact]
@@ -121,7 +143,7 @@ public class ClientModelTests
         Assert.Equal(RollBlock.NotEnoughCoins, PerkPageModel.CheckRoll(paid, 89, false));
         Assert.Equal(RollBlock.None, PerkPageModel.CheckRoll(paid, 90, false));
 
-        Assert.Equal(RollBlock.AllLocked, PerkPageModel.CheckRoll(State(0, (1, true), (4, true)), 999, false));
+        Assert.Equal(RollBlock.NothingToRoll, PerkPageModel.CheckRoll(State(0, (1, true), (4, true)), 999, false));
         Assert.Equal(RollBlock.NoSlots, PerkPageModel.CheckRoll(State(0), 999, false));
         Assert.Equal(RollBlock.NoSlots, PerkPageModel.CheckRoll(null!, 999, false));
     }
@@ -136,6 +158,148 @@ public class ClientModelTests
         Assert.Equal(-1, PerkPageModel.SlotOf(state, 24));
         Assert.True(PerkPageModel.IsSlotOpen(state, 3));
         Assert.False(PerkPageModel.IsSlotOpen(state, 4));
+    }
+
+    private static PerkStateDto Collection()
+    {
+        // P3, 상한 II: [제어 II 확정] [빈 칸] [강인 잠김]. 수색 I 은 장착 안 됨
+        var state = State(0, (14, false), (0, false), (11, true));
+        state.Slots[0].Fixed = true;
+        state.TierCap = 2;
+        state.Owned = new Dictionary<int, int> { [14] = 3, [26] = 1 };
+        state.ActiveTiers = new Dictionary<int, int> { [14] = 2, [11] = 1 };
+        state.TierPrices = [40, 100, 200];
+        state.TierEffectRatio = [0.5, 0.75, 1.0];
+        state.TierOpensAt = [null, 5];
+        return state;
+    }
+
+    [Fact]
+    public void Slot_kinds_and_roll_targets_follow_fixed_locked_and_empty_slots()
+    {
+        var state = Collection();
+        Assert.Equal([SlotKind.Fixed, SlotKind.Empty, SlotKind.Locked, SlotKind.Closed], Enumerable.Range(0, 4).Select(i => PerkPageModel.KindOf(state, i)));
+        Assert.Equal([1], PerkPageModel.SpinTargets(state));
+        Assert.Equal(1, PerkPageModel.FixedCount(state));
+        Assert.Equal(1, PerkPageModel.LockedCount(state));
+        Assert.Equal(2, PerkPageModel.OwnedCount(state));
+        Assert.Equal(-1, PerkPageModel.SlotOf(state, 0));
+
+        var pool = PerkPageModel.RollPool(state);
+        Assert.DoesNotContain(14, pool);
+        Assert.DoesNotContain(26, pool);
+        Assert.DoesNotContain(11, pool);
+        Assert.Equal(17, pool.Count);
+    }
+
+    [Fact]
+    public void Roll_is_blocked_when_the_collection_is_complete()
+    {
+        var state = State(0, (0, false));
+        state.Owned = PerkPageModel.AllPerks.ToDictionary(perk => perk, _ => 1);
+        Assert.Equal(RollBlock.CollectionComplete, PerkPageModel.CheckRoll(state, 999, false));
+    }
+
+    [Fact]
+    public void Shown_tier_is_applied_tier_in_a_slot_owned_tier_up_to_the_cap_otherwise_one()
+    {
+        var state = Collection();
+        Assert.Equal(2, PerkPageModel.ShownTier(state, 14)); // III 보유, 상한 II
+        Assert.Equal(1, PerkPageModel.ShownTier(state, 11)); // 미보유, 잠긴 칸
+        Assert.Equal(1, PerkPageModel.ShownTier(state, 26)); // I 보유, 장착 안 됨
+        Assert.Equal(1, PerkPageModel.ShownTier(state, 24)); // 미보유
+        Assert.Equal(0, PerkPageModel.AppliedTier(state, 26));
+        Assert.Equal("−10%", PerkPageModel.EffectValue(state, 11, 1));
+        Assert.Equal("−7.5%", PerkPageModel.EffectValue(state, 14, 2));
+    }
+
+    [Fact]
+    public void Drag_rules_allow_only_unequipped_owned_rows_and_fixed_slots_onto_unlocked_slots()
+    {
+        var state = Collection();
+        Assert.True(PerkPageModel.CanDragRow(state, 26));
+        Assert.False(PerkPageModel.CanDragRow(state, 14)); // 이미 칸에 있음
+        Assert.False(PerkPageModel.CanDragRow(state, 24)); // 미보유
+        Assert.True(PerkPageModel.CanDragSlot(state, 0));
+        Assert.False(PerkPageModel.CanDragSlot(state, 2));
+        Assert.Equal([true, true, false, false], Enumerable.Range(0, 4).Select(i => PerkPageModel.CanDrop(state, i)));
+    }
+
+    [Fact]
+    public void Selection_states_and_buy_buttons()
+    {
+        var state = Collection();
+        state.Slots.Add(new PerkSlotDto { Perk = 29 });
+
+        var roll = PerkPageModel.Select(state, 29, 500);
+        Assert.Equal((SelectionKind.RollSlot, 1, 40, BuyBlock.None), (roll.Kind, roll.NextTier, roll.Price, roll.Block));
+
+        var locked = PerkPageModel.Select(state, 11, 20);
+        Assert.Equal((SelectionKind.LockedSlot, 1, BuyBlock.NotEnoughCoins), (locked.Kind, locked.NextTier, locked.Block));
+
+        // 제어: III 보유라 살 단계 없음
+        var fixedPerk = PerkPageModel.Select(state, 14, 500);
+        Assert.Equal((SelectionKind.Fixed, 0, 2), (fixedPerk.Kind, fixedPerk.NextTier, fixedPerk.Tier));
+
+        var owned = PerkPageModel.Select(state, 26, 500);
+        Assert.Equal((SelectionKind.Owned, 2, 100, BuyBlock.None), (owned.Kind, owned.NextTier, owned.Price, owned.Block));
+
+        state.Owned[26] = 2;
+        var capped = PerkPageModel.Select(state, 26, 500);
+        Assert.Equal((3, BuyBlock.Capped, (int?)5), (capped.NextTier, capped.Block, capped.OpensAt));
+
+        var notShown = PerkPageModel.Select(state, 24, 500);
+        Assert.Equal((SelectionKind.NotShown, 0), (notShown.Kind, notShown.NextTier));
+        Assert.Equal(SelectionKind.None, PerkPageModel.Select(state, 0, 500).Kind);
+        Assert.Equal(SelectionKind.None, PerkPageModel.Select(null!, 14, 500).Kind);
+    }
+
+    [Theory]
+    [InlineData(14, 0.5, "−5%")]
+    [InlineData(9, 0.75, "+15%")]
+    [InlineData(30, 0.75, "+7.5")]
+    [InlineData(11, 0.75, "−15%")]
+    [InlineData(32, 0.75, "+3.8%")]
+    [InlineData(10, 0.75, "+11.3%")]
+    [InlineData(1, 1.0, "+30%")]
+    public void Effect_values_scale_and_round_to_one_decimal(int perk, double ratio, string expected)
+    {
+        Assert.Equal(expected, PerkAmounts.Format(perk, ratio));
+    }
+
+    [Fact]
+    public void Tier_ratio_falls_back_to_defaults()
+    {
+        Assert.Equal(0.75, PerkAmounts.Ratio(null!, 2));
+        Assert.Equal(0.4, PerkAmounts.Ratio([0.4, 0.6, 0.9], 1));
+        Assert.Equal(0, PerkAmounts.Ratio([0.5, 0.75, 1.0], 4));
+    }
+
+    [Fact]
+    public void Bonus_perk_amounts_match_the_server_catalog()
+    {
+        foreach (var perk in PerkCatalog.All.Where(perk => perk.Kind == PerkKind.Bonus))
+        {
+            Assert.All(perk.Bonuses, bonus => Assert.Equal(bonus.Value, PerkAmounts.Amount(perk.Number)));
+        }
+
+        Assert.All(PerkCatalog.Numbers, perk => Assert.True(PerkAmounts.IsKnown(perk), $"perk {perk}"));
+    }
+
+    [Theory]
+    [InlineData("kr")]
+    [InlineData("en")]
+    public void Effect_texts_take_the_value_and_have_no_numbers(string culture)
+    {
+        var locale = new PerkLocale(LocaleFile(culture), null!);
+        foreach (var perk in PerkCatalog.Numbers)
+        {
+            var text = LocaleFile(culture)[$"perk.{perk}.effect"];
+            Assert.Contains("{0}", text);
+            Assert.DoesNotMatch("[0-9]", text.Replace("{0}", ""));
+            Assert.EndsWith("+15%", locale.PerkEffect(perk, "+15%"));
+            Assert.DoesNotContain("{0}", locale.PerkSubject(perk));
+        }
     }
 
     [Fact]
@@ -301,7 +465,7 @@ public class ReelReverseTests
     [Fact]
     public void Random_effects_are_off_on_normal_rolls()
     {
-        // 흔들기와 겹쳐 헷갈려서 일반 리롤의 가짜 멈춤·역회전은 껐다 (리버스는 흔들기 결과로만)
+        // 일반 리롤의 가짜 멈춤·역회전은 껐다 (2026-10-18, 코드는 남겨 둠)
         var random = new Random(7);
         Assert.All(Enumerable.Range(0, 1000), _ => Assert.Equal(PrestigePerks.Model.ReelEffect.Normal, PrestigePerks.Model.ReelSchedule.PickEffect(random)));
     }

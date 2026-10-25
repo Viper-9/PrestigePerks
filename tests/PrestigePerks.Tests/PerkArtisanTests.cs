@@ -31,4 +31,14 @@ public class PerkArtisanTests
 
     [Fact]
     public void Bitcoin_keeps_missing_elapsed() => Assert.Null(PerkArtisan.BitcoinElapsed(null));
+
+    [Theory]
+    [InlineData(0.5, 900.0, 111L)]   // I: ×0.9, 100 ÷ 0.9 = 111.1
+    [InlineData(0.75, 850.0, 118L)]  // II: ×0.85
+    [InlineData(1.0, 800.0, 125L)]   // III: 지금 수치
+    public void Lower_tiers_scale_the_time_cut(double scale, double craft, long bitcoin)
+    {
+        Assert.Equal(craft, PerkArtisan.CraftTime(1000, scale)!.Value, 6);
+        Assert.Equal(bitcoin, PerkArtisan.BitcoinElapsed(100, scale));
+    }
 }

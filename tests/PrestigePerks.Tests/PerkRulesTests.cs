@@ -218,8 +218,8 @@ public class PerkRulesTests
         var data = Entered(1, 7);
         PerkRules.SetLock(data, 1, 0, true);
 
-        Assert.Equal(PerkError.AllLocked, PerkRules.CheckRoll(data, 1));
-        Assert.Equal(PerkError.AllLocked, PerkRules.Roll(data, 1, Config, new Random()).Error);
+        Assert.Equal(PerkError.NothingToRoll, PerkRules.CheckRoll(data, 1));
+        Assert.Equal(PerkError.NothingToRoll, PerkRules.Roll(data, 1, Config, new Random()).Error);
         Assert.Equal(3, data.Rerolls.FreeLeft);
     }
 
@@ -303,86 +303,260 @@ public class PerkRulesTests
         Assert.Equal([1, 4, 8], data.Slots.Select(slot => slot.Perk));
     }
 
-    [Fact]
-    public void Shake_is_offered_only_when_a_single_slot_is_rolled()
+    private static PerkData Owning(PerkData data, params (int Perk, int Tier)[] owned)
     {
-        var data = WithSlots(1, 4, 8);
-        Assert.Null(PerkRules.ShakeSlot(data, 3));
-        data.Slots[0].Locked = true;
-        Assert.Null(PerkRules.ShakeSlot(data, 3));
+        foreach (var (perk, tier) in owned)
+        {
+            data.Owned[perk] = tier;
+        }
+
+        return data;
+    }
+
+    [Fact]
+    public void Roll_never_draws_owned_perks()
+    {
+        for (var seed = 0; seed < 200; seed++)
+        {
+            var data = Owning(WithSlots(1, 2, 3), (4, 1), (8, 2), (9, 3));
+            data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 3 };
+            PerkRules.Roll(data, 3, Config, new Random(seed));
+            Assert.DoesNotContain(data.Slots, slot => slot.Perk is 4 or 8 or 9);
+        }
+    }
+
+    [Fact]
+    public void Roll_skips_fixed_slots_and_fixed_slots_do_not_raise_the_cost()
+    {
+        var data = Owning(WithSlots(1, 2, 3), (1, 1));
+        data.Slots[0].Fixed = true;
+        data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 0 };
+        Assert.Equal(PerkRules.RerollCost(Config, 3, 0, 1), PerkRules.NextRerollCost(Config, 3, data));
+
+        data.Slots[1].Locked = true;
+        Assert.Equal(PerkRules.RerollCost(Config, 3, 1, 1), PerkRules.NextRerollCost(Config, 3, data));
+
+        PerkRules.Roll(data, 3, Config, new Random(5));
+        Assert.Equal(1, data.Slots[0].Perk);
+        Assert.True(data.Slots[0].Fixed);
+        Assert.Equal(2, data.Slots[1].Perk);
+    }
+
+    [Fact]
+    public void Roll_fills_empty_slots_and_leaves_the_rest_empty_when_unowned_perks_run_out()
+    {
+        // 20개 중 18개 보유, 미보유 2개뿐인데 리롤 칸은 3개
+        var unowned = new[] { 24, 32 };
+        var data = new PerkData { Slots = [new PerkSlot(), new PerkSlot { Perk = 24 }, new PerkSlot()] };
+        foreach (var perk in PerkCatalog.Numbers.Except(unowned))
+        {
+            data.Owned[perk] = 1;
+        }
+
+        data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 3 };
+        Assert.Equal(PerkError.None, PerkRules.Roll(data, 3, Config, new Random(2)).Error);
+        Assert.Equal(unowned, data.Slots.Where(slot => !slot.IsEmpty).Select(slot => slot.Perk).Order());
+        Assert.Single(data.Slots, slot => slot.IsEmpty);
+    }
+
+    [Fact]
+    public void Roll_is_refused_when_nothing_can_be_rolled_or_the_collection_is_complete()
+    {
+        var data = Owning(WithSlots(1, 2), (1, 1));
+        data.Slots[0].Fixed = true;
+        data.Slots[1].Locked = true;
+        data.Rerolls = new PerkRerolls { Level = 2, FreeLeft = 3 };
+        Assert.Equal(PerkError.NothingToRoll, PerkRules.CheckRoll(data, 2));
+
+        // 빈 칸은 리롤 칸이다
+        data.Slots[1] = new PerkSlot();
+        Assert.Equal(PerkError.None, PerkRules.CheckRoll(data, 2));
+
+        foreach (var perk in PerkCatalog.Numbers)
+        {
+            data.Owned[perk] = 1;
+        }
+
+        Assert.Equal(PerkError.CollectionComplete, PerkRules.CheckRoll(data, 2));
+        Assert.Equal(PerkError.CollectionComplete, PerkRules.Roll(data, 2, Config, new Random()).Error);
+        Assert.Equal(3, data.Rerolls.FreeLeft);
+    }
+
+    [Fact]
+    public void New_slots_draw_only_unowned_perks_and_stay_empty_when_none_are_left()
+    {
+        var data = Owning(WithSlots(1), (2, 1));
+        data.Rerolls = new PerkRerolls { Level = 1, FreeLeft = 0 };
+        foreach (var perk in PerkCatalog.Numbers.Where(perk => perk is not (1 or 3)))
+        {
+            data.Owned[perk] = 1;
+        }
+
+        var (_, newPerks) = PerkRules.EnterLevel(data, 3, Config, new Random(1));
+
+        Assert.Equal([1, 3, 0], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal([3], newPerks);
+        Assert.Equal([3], data.UnseenNewPerks);
+    }
+
+    [Fact]
+    public void Tier_cap_follows_prestige_and_is_at_least_one()
+    {
+        Assert.Equal([1, 1, 1, 2, 2, 3, 3, 3], Enumerable.Range(0, 8).Select(Config.TierCap));
+        Assert.Equal(1, (Config with { TierCapByPrestige = [0, 0] }).TierCap(1));
+        Assert.Equal(3, (Config with { TierCapByPrestige = [9] }).TierCap(4));
+        Assert.Equal(3, Config.TierOpensAt(1, 2));
+        Assert.Equal(5, Config.TierOpensAt(1, 3));
+        Assert.Null(Config.TierOpensAt(3, 2));
+        Assert.Null(Config.TierOpensAt(6, 3));
+    }
+
+    [Fact]
+    public void Entering_a_level_that_raises_the_tier_cap_records_it_for_the_notice()
+    {
+        var data = Entered(2, 1);
+        Assert.Null(data.UnseenTierCap);
+        PerkRules.EnterLevel(data, 3, Config, new Random(1));
+        Assert.Equal(2, data.UnseenTierCap);
+    }
+
+    [Fact]
+    public void Applied_tier_is_owned_tier_up_to_the_cap_and_one_for_unowned_perks()
+    {
+        var data = Owning(WithSlots(1, 2, 3), (1, 3), (2, 2));
+        data.Slots[0].Fixed = data.Slots[1].Fixed = true;
+
+        Assert.Equal(new Dictionary<int, int> { [1] = 2, [2] = 2, [3] = 1 }, PerkRules.ActiveTiers(data, 3, Config));
+        Assert.Equal(new Dictionary<int, int> { [1] = 3, [2] = 2, [3] = 1 }, PerkRules.ActiveTiers(data, 5, Config));
+        Assert.Equal(new Dictionary<int, double> { [1] = 1.0, [2] = 0.75, [3] = 0.5 }, PerkRules.ActiveScales(data, 5, Config));
+
+        data.DevAllPerks = true;
+        Assert.All(PerkRules.ActiveTiers(data, 1, Config).Values, tier => Assert.Equal(3, tier));
+    }
+
+    [Fact]
+    public void Keep_buys_tier_one_of_a_perk_in_a_slot_and_fixes_that_slot()
+    {
+        var data = WithSlots(1, 2);
+        data.Slots[1].Locked = true;
+
+        Assert.Equal(PerkError.NotInSlot, PerkRules.CheckBuy(data, 2, Config, 3, 1));
+        Assert.Equal(PerkError.None, PerkRules.Buy(data, 2, Config, 2, 1));
+
+        Assert.Equal(1, data.OwnedTier(2));
+        Assert.True(data.Slots[1].Fixed);
+        Assert.False(data.Slots[1].Locked);
+        Assert.Equal(PerkError.AlreadyOwned, PerkRules.CheckBuy(data, 2, Config, 2, 1));
+    }
+
+    [Fact]
+    public void Higher_tiers_need_the_tier_below_and_the_cap()
+    {
+        var data = Owning(WithSlots(1), (14, 1));
+
+        Assert.Equal(PerkError.TierCapped, PerkRules.CheckBuy(data, 2, Config, 14, 2));
+        Assert.Equal(PerkError.TierOrder, PerkRules.CheckBuy(data, 6, Config, 14, 3));
+        Assert.Equal(PerkError.TierOrder, PerkRules.CheckBuy(data, 6, Config, 24, 2));
+        Assert.Equal(PerkError.None, PerkRules.Buy(data, 3, Config, 14, 2));
+        Assert.Equal(PerkError.TierCapped, PerkRules.CheckBuy(data, 4, Config, 14, 3));
+        Assert.Equal(PerkError.None, PerkRules.Buy(data, 5, Config, 14, 3));
+        Assert.Equal(3, data.OwnedTier(14));
+        Assert.Equal(PerkError.AlreadyOwned, PerkRules.CheckBuy(data, 6, Config, 14, 2));
+        Assert.Equal(PerkError.InvalidTier, PerkRules.CheckBuy(data, 6, Config, 14, 4));
+        Assert.Equal(PerkError.UnknownPerk, PerkRules.CheckBuy(data, 6, Config, 999, 1));
+    }
+
+    [Fact]
+    public void Equip_puts_an_owned_perk_on_a_roll_slot_or_swaps_a_fixed_one()
+    {
+        var data = Owning(WithSlots(1, 2, 3), (1, 1), (14, 2), (24, 1));
+        data.Slots[0].Fixed = true;
+
+        Assert.Equal(PerkError.None, PerkRules.Equip(data, 3, 14, 1));
+        Assert.Equal([1, 14, 3], data.Slots.Select(slot => slot.Perk));
+        Assert.True(data.Slots[1].Fixed);
+
+        Assert.Equal(PerkError.None, PerkRules.Equip(data, 3, 24, 0));
+        Assert.Equal([24, 14, 3], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(1, data.OwnedTier(1));
+    }
+
+    [Fact]
+    public void Equip_refuses_locked_slots_unowned_perks_and_perks_already_in_a_slot()
+    {
+        var data = Owning(WithSlots(1, 2, 3), (1, 1), (14, 1));
+        data.Slots[0].Fixed = true;
         data.Slots[2].Locked = true;
-        Assert.Equal(1, PerkRules.ShakeSlot(data, 3));
+
+        Assert.Equal(PerkError.SlotLocked, PerkRules.Equip(data, 3, 14, 2));
+        Assert.Equal(PerkError.NotOwned, PerkRules.Equip(data, 3, 24, 1));
+        Assert.Equal(PerkError.AlreadyEquipped, PerkRules.Equip(data, 3, 1, 1));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.Equip(data, 3, 14, 3));
+        Assert.Equal([1, 2, 3], data.Slots.Select(slot => slot.Perk));
+    }
+
+    [Fact]
+    public void Unequip_empties_a_fixed_slot_and_keeps_the_perk_owned()
+    {
+        var data = Owning(WithSlots(1, 2), (1, 2));
+        data.Slots[0].Fixed = true;
+
+        Assert.Equal(PerkError.NotFixed, PerkRules.Unequip(data, 2, 1));
+        Assert.Equal(PerkError.None, PerkRules.Unequip(data, 2, 0));
+        Assert.True(data.Slots[0].IsEmpty);
+        Assert.False(data.Slots[0].Fixed);
+        Assert.Equal(2, data.OwnedTier(1));
+        Assert.Equal([2], PerkRules.ActivePerks(data, 2));
+    }
+
+    [Fact]
+    public void Fixed_and_empty_slots_cannot_be_locked()
+    {
+        var data = Owning(new PerkData { Slots = [new PerkSlot { Perk = 1, Fixed = true }, new PerkSlot()] }, (1, 1));
+        Assert.Equal(PerkError.SlotFixed, PerkRules.SetLock(data, 2, 0, true));
+        Assert.Equal(PerkError.SlotEmpty, PerkRules.SetLock(data, 2, 1, true));
+        Assert.Equal(PerkError.None, PerkRules.SetLock(data, 2, 1, false));
+    }
+
+    [Fact]
+    public void Dev_tier_and_collection_reset_keep_slots_consistent()
+    {
+        var data = Owning(WithSlots(1, 2), (1, 2));
+        data.Slots[0].Fixed = true;
+
+        Assert.Equal(PerkError.None, PerkRules.SetOwnedTier(data, 2, 3));
+        Assert.Equal(3, data.OwnedTier(2));
+        Assert.Equal(PerkError.None, PerkRules.SetOwnedTier(data, 1, 0));
+        Assert.False(data.Slots[0].Fixed);
+        Assert.Equal(PerkError.InvalidTier, PerkRules.SetOwnedTier(data, 1, 4));
+
+        PerkRules.ResetCollection(data);
+        Assert.Empty(data.Owned);
+        Assert.All(data.Slots, slot => Assert.False(slot.Fixed));
+    }
+
+    [Fact]
+    public void Dev_set_marks_owned_perks_as_fixed()
+    {
+        var data = Owning(WithSlots(1, 2), (24, 1));
         data.Slots[1].Locked = true;
-        Assert.Null(PerkRules.ShakeSlot(data, 3));
-        // 단계가 낮으면 앞 슬롯만 돈다
-        Assert.Equal(0, PerkRules.ShakeSlot(WithSlots(1, 4, 8), 1));
+        PerkRules.SetPerk(data, 2, 1, 24);
+        Assert.True(data.Slots[1].Fixed);
+        Assert.False(data.Slots[1].Locked);
     }
 
     [Fact]
-    public void Shake_next_takes_the_perk_shown_in_the_next_cell()
-    {
-        var data = WithSlots(1, 4, 8);
-        Assert.Equal(ShakeOutcome.Next, PerkRules.Shake(data, 3, 2, 24, 1.0, 0, new Random(1)));
-        Assert.Equal([1, 4, 24], data.Slots.Select(slot => slot.Perk));
-    }
-
-    [Fact]
-    public void Shake_next_refuses_a_perk_another_slot_has_or_an_unknown_one()
-    {
-        var data = WithSlots(1, 4, 8);
-        Assert.Equal(ShakeOutcome.Stay, PerkRules.Shake(data, 3, 2, 4, 1.0, 0, new Random(1)));
-        Assert.Equal(ShakeOutcome.Stay, PerkRules.Shake(data, 3, 2, 999, 1.0, 0, new Random(1)));
-        Assert.Equal([1, 4, 8], data.Slots.Select(slot => slot.Perk));
-    }
-
-    [Fact]
-    public void Shake_reverse_picks_a_free_perk_other_than_the_next_cell()
-    {
-        for (var seed = 0; seed < 100; seed++)
-        {
-            var data = WithSlots(1, 4, 8);
-            Assert.Equal(ShakeOutcome.Reverse, PerkRules.Shake(data, 3, 0, 24, 0, 1.0, new Random(seed)));
-            Assert.DoesNotContain(data.Slots[0].Perk, new[] { 1, 4, 8, 24 });
-            Assert.True(PerkCatalog.IsKnown(data.Slots[0].Perk));
-        }
-    }
-
-    [Fact]
-    public void Shake_ignores_locked_and_out_of_range_slots()
-    {
-        var data = WithSlots(1, 4, 8);
-        data.Slots[1].Locked = true;
-        Assert.Equal(ShakeOutcome.Stay, PerkRules.Shake(data, 3, 1, 24, 1.0, 0, new Random(1)));
-        Assert.Equal(ShakeOutcome.Stay, PerkRules.Shake(data, 3, 3, 24, 1.0, 0, new Random(1)));
-        Assert.Equal(ShakeOutcome.Stay, PerkRules.Shake(data, 2, 2, 24, 1.0, 0, new Random(1)));
-        Assert.Equal([1, 4, 8], data.Slots.Select(slot => slot.Perk));
-    }
-
-    [Fact]
-    public void Shake_outcomes_follow_the_configured_chances()
-    {
-        var random = new Random(11);
-        var counts = new Dictionary<ShakeOutcome, int>();
-        for (var i = 0; i < 20000; i++)
-        {
-            var outcome = PerkRules.Shake(WithSlots(1), 1, 0, 24, Config.ShakeChance, Config.ShakeReverseChance, random);
-            counts[outcome] = counts.GetValueOrDefault(outcome) + 1;
-        }
-
-        Assert.InRange(counts[ShakeOutcome.Next] / 20000.0, Config.ShakeChance - 0.02, Config.ShakeChance + 0.02);
-        Assert.InRange(counts[ShakeOutcome.Reverse] / 20000.0, 0.04, 0.06);
-        Assert.InRange(counts[ShakeOutcome.Stay] / 20000.0, 1 - Config.ShakeChance - Config.ShakeReverseChance - 0.02, 1 - Config.ShakeChance - Config.ShakeReverseChance + 0.02);
-    }
-
-    [Fact]
-    public void Shake_config_is_validated()
+    public void Tier_config_is_validated()
     {
         Assert.Null(Config.Validate());
-        Assert.NotNull((Config with { ShakeChance = 1.5 }).Validate());
-        Assert.NotNull((Config with { ShakeChance = 0.6, ShakeReverseChance = 0.5 }).Validate());
-        Assert.NotNull((Config with { ShakeWindowSeconds = 0 }).Validate());
+        Assert.NotNull((Config with { TierEffectRatio = [0.5, 1] }).Validate());
+        Assert.NotNull((Config with { TierEffectRatio = [0.5, 0.75, 1.5] }).Validate());
+        Assert.NotNull((Config with { TierPrices = [40, -1, 200] }).Validate());
+        Assert.NotNull((Config with { TierCapByPrestige = [] }).Validate());
+        Assert.Equal(0.75, Config.TierRatio(2));
+        Assert.Equal(0, Config.TierRatio(0));
+        Assert.Equal(200, Config.TierPrice(3));
     }
-
     [Fact]
     public void Slot_flags_set_the_slot_count_per_prestige_level()
     {
@@ -467,13 +641,17 @@ public class PerkRulesTests
     }
 
     [Fact]
-    public void Shipped_config_keeps_the_default_slot_and_shake_flags()
+    public void Shipped_config_keeps_the_default_slot_and_tier_values()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "config", PerkConfigLoader.FileName);
-        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(File.ReadAllText(path)), warning => Assert.Fail(warning)).Perks;
+        var json = File.ReadAllText(path);
+        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json), warning => Assert.Fail(warning)).Perks;
         Assert.Equal([0, 1, 2, 3, 4, 5, 6], Enumerable.Range(0, 7).Select(config.Slots));
         Assert.Equal(3, config.FreeRerolls);
-        Assert.True(config.ShakeEnabled);
+        Assert.Equal([0.5, 0.75, 1.0], config.TierEffectRatio);
+        Assert.Equal([1, 1, 1, 2, 2, 3, 3], config.TierCapByPrestige);
+        Assert.Equal([40, 100, 200], config.TierPrices);
+        Assert.DoesNotContain("shake", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
