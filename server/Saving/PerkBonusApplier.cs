@@ -11,9 +11,10 @@ namespace PrestigePerks.Saving;
 public static class PerkBonusApplier
 {
     /// <summary>특전 ID 를 모두 지우고 현재 특전의 Bonus 를 다시 넣는다. 여러 번 불러도 결과가 같다.</summary>
-    public static void Apply(PmcData pmc, IEnumerable<int> perks)
+    /// <param name="scales">특전 번호 → 효과 비율 (단계 III = 1, <see cref="PerkRules.ActiveScales"/>).</param>
+    public static void Apply(PmcData pmc, IReadOnlyDictionary<int, double> scales)
     {
-        var bonuses = CreateBonuses(perks);
+        var bonuses = CreateBonuses(scales);
         if (pmc.Bonuses is null)
         {
             // 빈 프로필(계정만 만든 상태)의 null 을 [] 로 바꾸지 않는다
@@ -34,12 +35,19 @@ public static class PerkBonusApplier
     /// <summary>특전 Bonus 를 뺀 새 목록. 원본은 바꾸지 않는다.</summary>
     public static List<Bonus> Strip(IEnumerable<Bonus> bonuses) => bonuses.Where(bonus => !IsPerkBonus(bonus)).ToList();
 
-    public static List<Bonus> CreateBonuses(IEnumerable<int> perks)
+    /// <summary>단계 III (지금 수치) 그대로. 테스트와 개발용 비교에 쓴다.</summary>
+    public static void Apply(PmcData pmc, IEnumerable<int> perks) => Apply(pmc, FullScale(perks));
+
+    /// <summary>단계 III (지금 수치) 그대로.</summary>
+    public static List<Bonus> CreateBonuses(IEnumerable<int> perks) => CreateBonuses(FullScale(perks));
+
+    /// <summary>특전 Bonus. 값은 카탈로그 수치(III) × 효과 비율이다. 비율이 0 이하인 특전은 넣지 않는다.</summary>
+    public static List<Bonus> CreateBonuses(IReadOnlyDictionary<int, double> scales)
     {
         var result = new List<Bonus>();
-        foreach (var number in perks.Distinct())
+        foreach (var (number, scale) in scales)
         {
-            if (!PerkCatalog.TryGet(number, out var perk))
+            if (!(scale > 0) || !PerkCatalog.TryGet(number, out var perk))
             {
                 continue;
             }
@@ -51,7 +59,7 @@ public static class PerkBonusApplier
                 {
                     Id = new MongoId(bonus.Id),
                     Type = bonus.Type,
-                    Value = bonus.Value,
+                    Value = bonus.Value * scale,
                     SkillType = bonus.SkillType,
                     IsPassive = true,
                     IsProduction = false,
@@ -62,4 +70,6 @@ public static class PerkBonusApplier
 
         return result;
     }
+
+    private static Dictionary<int, double> FullScale(IEnumerable<int> perks) => perks.Distinct().ToDictionary(perk => perk, _ => 1.0);
 }
