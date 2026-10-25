@@ -7,6 +7,7 @@
   "ui.slotN": "슬롯 {0}",
   "ui.opensAt": "P{0}에서 열림",
   "ui.slotClosed": "열리지 않는 슬롯",
+  "ui.slotEmpty": "비어 있음",
   "ui.coins": "보유 코인",
   "ui.free": "무료 리롤",
   "ui.lockedSlots": "잠근 슬롯",

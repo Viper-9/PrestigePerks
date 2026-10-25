@@ -57,6 +57,9 @@ namespace PrestigePerks.UI
         // 화면 제목은 패널 제목보다 조금 밝게
         private static readonly Color TitleText = new Color32(232, 234, 230, 255);
 
+        // 아이콘 칸 테두리: 평소 어두운 선, 리롤 대상 줄은 금색 (줄 테두리 대신, 2026-10-25 결정 ②)
+        private static readonly Color SquareLine = new Color(0, 0, 0, 120 / 255f);
+
         // 버튼 모양: 타르코프 기본 버튼(밝은 회색 그라데이션), 꺼진 버튼·보조 버튼(어두운 그라데이션)
         private static readonly Color32 ButtonTop = new Color32(158, 162, 158, 255), ButtonBottom = new Color32(98, 102, 102, 255);
         private static readonly Color ButtonLine = new Color32(186, 190, 186, 255);
@@ -109,6 +112,9 @@ namespace PrestigePerks.UI
         private int selectedPerk;
         private bool autoPicked;
 
+        // 슬롯 ↔ 줄 연결: 마우스를 올린 슬롯 (0 부터, 없으면 -1), 마우스를 올린 줄의 특전 (없으면 0)
+        private int hoverSlot = -1, hoverPerk;
+
         // 마지막으로 그린 상태 (선택·드래그·확인 시간이 바뀌면 다시 그린다). 구매 메시지는 선택한 특전 칸 구매 버튼 아래
         private PerkStateDto lastState;
         private int lastCoins;
@@ -158,9 +164,10 @@ namespace PrestigePerks.UI
         /// <summary>목록 한 줄 (5.0 PersonalPerkTemplate 처럼 아이콘 칸 + 이름 + 효과 + 단계 칸).</summary>
         private sealed class Row
         {
+            public int Perk;
             public RectTransform Rect;
             public CanvasGroup Group;
-            public Image Glow, Square, Icon, Outline, Flash;
+            public Image Glow, Square, SquareLine, Icon, Outline, Flash;
             public TextMeshProUGUI Name, Effect;
             public readonly Image[] TierFill = new Image[PerkPageModel.MaxTier];
             public readonly Image[] TierLine = new Image[PerkPageModel.MaxTier];
@@ -410,7 +417,13 @@ namespace PrestigePerks.UI
             OnHover(hit.gameObject, on =>
             {
                 reel.LockHover = on;
+                hoverSlot = on ? index : hoverSlot == index ? -1 : hoverSlot;
                 RefreshLock(reel);
+                // 이 슬롯 특전의 줄에도 마우스를 올린 테두리
+                foreach (var row in rows.Values)
+                {
+                    RefreshOutline(row);
+                }
             });
             On(hit.gameObject, EventTriggerType.BeginDrag, data => BeginSlotDrag(index, data));
             On(hit.gameObject, EventTriggerType.Drag, MoveDrag);
@@ -428,16 +441,16 @@ namespace PrestigePerks.UI
             return UiKit.Image(rect, UiKit.Text);
         }
 
-        /// <summary>아이콘 칸: 어두운 칸에 아이콘 (장착하지 않은 특전은 아이콘을 흐리게). 칸 그림과 아이콘을 돌려준다.</summary>
-        private static (Image Square, Image Icon) IconSquare(RectTransform parent, string name, float x, float y, float size)
+        /// <summary>아이콘 칸: 어두운 칸에 아이콘 (장착하지 않은 특전은 아이콘을 흐리게). 칸 그림, 칸 테두리, 아이콘을 돌려준다.</summary>
+        private static (Image Square, Image Line, Image Icon) IconSquare(RectTransform parent, string name, float x, float y, float size)
         {
             var rect = UiKit.Rect(parent, name, x, y, size, size);
             var square = UiKit.Sprite(rect, PerkSprites.Gradient(SquareTop, SquareBottom), Color.white);
-            UiKit.Outline(rect, new Color(0, 0, 0, 120 / 255f));
+            var line = UiKit.Outline(rect, SquareLine);
             var iconSize = Mathf.Round(size * 0.88f);
             var icon = UiKit.Sprite(UiKit.Rect(rect, "Icon", (size - iconSize) / 2, (size - iconSize) / 2, iconSize, iconSize), null, Color.white);
             icon.preserveAspect = true;
-            return (square, icon);
+            return (square, line, icon);
         }
 
         private void BuildList(float x, float y, float width, float height)
@@ -539,6 +552,15 @@ namespace PrestigePerks.UI
                     row.Rect.anchoredPosition = rowPlaces[ownedOnly ? place : Array.IndexOf(PerkPageModel.AllPerks, perk)];
                     place++;
                 }
+                else if (row.Hover)
+                {
+                    // 숨긴 줄에는 마우스가 나갔다는 알림이 오지 않으므로 여기서 지운다 (슬롯 연결 테두리도)
+                    row.Hover = false;
+                    if (hoverPerk == perk)
+                    {
+                        hoverPerk = 0;
+                    }
+                }
             }
         }
 
@@ -548,14 +570,14 @@ namespace PrestigePerks.UI
             UiKit.Image(rect, RowBase, raycast: true);
             UiKit.Sprite(UiKit.Fill(rect, "Gradient"), PerkSprites.RowGradient, new Color(1, 1, 1, 0.9f));
             UiKit.Sprite(UiKit.Fill(rect, "Grid"), PerkSprites.Grid, new Color(1, 1, 1, 0.55f), Image.Type.Tiled);
-            var row = new Row { Rect = rect, Group = rect.gameObject.AddComponent<CanvasGroup>() };
+            var row = new Row { Perk = perk, Rect = rect, Group = rect.gameObject.AddComponent<CanvasGroup>() };
             // 5.0 '선택' 줄처럼 왼쪽에서 번지는 초록 (장착한 특전)
             row.Glow = UiKit.Sprite(UiKit.Rect(rect, "Glow", 0, 0, width * 0.55f, RowHeight), PerkSprites.RowGlow, RowGlowTint);
             UiKit.Sprite(UiKit.Rect(rect, "Shadow", width - width / 3, 0, width / 3, RowHeight), PerkSprites.RowShadow, new Color(1, 1, 1, 0.7f));
             UiKit.Image(UiKit.Rect(rect, "Bottom", 0, RowHeight - 1, width, 1), new Color32(8, 10, 11, 255));
 
             var size = RowHeight - 12;
-            (row.Square, row.Icon) = IconSquare(rect, "Square", 6, 6, size);
+            (row.Square, row.SquareLine, row.Icon) = IconSquare(rect, "Square", 6, 6, size);
             row.Icon.sprite = PerkSprites.Icon(perk);
             var x0 = size + 18;
             var effectX = x0 + nameColumn;
@@ -577,7 +599,13 @@ namespace PrestigePerks.UI
             OnHover(rect.gameObject, on =>
             {
                 row.Hover = on;
+                hoverPerk = on ? perk : hoverPerk == perk ? 0 : hoverPerk;
                 RefreshOutline(row);
+                // 이 특전이 든 슬롯 육각에도 마우스를 올린 테두리
+                foreach (var reel in reels)
+                {
+                    RefreshLock(reel);
+                }
             });
             On(rect.gameObject, EventTriggerType.PointerClick, _ => OnRowClicked(perk));
             On(rect.gameObject, EventTriggerType.BeginDrag, data => BeginRowDrag(perk, data));
@@ -655,7 +683,7 @@ namespace PrestigePerks.UI
             var body = picked.Body;
             picked.Empty = UiKit.Label(body, "Empty", w / 2, 90, w - 32, locale.Get("ui.selectNone"), 16, UiKit.Muted, TextAlignmentOptions.Center);
 
-            (picked.Square, picked.Icon) = IconSquare(body, "Square", 16, 16, 50);
+            (picked.Square, _, picked.Icon) = IconSquare(body, "Square", 16, 16, 50);
             picked.Name = UiKit.Label(body, "Name", 80, 30, w - 96 - 130, "", 20, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             picked.Status = UiKit.Label(body, "Status", w - 16, 30, 130, "", 14, UiKit.Muted, TextAlignmentOptions.Right);
             picked.StatusLock = UiKit.Sprite(UiKit.Rect(body, "StatusLock", 0, 23.5f, 13, 13), PerkSprites.Lock, Color.white);
@@ -729,11 +757,18 @@ namespace PrestigePerks.UI
             trigger.triggers.Add(entry);
         }
 
-        // 선택한 줄은 흰 테두리, 리롤 대상은 얇은 금색 테두리, 마우스를 올리면 밝은 테두리
-        private static void RefreshOutline(Row row) =>
-            row.Outline.color = row.Selected ? SelectedLine : row.Target ? UiKit.Gold : row.Hover ? HoverLine : Color.clear;
+        // 슬롯 ↔ 줄 연결은 릴이 돌거나 끄는 동안에는 쉰다
+        private bool CanLink => spinning.Count == 0 && ghost == null;
 
-        // 슬롯에 마우스를 올리면 표시와 육각 틀이 밝아진다 (리롤 칸·잠긴 칸은 누르면 잠금 토글, 확정 칸은 선택). 드래그 중에는 놓을 곳 표시가 우선이다
+        // 선택한 줄은 흰 테두리, 마우스를 올린 줄과 마우스를 올린 슬롯의 줄은 밝은 테두리 (리롤 대상은 아이콘 칸 테두리만 금색, RenderRow)
+        private void RefreshOutline(Row row)
+        {
+            var linked = CanLink && hoverSlot >= 0 && hoverSlot < reels.Count && reels[hoverSlot].Open && reels[hoverSlot].CurrentPerk == row.Perk;
+            row.Outline.color = row.Selected ? SelectedLine : row.Hover || linked ? HoverLine : Color.clear;
+        }
+
+        // 슬롯에 마우스를 올리면 표시와 육각 틀이 밝아진다 (리롤 칸·잠긴 칸은 누르면 잠금 토글, 확정 칸은 선택). 드래그 중에는 놓을 곳 표시가 우선이다.
+        // 목록 줄에 마우스를 올리면 그 특전이 든 슬롯 육각도 같은 모양으로 밝아진다
         private void RefreshLock(Reel reel)
         {
             var hover = reel.LockHover && reel.LockButton.interactable && reel.Kind != SlotKind.Empty;
@@ -748,7 +783,8 @@ namespace PrestigePerks.UI
                 return;
             }
 
-            reel.Hover.color = hover && dragSlot < 0 ? new Color(1, 1, 1, 0.45f) : Color.clear;
+            var linked = CanLink && hoverPerk > 0 && reel.Open && reel.CurrentPerk == hoverPerk;
+            reel.Hover.color = (hover && dragSlot < 0) || linked ? new Color(1, 1, 1, 0.45f) : Color.clear;
         }
 
         private static void SetEquipped(Row row, bool equipped)
@@ -874,6 +910,8 @@ namespace PrestigePerks.UI
             SetEquipped(row, equipped);
             row.Target = equipped && PerkPageModel.KindOf(state, slot) == SlotKind.Roll;
             row.Selected = perk == selectedPerk;
+            // 리롤 대상 줄은 아이콘 칸 테두리만 금색 (줄 전체 금색 상자는 슬롯의 금색 육각과 겹쳐 많아 보였다)
+            row.SquareLine.color = row.Target ? UiKit.Gold : SquareLine;
             RefreshOutline(row);
 
             var shown = PerkPageModel.ShownTier(state, perk);
@@ -907,6 +945,7 @@ namespace PrestigePerks.UI
                 reel.Fill.color = new Color(1, 1, 1, 0.6f);
                 reel.FaceIcon.gameObject.SetActive(false);
                 reel.TierBox.gameObject.SetActive(false);
+                reel.Closed.fontSize = 13;
                 reel.Closed.text = PerkPageModel.OpensAt(state, index) is int level ? locale.Format("ui.opensAt", level) : locale.Get("ui.slotClosed");
                 reel.Name.text = "";
                 reel.Effect.text = "";
@@ -917,7 +956,9 @@ namespace PrestigePerks.UI
             var blue = reel.Kind == SlotKind.Locked || reel.Kind == SlotKind.Fixed;
             reel.Header.color = UiKit.Muted;
             reel.Fill.color = Color.white;
-            reel.Closed.text = "";
+            // 특전이 없는 열린 칸은 닫힌 칸처럼 육각 안에 흐린 "비어 있음" (도는 동안에는 띠가 보인다)
+            reel.Closed.fontSize = 14;
+            reel.Closed.text = slot.IsEmpty && !spinning.ContainsKey(index) ? locale.Get("ui.slotEmpty") : "";
             reel.Locked = slot.Locked;
             reel.CurrentPerk = slot.Perk;
             // 잠근 칸·확정 칸은 푸른 틀과 빛, 리롤 칸·빈 칸은 금색 틀 (한 겹 선)
@@ -1187,11 +1228,13 @@ namespace PrestigePerks.UI
             group.blocksRaycasts = false;
             UiKit.Image(ghost, new Color32(17, 21, 23, 240));
             UiKit.Outline(ghost, SelectedLine);
-            var (_, icon) = IconSquare(ghost, "Square", 7, 7, 38);
+            var (_, _, icon) = IconSquare(ghost, "Square", 7, 7, 38);
             icon.sprite = PerkSprites.Icon(perk);
             UiKit.Label(ghost, "Name", 54, 17, 150, locale.PerkName(perk), 15, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             UiKit.Label(ghost, "Value", 54, 36, 150, $"{PerkPageModel.EffectValue(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
             GameSounds(EUISoundType.MenuInstallModFunc);
+            // 끌기 시작하면 바로 끄는 표시로 (슬롯 ↔ 줄 연결 테두리도 끈다)
+            RenderDragMarks();
             MoveDrag(data);
         }
 
@@ -1293,6 +1336,8 @@ namespace PrestigePerks.UI
             foreach (var pair in rows)
             {
                 pair.Value.Group.alpha = pair.Key == dragPerk ? 0.4f : 1f;
+                // 끄는 동안에는 슬롯 ↔ 줄 연결 테두리를 쉰다
+                RefreshOutline(pair.Value);
             }
 
             listDropLabel.enabled = dragSlot >= 0;
@@ -1318,6 +1363,7 @@ namespace PrestigePerks.UI
                 spinning[slot] = spin;
                 HideFace(reel);
                 reel.TierBox.gameObject.SetActive(false);
+                reel.Closed.text = "";
                 DrawStrip(reel, spin);
             }
 
