@@ -49,10 +49,11 @@ public class BossCoinCheck(BotGenerator botGenerator, BotTable botTable, ItemHel
         }
 
         var coin = new MongoId(PrestigeCoinItem.TemplateId);
-        var special = (type.BotGeneration?.Items?.SpecialItems?.Whitelist?.Keys ?? Enumerable.Empty<MongoId>())
-            .Concat(type.BotInventory?.Items?.SpecialLoot?.Keys ?? Enumerable.Empty<MongoId>())
+        // SPT 가 실제로 쓰는 특수 풀: whitelist 가 있으면 그것만, 없으면 SpecialLoot (BotLootCacheService)
+        var whitelist = type.BotGeneration?.Items?.SpecialItems?.Whitelist;
+        var pool = whitelist is { Count: > 0 } ? whitelist.Keys : type.BotInventory?.Items?.SpecialLoot?.Keys ?? Enumerable.Empty<MongoId>();
+        var special = pool
             .Where(tpl => tpl != coin)
-            .Distinct()
             .ToDictionary(tpl => tpl, tpl => itemHelper.GetItem(tpl).Value?.Name ?? tpl.ToString());
         var tally = new BossCoinTally(special.Keys);
         try
