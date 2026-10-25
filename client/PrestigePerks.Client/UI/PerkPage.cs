@@ -19,6 +19,9 @@ namespace PrestigePerks.UI
     internal sealed class PerkPage : MonoBehaviour
     {
         private const float ReferenceHeight = 1080f;
+
+        // 내용 폭 상한 (16:9 의 1920). 21:9 처럼 더 넓으면 가운데에 두고 배경만 화면 전체에 깐다
+        private const float MaxContentWidth = 1920f;
         private const float Margin = 16, PanelGap = 12, HeaderTop = 12, PanelHead = 46, SideWidth = 452;
         private const float SlotsTop = 68, SlotsHeight = 238, ListTop = 318;
         private const float CardHeight = 168, CardGap = 12;
@@ -65,7 +68,8 @@ namespace PrestigePerks.UI
         public event Action<int> UnequipDropped;
 
         private PerkLocale locale;
-        private RectTransform root;
+        // root 는 화면 전체 (배경, 드래그 카드), content 는 폭 상한을 둔 내용 (머리줄과 패널)
+        private RectTransform root, content;
         private TextMeshProUGUI levelLabel, coinsValue, freeValue, nextValue, lockedValue, fixedValue, rollLabel, rollSub, messageLabel;
         private RectTransform freeDots, nextDots, lockedDots, fixedDots;
         private float freeDotsStart, nextDotsStart, lockedDotsStart, fixedDotsStart, sideWidth;
@@ -213,26 +217,30 @@ namespace PrestigePerks.UI
 
         private void Build(float scale, float bottomInsetPixels)
         {
-            // 16:9 가 아니면 (울트라와이드 등) 화면 너비에 맞춘다. 늘어난 너비는 목록 줄과 슬롯 카드가 나눠 쓴다
+            // 16:9 보다 좁으면 (16:10, 4:3) 화면 너비에 맞춘다. 늘어난 너비는 목록 줄과 슬롯 카드가 나눠 쓴다.
+            // 21:9 처럼 넓으면 내용 폭은 1920 에서 멈추고 가운데에 둔다 (줄 가운데가 비지 않게, 16:9 와 같은 모양)
             var width = UnityEngine.Screen.width / scale;
             var height = ReferenceHeight - bottomInsetPixels / scale;
+            var contentWidth = Mathf.Min(width, MaxContentWidth);
+            var left = (width - contentWidth) / 2;
 
             root = UiKit.Fill(transform, "Root");
             root.offsetMin = new Vector2(0, bottomInsetPixels / scale);
-            BuildBackground();
-            BuildHeader(width);
+            BuildBackground(left);
+            content = UiKit.Rect(root, "Content", left, 0, contentWidth, height);
+            BuildHeader(contentWidth);
 
-            var leftWidth = width - 2 * Margin - PanelGap - SideWidth;
+            var leftWidth = contentWidth - 2 * Margin - PanelGap - SideWidth;
             BuildSlots(Margin, SlotsTop, leftWidth);
             BuildList(Margin, ListTop, leftWidth, height - Margin + 4 - ListTop);
-            BuildSide(width - Margin - SideWidth, SlotsTop, height - Margin + 4 - SlotsTop);
+            BuildSide(contentWidth - Margin - SideWidth, SlotsTop, height - Margin + 4 - SlotsTop);
         }
 
-        private void BuildBackground()
+        private void BuildBackground(float left)
         {
             UiKit.Sprite(root, PerkSprites.Gradient(new Color32(24, 30, 34, 255), new Color32(8, 10, 11, 255)), Color.white).raycastTarget = true;
-            // 프레스티지 화면처럼 흐릿한 큰 문양
-            UiKit.Sprite(UiKit.Rect(root, "Emblem", -140, 260, 700, 796), PerkSprites.Emblem, new Color(1, 1, 1, 0.05f));
+            // 프레스티지 화면처럼 흐릿한 큰 문양. 내용과 같이 움직이고 비네트 아래에 깔린다
+            UiKit.Sprite(UiKit.Rect(root, "Emblem", left - 140, 260, 700, 796), PerkSprites.Emblem, new Color(1, 1, 1, 0.05f));
             UiKit.Sprite(UiKit.Fill(root, "Vignette"), PerkSprites.Vignette, Color.white);
         }
 
@@ -240,7 +248,7 @@ namespace PrestigePerks.UI
         {
             // 아래 패널 머리띠와 같은 모양·폭 (좌우 여백, 가로 그라데이션, 테두리)
             var barWidth = width - 2 * Margin;
-            var header = UiKit.Rect(root, "Header", Margin, HeaderTop, barWidth, PanelHead);
+            var header = UiKit.Rect(content, "Header", Margin, HeaderTop, barWidth, PanelHead);
             UiKit.Sprite(header, PerkSprites.Gradient(new Color32(46, 56, 62, 240), new Color32(24, 29, 32, 240), true), Color.white);
             UiKit.Outline(header, UiKit.Line);
             var title = UiKit.Label(header, "Title", 16, 23, 300, locale.Get("ui.title"), 26, UiKit.Text);
@@ -260,7 +268,7 @@ namespace PrestigePerks.UI
         /// <summary>프레스티지 화면 패널: 왼쪽이 밝은 청회색 머리띠 + 평평한 본문.</summary>
         private RectTransform Panel(string name, float x, float y, float width, float height, string title)
         {
-            var panel = UiKit.Rect(root, name, x, y, width, height);
+            var panel = UiKit.Rect(content, name, x, y, width, height);
             UiKit.Image(panel, new Color32(17, 21, 23, 230));
             Head(panel, 0, width, title);
             UiKit.Outline(panel, UiKit.Line);
