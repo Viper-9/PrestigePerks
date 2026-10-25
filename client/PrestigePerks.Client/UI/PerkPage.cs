@@ -65,6 +65,9 @@ namespace PrestigePerks.UI
         // 버튼 색 틴트 평소 값 (마우스를 올리면 1.0): 기본 버튼 0.9, 보조 버튼 0.87 (≈ ×1.15 밝아짐)
         private const float ButtonTint = 0.9f, DarkTint = 0.87f;
 
+        // 버튼 아래 줄의 코인 아이콘: 높이와 숫자까지 간격 (리롤·구매 버튼이 같은 크기라 하나로)
+        private const float CoinHeight = 16, CoinGap = 5;
+
         public event Action<int> LockClicked;
         public event Action RollClicked;
         public event Action CloseClicked;
@@ -81,10 +84,10 @@ namespace PrestigePerks.UI
         private PerkLocale locale;
         // root 는 화면 전체 (배경, 드래그 카드), content 는 폭 상한을 둔 내용 (머리줄과 패널)
         private RectTransform root, content;
-        private TextMeshProUGUI levelLabel, coinsValue, freeValue, nextValue, lockedValue, fixedValue, rollLabel, rollSub, messageLabel;
-        private RectTransform freeDots, nextDots, lockedDots, fixedDots;
-        private float freeDotsStart, nextDotsStart, lockedDotsStart, fixedDotsStart, sideWidth;
-        private Image coinIcon;
+        private TextMeshProUGUI levelLabel, coinsValue, freeValue, lockedValue, rollLabel, rollSub, messageLabel;
+        private RectTransform freeDots, lockedDots;
+        private float freeDotsStart, lockedDotsStart, sideWidth;
+        private Image coinIcon, rollCoin;
         private Button rollButton;
         private Image rollFill, rollOutline;
         private readonly Dictionary<int, Row> rows = new Dictionary<int, Row>();
@@ -255,6 +258,8 @@ namespace PrestigePerks.UI
             BuildSlots(Margin, SlotsTop, leftWidth);
             BuildList(Margin, ListTop, leftWidth, height - Margin + 4 - ListTop);
             BuildSide(contentWidth - Margin - SideWidth, SlotsTop, height - Margin + 4 - SlotsTop);
+            // 코인 그림이 이미 받아 둔 것이면 바로 끝나므로 그림을 쓰는 칸을 다 만든 뒤 부른다
+            LoadCoinIcon();
         }
 
         private void BuildBackground(float left)
@@ -594,35 +599,24 @@ namespace PrestigePerks.UI
             // 받침 없이 코인 그림만 크게
             coinIcon = UiKit.Sprite(UiKit.Rect(art, "Coin", 12, 16, 100, 100), PerkSprites.CoinFallback, Color.white);
             coinIcon.preserveAspect = true;
-            LoadCoinIcon();
             // 이름과 수치를 코인 그림(세로 가운데 66)에 맞춰 위아래로 둔다
             UiKit.Label(art, "Key", 128, 44, w - 148, locale.Get("ui.coins"), 16, UiKit.Muted);
             coinsValue = UiKit.Label(art, "Value", 126, 84, w - 146, "", 46, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             UiKit.Image(UiKit.Rect(panel, "Line1", 1, 179, w - 2, 1), UiKit.Line);
 
+            // 수치는 두 줄만 (다음 비용은 리롤 버튼 아래 줄, 확정 수는 슬롯 ◆ 로 보인다)
             (freeValue, freeDots, freeDotsStart) = KeyValue(panel, 212, "ui.free");
-            (nextValue, nextDots, nextDotsStart) = KeyValue(panel, 256, "ui.next");
-            (lockedValue, lockedDots, lockedDotsStart) = KeyValue(panel, 300, "ui.lockedSlots");
-            (fixedValue, fixedDots, fixedDotsStart) = KeyValue(panel, 344, "ui.fixedSlots");
+            (lockedValue, lockedDots, lockedDotsStart) = KeyValue(panel, 256, "ui.lockedSlots");
 
-            // 선택한 특전 칸: 패널 안의 두 번째 머리띠
-            const float pickTop = 378;
-            UiKit.Image(UiKit.Rect(panel, "Line2", 1, pickTop - 1, w - 2, 1), UiKit.Line);
-            var pick = UiKit.Rect(panel, "Picked", 0, pickTop, w, PanelHead + 240);
-            Head(pick, 0, w, locale.Get("ui.selected"));
-            BuildPicked(pick, w);
-
-            // 맨 아래: 리롤 버튼. 메시지는 그 바로 위 (리롤 대상은 슬롯의 금색 틀로 보인다)
-            var buttonY = height - 16 - 92;
-            messageLabel = UiKit.Label(UiKit.Rect(panel, "Message", 18, buttonY - 8 - 48, w - 36, 48), "", 15, UiKit.Bad, TextAlignmentOptions.BottomLeft);
-            messageLabel.enableWordWrapping = true;
-            messageLabel.overflowMode = TextOverflowModes.Overflow;
-
-            var roll = UiKit.Rect(panel, "Roll", 16, buttonY, w - 32, 92);
+            // 리롤 버튼은 수치 바로 아래 (4안 A). 패널 맨 아래 예전 버튼 자리는 일부러 비워 둔다: 손에 익은 자리를 눌러도 코인을 쓰지 않게.
+            // 크기는 구매 버튼과 같다 (높이 62, 글자 22, 아래 줄 13). 높이 92·글자 38 일 때는 페이지에서 혼자 너무 컸다
+            const float rollTop = 294, rollHeight = 62;
+            var roll = UiKit.Rect(panel, "Roll", 16, rollTop, w - 32, rollHeight);
             rollFill = UiKit.Sprite(roll, null, Color.white);
             rollOutline = UiKit.Outline(roll, Color.clear);
-            rollLabel = UiKit.Label(roll, "Label", (w - 32) / 2, 46 - 12, w - 48, locale.Get("ui.roll"), 38, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
-            rollSub = UiKit.Label(roll, "Sub", (w - 32) / 2, 46 + 26, w - 48, "", 16, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
+            rollLabel = UiKit.Label(roll, "Label", (w - 32) / 2, 23, w - 48, locale.Get("ui.rollButton"), 22, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
+            rollSub = UiKit.Label(roll, "Sub", (w - 32) / 2, 46, w - 48, "", 13, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
+            rollCoin = CoinImage(roll, 46);
             rollButton = UiKit.Button(rollFill);
             SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
             rollButton.onClick.AddListener(() =>
@@ -632,6 +626,25 @@ namespace PrestigePerks.UI
                     RollClicked?.Invoke();
                 }
             });
+
+            // 리롤·잠금·넣기/빼기가 실패했을 때만 버튼 바로 아래 한 줄. 리롤할 수 없는 이유(코인 부족, 리롤할 슬롯 없음 등)는
+            // 꺼진 버튼과 슬롯·코인 수로 보이므로 적지 않는다. 자리를 늘 비워 두어 메시지가 떠도 아래 칸이 움직이지 않는다
+            messageLabel = UiKit.Label(panel, "Message", 18, rollTop + rollHeight + 24, w - 36, "", 15, UiKit.Bad);
+
+            // 선택한 특전 칸: 패널 안의 두 번째 머리띠 (메시지 자리 아래 고정)
+            const float pickTop = rollTop + rollHeight + 40;
+            UiKit.Image(UiKit.Rect(panel, "Line2", 1, pickTop - 1, w - 2, 1), UiKit.Line);
+            var pick = UiKit.Rect(panel, "Picked", 0, pickTop, w, PanelHead + 240);
+            Head(pick, 0, w, locale.Get("ui.selected"));
+            BuildPicked(pick, w);
+        }
+
+        /// <summary>버튼 아래 줄 앞의 작은 코인 그림 (자리와 폭은 <see cref="CoinLine"/> 이 정한다). centerY 는 세로 가운데.</summary>
+        private Image CoinImage(RectTransform parent, float centerY)
+        {
+            var image = UiKit.Sprite(UiKit.Rect(parent, "Coin", 0, centerY - CoinHeight / 2, CoinHeight, CoinHeight), coinIcon.sprite, Color.white);
+            image.gameObject.SetActive(false);
+            return image;
         }
 
         private void BuildPicked(RectTransform pick, float w)
@@ -685,7 +698,12 @@ namespace PrestigePerks.UI
             var sprite = await PerkGame.CoinIcon();
             if (sprite != null && coinIcon != null)
             {
-                coinIcon.sprite = sprite;
+                coinIcon.sprite = rollCoin.sprite = sprite;
+                // 버튼 아래 줄의 코인 폭은 그림 비율을 따르므로 다시 맞춘다
+                if (lastState != null)
+                {
+                    Rerender();
+                }
             }
         }
 
@@ -747,8 +765,8 @@ namespace PrestigePerks.UI
             {
                 levelLabel.text = locale.Get("ui.loading");
                 SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
-                rollLabel.text = locale.Get("ui.roll");
-                rollSub.text = "";
+                rollLabel.text = locale.Get("ui.rollButton");
+                CoinLine(rollSub, rollCoin, "", false, false);
                 messageLabel.text = message ?? "";
                 RenderPicked(null, coins, busy);
                 return;
@@ -773,42 +791,59 @@ namespace PrestigePerks.UI
             }
 
             freeValue.text = $"{state.FreeRerollsLeft} / {state.FreeRerolls}";
+            lockedValue.text = $"{PerkPageModel.LockedCount(state)} / {state.Slots.Count}";
+            SetDots(freeDots, freeDotsStart, freeValue);
+            SetDots(lockedDots, lockedDotsStart, lockedValue);
 
-            if (state.NextRerollCost == 0)
+            rollLabel.text = locale.Get("ui.rollButton");
+            var block = PerkPageModel.CheckRoll(state, coins, busy);
+            var rollEnabled = block == RollBlock.None;
+            SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, rollEnabled ? ButtonLook.Roll : ButtonLook.Disabled);
+            // 버튼 아래 줄: 도는 중, 무료, 또는 코인 그림 + 다음 비용 (고정이면 표시)
+            if (spinning.Count > 0)
             {
-                nextValue.text = locale.Get("ui.nextFree");
-                nextValue.color = UiKit.Green;
-                rollSub.text = locale.Format("ui.rollFree", state.FreeRerollsLeft);
+                CoinLine(rollSub, rollCoin, locale.Get("ui.rolling"), false, false);
+            }
+            else if (state.NextRerollCost == 0)
+            {
+                CoinLine(rollSub, rollCoin, locale.Get("ui.nextFree"), false, false);
             }
             else
             {
-                nextValue.text = locale.Format("ui.nextCoins", state.NextRerollCost) + (state.CostFixed ? $"<size=14>{locale.Get("ui.fixed")}</size>" : "");
-                nextValue.color = UiKit.Text;
-                rollSub.text = locale.Format("ui.rollPaid", state.NextRerollCost);
-            }
-
-            lockedValue.text = $"{PerkPageModel.LockedCount(state)} / {state.Slots.Count}";
-            fixedValue.text = $"{PerkPageModel.FixedCount(state)} / {state.Slots.Count}";
-            SetDots(freeDots, freeDotsStart, freeValue);
-            SetDots(nextDots, nextDotsStart, nextValue);
-            SetDots(lockedDots, lockedDotsStart, lockedValue);
-            SetDots(fixedDots, fixedDotsStart, fixedValue);
-
-            rollLabel.text = locale.Get("ui.roll");
-            var block = PerkPageModel.CheckRoll(state, coins, busy);
-            SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, block == RollBlock.None ? ButtonLook.Roll : ButtonLook.Disabled);
-            if (spinning.Count > 0)
-            {
-                rollSub.text = locale.Get("ui.rolling");
+                CoinLine(rollSub, rollCoin, state.NextRerollCost + (state.CostFixed ? locale.Get("ui.fixed") : ""), true, rollEnabled);
             }
 
             messageLabel.color = UiKit.Bad;
-            messageLabel.text = message ?? BlockMessage(block, state, coins);
+            messageLabel.text = message ?? "";
             RenderPicked(state, coins, busy);
             RenderDragMarks();
         }
 
         private void Rerender() => Render(lastState, lastCoins, lastBusy, lastMessage);
+
+        /// <summary>
+        /// 버튼 아래 줄. withCoin 이면 코인 그림(높이 CoinHeight, 폭은 그림 비율) + CoinGap + 글자를 한 묶음으로 가운데에 둔다.
+        /// 글자 칸은 가운데 정렬 그대로 두고 왼쪽 여백만 그림 자리만큼 준다. 꺼진 버튼이면 그림도 흐리게.
+        /// </summary>
+        private static void CoinLine(TextMeshProUGUI sub, Image coin, string text, bool withCoin, bool enabled)
+        {
+            sub.text = text;
+            sub.margin = Vector4.zero;
+            coin.gameObject.SetActive(withCoin);
+            if (!withCoin)
+            {
+                return;
+            }
+
+            var sprite = coin.sprite;
+            var coinWidth = sprite != null && sprite.rect.height > 0 ? CoinHeight * sprite.rect.width / sprite.rect.height : CoinHeight;
+            var textWidth = UiKit.Width(sub, text);
+            sub.margin = new Vector4(coinWidth + CoinGap, 0, 0, 0);
+            var center = sub.rectTransform.anchoredPosition.x + sub.rectTransform.sizeDelta.x / 2;
+            coin.rectTransform.sizeDelta = new Vector2(coinWidth, CoinHeight);
+            coin.rectTransform.anchoredPosition = new Vector2(center - (coinWidth + CoinGap + textWidth) / 2, coin.rectTransform.anchoredPosition.y);
+            coin.color = new Color(1, 1, 1, enabled ? 1f : 0.35f);
+        }
 
         private void RenderRow(int perk, Row row, PerkStateDto state)
         {
@@ -1002,23 +1037,6 @@ namespace PrestigePerks.UI
             }
 
             button.interactable = look != ButtonLook.Disabled;
-        }
-
-        private string BlockMessage(RollBlock block, PerkStateDto state, int coins)
-        {
-            switch (block)
-            {
-                case RollBlock.NoSlots:
-                    return locale.Get("ui.noSlots");
-                case RollBlock.NothingToRoll:
-                    return locale.Get("ui.nothingToRoll");
-                case RollBlock.CollectionComplete:
-                    return locale.Get("ui.collectionComplete");
-                case RollBlock.NotEnoughCoins:
-                    return locale.Format("ui.notEnoughCoins", state.NextRerollCost, coins);
-                default:
-                    return "";
-            }
         }
 
         public void ShowStatus(string text, Color color)
@@ -1252,8 +1270,8 @@ namespace PrestigePerks.UI
                 DrawStrip(reel, spin);
             }
 
-            rollSub.text = locale.Get("ui.rolling");
             SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
+            CoinLine(rollSub, rollCoin, locale.Get("ui.rolling"), false, false);
             GameSounds(EUISoundType.MenuCheckBox);
         }
 
