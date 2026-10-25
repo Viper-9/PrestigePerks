@@ -7,7 +7,7 @@ A prestige overhaul for SPT 4.1.x. Each prestige makes your next run a little st
 ## Planned
 
 - Lower prestige requirements, close to SPT 5.0 (prestige 1-6)
-- Perk slots: one more slot per prestige level, filled by random rolls you can lock and reroll
+- Perk slots: one more slot per prestige level, filled by random rolls you can lock and reroll. Keep a rolled perk with coins to own it for good, upgrade it from tier I to III (higher tiers unlock with prestige), and drag owned perks into fixed slots
 - Prestige coins: items handed in at prestige are converted to coins by their rouble value
 - Leftover coins carry over to your next prestige automatically
 - Works with the Prestige Trader mod, which sells for coins
