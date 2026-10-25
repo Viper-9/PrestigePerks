@@ -64,7 +64,7 @@ public class PrestigeCommandoCommand(
     public string GetCommandHelp(string command) =>
         command switch
         {
-            CoinCommand => $"{Prefix} {CoinCommand}\n========\nSends prestige coins to the player through the message system.\n\n\t{Prefix} {CoinCommand} [quantity]\n\t\tEx: {Prefix} {CoinCommand} 10\n\t\tQuantity defaults to 1, max {MaxCoinAmount}.\n\t{Prefix} {CoinCommand} boss [bots]\t\tgenerate each boss [bots] times (default {BossCoinCheck.DefaultBots}, max {BossCoinCheck.MaxBots}) and count prestige coins and kept special items",
+            CoinCommand => $"{Prefix} {CoinCommand}\n========\nSends prestige coins to the player through the message system.\n\n\t{Prefix} {CoinCommand} [quantity]\n\t\tEx: {Prefix} {CoinCommand} 10\n\t\tQuantity defaults to 1, max {MaxCoinAmount}.\n\t{Prefix} {CoinCommand} boss [bots]\t\tgenerate each boss [bots] times (default {BossCoinCheck.DefaultBots}, max {BossCoinCheck.MaxBots}) and count prestige coins and GP coins",
             PerkCommand => $"{Prefix} {PerkCommand}\n========\nDev commands for prestige perks.\n\n" +
                             $"\t{Prefix} {PerkCommand} status\n" +
                             $"\t{Prefix} {PerkCommand} roll\t\tfree rerolls only (paid rerolls use inventory coins on the perk page)\n" +
