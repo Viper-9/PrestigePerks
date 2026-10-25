@@ -33,7 +33,8 @@ public class PrestigeCommandoCommand(
     SaveServer saveServer,
     HideoutHelper hideoutHelper,
     HideoutController hideoutController,
-    HideoutTable hideoutTable) : ICommandoCommand
+    HideoutTable hideoutTable,
+    BossCoinCheck bossCoinCheck) : ICommandoCommand
 {
     public const string Prefix = "prestige";
     public const string CoinCommand = "coin";
@@ -47,6 +48,7 @@ public class PrestigeCommandoCommand(
 
     private static readonly Regex CoinRegex = new($"^{Prefix} {CoinCommand}(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex CoinPreviewRegex = new($"^{Prefix} {CoinCommand} preview$", RegexOptions.IgnoreCase);
+    private static readonly Regex BossCheckRegex = new($"^{Prefix} {CoinCommand} boss(?: (\\S+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex HideoutRegex = new($"^{Prefix} {PerkCommand} hideout$", RegexOptions.IgnoreCase);
@@ -62,7 +64,7 @@ public class PrestigeCommandoCommand(
     public string GetCommandHelp(string command) =>
         command switch
         {
-            CoinCommand => $"{Prefix} {CoinCommand}\n========\nSends prestige coins to the player through the message system.\n\n\t{Prefix} {CoinCommand} [quantity]\n\t\tEx: {Prefix} {CoinCommand} 10\n\t\tQuantity defaults to 1, max {MaxCoinAmount}.",
+            CoinCommand => $"{Prefix} {CoinCommand}\n========\nSends prestige coins to the player through the message system.\n\n\t{Prefix} {CoinCommand} [quantity]\n\t\tEx: {Prefix} {CoinCommand} 10\n\t\tQuantity defaults to 1, max {MaxCoinAmount}.\n\t{Prefix} {CoinCommand} boss [bots]\t\tgenerate each boss [bots] times (default {BossCoinCheck.DefaultBots}, max {BossCoinCheck.MaxBots}) and count prestige coins and kept special items",
             PerkCommand => $"{Prefix} {PerkCommand}\n========\nDev commands for prestige perks.\n\n" +
                             $"\t{Prefix} {PerkCommand} status\n" +
                             $"\t{Prefix} {PerkCommand} roll\t\tfree rerolls only (paid rerolls use inventory coins on the perk page)\n" +
@@ -94,6 +96,13 @@ public class PrestigeCommandoCommand(
         if (IsCoinPreview(text))
         {
             return DescribeCoinPreview(sessionId);
+        }
+
+        if (IsBossCheck(text))
+        {
+            return ParseBossCheckBots(text) is { } bots
+                ? bossCoinCheck.Describe(sessionId, bots)
+                : $"Invalid use of {Prefix} {CoinCommand} boss. Bots must be 1-{BossCoinCheck.MaxBots}.";
         }
 
         var amount = ParseCoinAmount(text);
@@ -173,6 +182,26 @@ public class PrestigeCommandoCommand(
 
     /// <summary>"prestige coin preview".</summary>
     internal static bool IsCoinPreview(string? text) => CoinPreviewRegex.IsMatch(text?.Trim() ?? "");
+
+    /// <summary>"prestige coin boss [n]".</summary>
+    internal static bool IsBossCheck(string? text) => BossCheckRegex.IsMatch(text?.Trim() ?? "");
+
+    /// <summary>"prestige coin boss [n]" 의 봇 수. 생략하면 <see cref="BossCoinCheck.DefaultBots"/>, 1~MaxBots 를 벗어나면 null.</summary>
+    internal static int? ParseBossCheckBots(string? text)
+    {
+        var match = BossCheckRegex.Match(text?.Trim() ?? "");
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        if (!match.Groups[1].Success)
+        {
+            return BossCoinCheck.DefaultBots;
+        }
+
+        return int.TryParse(match.Groups[1].Value, out var bots) && bots is >= 1 and <= BossCoinCheck.MaxBots ? bots : null;
+    }
 
     private string DescribeCoinPreview(MongoId sessionId)
     {
