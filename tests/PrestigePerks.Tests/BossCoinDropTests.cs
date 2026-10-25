@@ -88,6 +88,33 @@ public class BossCoinDropTests
     }
 
     [Fact]
+    public void Zero_weight_count_table_counts_as_zero_draws()
+    {
+        // 4.1.2 bossbully·bossgluhar·bosskilla·bosspartisan 의 specialItems.weights 는 {"0": 0} 이다 (게임 확인 때 이 4명만 코인 0)
+        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, BossCoinDrop.ShiftCounts(new() { [0] = 0 }, 1));
+        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, BossCoinDrop.ShiftCounts(new() { [0] = 0, [1] = 0 }, 1));
+
+        var half = BossCoinDrop.ShiftCounts(new() { [0] = 0 }, 0.5);
+        Assert.Equal(0.5, half[1], 9);
+        Assert.Equal(0.5, half[0], 9);
+    }
+
+    [Fact]
+    public void Boss_with_zero_weight_count_table_gets_the_coin()
+    {
+        var bot = Boss();
+        Special(bot).Weights = new() { [0] = 0 };
+        BossCoinDrop.AddCoin(bot, 1);
+        var limits = new Dictionary<MongoId, double> { [Coin] = 1 };
+        var random = new Random(3);
+
+        for (var i = 0; i < 200; i++)
+        {
+            Assert.Equal([Coin], Draw(Special(bot), limits, random));
+        }
+    }
+
+    [Fact]
     public void Partial_chance_splits_each_count()
     {
         var shifted = BossCoinDrop.ShiftCounts(new() { [2] = 1 }, 0.4);
