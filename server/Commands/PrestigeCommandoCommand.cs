@@ -50,6 +50,8 @@ public class PrestigeCommandoCommand(
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex HideoutRegex = new($"^{Prefix} {PerkCommand} hideout$", RegexOptions.IgnoreCase);
+    private static readonly Regex TierRegex = new($"^{Prefix} {PerkCommand} tier ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
+    private static readonly Regex CollectionResetRegex = new($"^{Prefix} {PerkCommand} collection reset$", RegexOptions.IgnoreCase);
     private static readonly Regex AllRegex = new($"^{Prefix} {PerkCommand} all (on|off)$", RegexOptions.IgnoreCase);
 
     public string CommandPrefix => Prefix;
@@ -68,9 +70,11 @@ public class PrestigeCommandoCommand(
                             $"\t{Prefix} {PerkCommand} unlock <slot>\n" +
                             $"\t{Prefix} {PerkCommand} free <count>\t\tset free rerolls left (0-{MaxFreeRerolls})\n" +
                             $"\t{Prefix} {PerkCommand} set <slot> <perk>\t\tput perk number <perk> in a slot (swaps if another slot has it). Reopen the perk page or main menu to apply it in game\n" +
-                            $"\t{Prefix} {PerkCommand} all on|off\t\tapply every perk regardless of slots (dev testing). Reopen the perk page or main menu to apply it in game\n" +
+                            $"\t{Prefix} {PerkCommand} tier <perk> <0-3>\t\tset the owned tier of perk number <perk> without coins (0 removes it from the collection)\n" +
+                            $"\t{Prefix} {PerkCommand} collection reset\t\tclear the collection (fixed slots become reroll slots)\n" +
+                            $"\t{Prefix} {PerkCommand} all on|off\t\tapply every perk at tier III regardless of slots (dev testing). Reopen the perk page or main menu to apply it in game\n" +
                             $"\t{Prefix} {PerkCommand} hideout\t\tshow server hideout times with artisan(17) applied (compare all on/off)\n" +
-                            $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, free/paid rerolls (previous file kept as .bak)",
+                            $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, collection, free/paid rerolls (previous file kept as .bak)",
             _ => "",
         };
 
@@ -108,6 +112,16 @@ public class PrestigeCommandoCommand(
         if (ParseSetCommand(text) is var (slot, perk))
         {
             return FormatState(perkService.SetPerk(sessionId, slot - 1, perk));
+        }
+
+        if (ParseTierCommand(text) is var (tierPerk, tier))
+        {
+            return FormatState(perkService.SetOwnedTier(sessionId, tierPerk, tier));
+        }
+
+        if (CollectionResetRegex.IsMatch(text?.Trim() ?? ""))
+        {
+            return FormatState(perkService.ResetCollection(sessionId));
         }
 
         if (HideoutRegex.IsMatch(text?.Trim() ?? ""))
@@ -226,6 +240,18 @@ public class PrestigeCommandoCommand(
         return slot is >= 1 and <= 6 && PerkCatalog.IsKnown(perk) ? (slot, perk) : null;
     }
 
+    /// <summary>"prestige perk tier &lt;특전 번호&gt; &lt;0~3&gt;". 특전은 목록에 있는 번호. 틀리면 null.</summary>
+    internal static (int Perk, int Tier)? ParseTierCommand(string? text)
+    {
+        var match = TierRegex.Match(text?.Trim() ?? "");
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var perk) || !int.TryParse(match.Groups[2].Value, out var tier))
+        {
+            return null;
+        }
+
+        return PerkCatalog.IsKnown(perk) && tier is >= 0 and <= PerkConfig.MaxTier ? (perk, tier) : null;
+    }
+
     /// <summary>
     /// 개발용: 서버가 지금 계산하는 은신처 시간 (17번 패치를 지난 실제 값). all on / all off 로 비교하면 ×0.8 인지 바로 보인다.
     /// 클라이언트 화면 시간은 레시피 화면을 연 뒤 BepInEx [dev] 로그의 17 줄로 확인한다.
@@ -237,8 +263,9 @@ public class PrestigeCommandoCommand(
             return "No PMC profile.";
         }
 
-        var active = PerkArtisan.Has(pmc);
-        var text = new StringBuilder($"artisan(17) {(active ? "ACTIVE" : "inactive")} (server times in seconds)");
+        var scale = PerkArtisan.Scale(pmc);
+        var active = scale > 0;
+        var text = new StringBuilder($"artisan(17) {(active ? $"ACTIVE x{PerkArtisan.Factor(scale):0.###}" : "inactive")} (server times in seconds)");
         var recipes = (hideoutTable.Production.Recipes ?? [])
             .Where(recipe => recipe.Id != HideoutHelper.BitcoinProductionId && recipe.ProductionTime > 0)
             .GroupBy(recipe => recipe.Continuous == true)
@@ -256,8 +283,8 @@ public class PrestigeCommandoCommand(
             text.Append($"\nscav case {scavRecipe.Id}: base {scavRecipe.ProductionTime:0} -> {scavTime:0.#} (fence modifier included, crafting skill not)");
         }
 
-        text.Append($"\ncultist 43200 (12h) -> {(active ? PerkArtisan.CraftTime(43200) : 43200):0}");
-        text.Append($"\nbitcoin progress per 100 s elapsed -> {(active ? PerkArtisan.BitcoinElapsed(100) : 100)} s");
+        text.Append($"\ncultist 43200 (12h) -> {(active ? PerkArtisan.CraftTime(43200, scale) : 43200):0}");
+        text.Append($"\nbitcoin progress per 100 s elapsed -> {(active ? PerkArtisan.BitcoinElapsed(100, scale) : 100)} s");
         return text.ToString();
     }
 
@@ -269,8 +296,9 @@ public class PrestigeCommandoCommand(
     }
 
     /// <summary>
-    /// P3 | active: experience(1), scav(8)
-    /// slots:  [1] experience(1) (locked)  [2] mastery(24)  [3] scav(8)
+    /// P3 | tier cap II | active: experience(1) II, scav(8) I
+    /// slots:  [1] experience(1) II (fixed)  [2] empty  [3] scav(8) I (locked)
+    /// collection 1 / 20: experience(1) II
     /// free rerolls 2 | paid rerolls 0 | next reroll: free
     /// </summary>
     internal static string FormatState(PerkState state)
@@ -281,8 +309,9 @@ public class PrestigeCommandoCommand(
             text.Append($"Error: {state.Error}\n");
         }
 
-        text.Append($"P{state.PrestigeLevel} | active: ");
-        text.Append(state.ActivePerks.Count == 0 ? "none" : string.Join(", ", state.ActivePerks.Select(PerkCatalog.Describe)));
+        string Tier(int perk) => PerkService.TierName(state.ActiveTiers.TryGetValue(perk, out var tier) ? tier : 0);
+        text.Append($"P{state.PrestigeLevel} | tier cap {PerkService.TierName(state.TierCap)} | active: ");
+        text.Append(state.ActivePerks.Count == 0 ? "none" : string.Join(", ", state.ActivePerks.Select(perk => $"{PerkCatalog.Describe(perk)} {Tier(perk)}")));
         if (state.RollCost is > 0)
         {
             text.Append($"\nreroll paid {state.RollCost} coins");
@@ -297,7 +326,15 @@ public class PrestigeCommandoCommand(
         for (var i = 0; i < state.Slots.Count; i++)
         {
             var slot = state.Slots[i];
-            text.Append($"  [{i + 1}] {PerkCatalog.Describe(slot.Perk)}{(slot.Locked ? " (locked)" : "")}");
+            text.Append(slot.IsEmpty
+                ? $"  [{i + 1}] empty"
+                : $"  [{i + 1}] {PerkCatalog.Describe(slot.Perk)} {Tier(slot.Perk)}{(slot.Fixed ? " (fixed)" : slot.Locked ? " (locked)" : "")}");
+        }
+
+        text.Append($"\ncollection {state.Owned.Count} / {PerkCatalog.Numbers.Count}");
+        if (state.Owned.Count > 0)
+        {
+            text.Append(": ").Append(string.Join(", ", state.Owned.OrderBy(pair => pair.Key).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
         }
 
         text.Append($"\nfree rerolls {state.FreeRerollsLeft} | paid rerolls {state.PaidRerolls} | next reroll: ");
