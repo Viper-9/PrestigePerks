@@ -103,14 +103,14 @@ public class SafeCoinDropTests
     }
 
     [Fact]
-    public void Shipped_config_drops_five_to_ten_coins_in_one_of_five_safes()
+    public void Shipped_config_drops_five_to_fifteen_coins_in_three_of_ten_safes()
     {
         var path = System.IO.Path.Combine(AppContext.BaseDirectory, "config", PerkConfigLoader.FileName);
         var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(File.ReadAllText(path)), warning => Assert.Fail(warning)).SafeCoins;
 
         Assert.Equal(new SafeCoinConfig(), config);
-        Assert.Equal(0.2, config.Chance);
-        Assert.Equal((5, 10), (config.MinStack, config.MaxStack));
+        Assert.Equal(0.3, config.Chance);
+        Assert.Equal((5, 15), (config.MinStack, config.MaxStack));
     }
 
     [Theory]
