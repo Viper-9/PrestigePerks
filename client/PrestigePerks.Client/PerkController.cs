@@ -262,11 +262,12 @@ namespace PrestigePerks
             }
         }
 
-        private void RenderPage(string message)
+        /// <summary>message 는 리롤 버튼 아래, buyMessage 는 구매 버튼 아래 (구매 실패만).</summary>
+        private void RenderPage(string message, string buyMessage = null)
         {
             if (page != null)
             {
-                page.Render(state, PerkGame.CountCoins(), busy, message);
+                page.Render(state, PerkGame.CountCoins(), busy, message, buyMessage);
             }
         }
 
@@ -400,7 +401,7 @@ namespace PrestigePerks
                 if (result == null || result.Failed)
                 {
                     await Reload();
-                    RenderPage(BuyError(result?.Error, price));
+                    RenderPage(null, BuyError(result?.Error, price));
                     PerkGame.Sound(EUISoundType.ErrorMessage);
                     return;
                 }
@@ -408,7 +409,7 @@ namespace PrestigePerks
                 var fresh = await PerkApi.GetState();
                 if (fresh == null)
                 {
-                    RenderPage(Locale.Get("ui.network"));
+                    RenderPage(null, Locale.Get("ui.network"));
                     return;
                 }
 
@@ -420,7 +421,7 @@ namespace PrestigePerks
             {
                 Log.Warn($"buy failed: {e}");
                 busy = false;
-                RenderPage(Locale.Get("ui.network"));
+                RenderPage(null, Locale.Get("ui.network"));
             }
         }
 

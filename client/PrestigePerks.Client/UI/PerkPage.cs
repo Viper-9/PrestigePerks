@@ -108,11 +108,11 @@ namespace PrestigePerks.UI
         private Picked picked;
         private int selectedPerk;
 
-        // 마지막으로 그린 상태 (선택·드래그·확인 시간이 바뀌면 다시 그린다)
+        // 마지막으로 그린 상태 (선택·드래그·확인 시간이 바뀌면 다시 그린다). 구매 메시지는 선택한 특전 칸 구매 버튼 아래
         private PerkStateDto lastState;
         private int lastCoins;
         private bool lastBusy;
-        private string lastMessage;
+        private string lastMessage, lastBuyMessage;
 
         // 드래그: 목록의 보유 특전(dragPerk) 또는 확정 칸(dragSlot). 끄는 동안 작은 카드가 마우스를 따라온다
         private int dragPerk, dragSlot = -1, dropReel = -1;
@@ -214,9 +214,9 @@ namespace PrestigePerks.UI
         {
             public RectTransform Body;
             public Image Square, Icon, StatusLock, StatusMark;
-            public TextMeshProUGUI Empty, Name, Status, Subject, Value, Tier, Next, Hint, BuyLabel, BuySub;
+            public TextMeshProUGUI Empty, Name, Status, Subject, Value, Tier, Next, Hint, BuyLabel, BuySub, BuyMessage;
             public RectTransform Buy;
-            public Image BuyFill, BuyOutline;
+            public Image BuyFill, BuyOutline, BuyCoin;
             public Button BuyButton;
             public float Width;
         }
@@ -672,8 +672,14 @@ namespace PrestigePerks.UI
             picked.BuyOutline = UiKit.Outline(picked.Buy, Color.clear);
             picked.BuyLabel = UiKit.Label(picked.Buy, "Label", (w - 32) / 2, 23, w - 48, "", 22, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
             picked.BuySub = UiKit.Label(picked.Buy, "Sub", (w - 32) / 2, 46, w - 48, "", 13, UiKit.Dark, TextAlignmentOptions.Center);
+            picked.BuyCoin = CoinImage(picked.Buy, 46);
             picked.BuyButton = UiKit.Button(picked.BuyFill);
             picked.BuyButton.onClick.AddListener(OnBuyClicked);
+
+            // 구매 실패 문구는 구매 버튼 바로 아래 (글줄 가운데 = 버튼 아래 + 20). 길면 아래로 줄을 바꾼다
+            picked.BuyMessage = UiKit.Label(UiKit.Rect(body, "BuyMessage", 16, 248 - 8, w - 32, 48), "", 15, UiKit.Bad, TextAlignmentOptions.TopLeft);
+            picked.BuyMessage.enableWordWrapping = true;
+            picked.BuyMessage.overflowMode = TextOverflowModes.Overflow;
         }
 
         /// <summary>점선으로 이은 이름·값 한 줄. 점선은 값 폭에 맞춰 Render 에서 늘인다.</summary>
@@ -698,7 +704,7 @@ namespace PrestigePerks.UI
             var sprite = await PerkGame.CoinIcon();
             if (sprite != null && coinIcon != null)
             {
-                coinIcon.sprite = rollCoin.sprite = sprite;
+                coinIcon.sprite = rollCoin.sprite = picked.BuyCoin.sprite = sprite;
                 // 버튼 아래 줄의 코인 폭은 그림 비율을 따르므로 다시 맞춘다
                 if (lastState != null)
                 {
@@ -754,13 +760,17 @@ namespace PrestigePerks.UI
 
         internal static string TierName(int tier) => tier == 1 ? "I" : tier == 2 ? "II" : tier == 3 ? "III" : "";
 
-        /// <summary>상태를 그린다. 돌고 있는 릴의 아이콘·이름은 연출이 맡는다.</summary>
-        public void Render(PerkStateDto state, int coins, bool busy, string message)
+        /// <summary>
+        /// 상태를 그린다. 돌고 있는 릴의 아이콘·이름은 연출이 맡는다.
+        /// message 는 리롤 버튼 아래 (리롤·잠금·넣기/빼기·통신), buyMessage 는 선택한 특전 칸 구매 버튼 아래 (구매 실패).
+        /// </summary>
+        public void Render(PerkStateDto state, int coins, bool busy, string message, string buyMessage = null)
         {
             lastState = state;
             lastCoins = coins;
             lastBusy = busy;
             lastMessage = message;
+            lastBuyMessage = buyMessage;
             if (state == null)
             {
                 levelLabel.text = locale.Get("ui.loading");
@@ -819,7 +829,7 @@ namespace PrestigePerks.UI
             RenderDragMarks();
         }
 
-        private void Rerender() => Render(lastState, lastCoins, lastBusy, lastMessage);
+        private void Rerender() => Render(lastState, lastCoins, lastBusy, lastMessage, lastBuyMessage);
 
         /// <summary>
         /// 버튼 아래 줄. withCoin 이면 코인 그림(높이 CoinHeight, 폭은 그림 비율) + CoinGap + 글자를 한 묶음으로 가운데에 둔다.
@@ -979,9 +989,8 @@ namespace PrestigePerks.UI
             picked.Name.text = locale.PerkName(perk);
             picked.Subject.text = locale.PerkSubject(perk);
 
-            // 상태: "슬롯 n" (잠금이면 자물쇠, 확정이면 ◆), 장착 안 됨, 미보유
-            picked.Status.text = equipped ? locale.Format("ui.slotN", pick.Slot + 1)
-                : pick.Kind == SelectionKind.Owned ? locale.Get("ui.notEquipped") : locale.Get("ui.notOwned");
+            // 오른쪽 위는 슬롯 상태만: "슬롯 n" (잠금이면 자물쇠, 확정이면 ◆) 또는 장착 안 됨. 보유 여부는 아래 안내 줄
+            picked.Status.text = equipped ? locale.Format("ui.slotN", pick.Slot + 1) : locale.Get("ui.notEquipped");
             // 표시는 슬롯 머리줄처럼 글자 오른쪽에 둔다: 표시 자리만큼 글자를 왼쪽으로 민다
             var locked = pick.Kind == SelectionKind.LockedSlot;
             var fixedSlot = pick.Kind == SelectionKind.Fixed;
@@ -1003,6 +1012,7 @@ namespace PrestigePerks.UI
             // 안내 줄은 보유 여부만 보인다
             var owned = pick.Kind == SelectionKind.Fixed || pick.Kind == SelectionKind.Owned;
             picked.Hint.text = locale.Get(owned ? "ui.hintOwned" : "ui.notOwned");
+            picked.BuyMessage.text = lastBuyMessage ?? "";
 
             picked.Buy.gameObject.SetActive(pick.NextTier > 0);
             if (pick.NextTier == 0)
@@ -1012,10 +1022,20 @@ namespace PrestigePerks.UI
 
             picked.BuyLabel.text = pick.NextTier == 1 ? locale.Get("ui.keep")
                 : locale.Format("ui.buyTier", TierName(pick.NextTier));
-            picked.BuySub.text = pick.Block == BuyBlock.Capped && pick.OpensAt is int at ? locale.Format("ui.availableAt", at) : locale.Format("ui.price", pick.Price);
             var enabled = pick.Block == BuyBlock.None && !busy && spinning.Count == 0;
             SetLook(picked.BuyFill, picked.BuyOutline, picked.BuyLabel, picked.BuySub, picked.BuyButton,
                 enabled ? ButtonLook.Roll : ButtonLook.Disabled);
+            // 아래 줄: 코인 그림 + 가격. 단계 상한에 막히면 열리는 프레스티지만
+            if (pick.Block == BuyBlock.Capped && pick.OpensAt is int at)
+            {
+                picked.BuySub.fontStyle = FontStyles.Normal;
+                CoinLine(picked.BuySub, picked.BuyCoin, locale.Format("ui.availableAt", at), false, false);
+            }
+            else
+            {
+                picked.BuySub.fontStyle = FontStyles.Bold;
+                CoinLine(picked.BuySub, picked.BuyCoin, pick.Price.ToString(), true, enabled);
+            }
         }
 
         private static void SetLook(Image fill, Image outline, TextMeshProUGUI label, TextMeshProUGUI sub, Button button, ButtonLook look)
@@ -1081,9 +1101,20 @@ namespace PrestigePerks.UI
 
         private void Select(int perk)
         {
-            selectedPerk = perk;
+            Pick(perk);
             GameSounds(EUISoundType.ButtonOver);
             Rerender();
+        }
+
+        // 구매 메시지는 고른 특전에 대한 것이라 다른 특전을 고르면 지운다
+        private void Pick(int perk)
+        {
+            if (perk != selectedPerk)
+            {
+                lastBuyMessage = null;
+            }
+
+            selectedPerk = perk;
         }
 
         // 누르면 바로 산다. 서버가 목표 단계를 받으므로 연달아 눌러도 한 번만 산다
@@ -1110,7 +1141,7 @@ namespace PrestigePerks.UI
             }
 
             dragPerk = perk;
-            selectedPerk = perk;
+            Pick(perk);
             BeginGhost(perk, data);
         }
 
@@ -1122,7 +1153,7 @@ namespace PrestigePerks.UI
             }
 
             dragSlot = index;
-            selectedPerk = lastState.Slots[index].Perk;
+            Pick(lastState.Slots[index].Perk);
             BeginGhost(selectedPerk, data);
         }
 
@@ -1270,6 +1301,7 @@ namespace PrestigePerks.UI
                 DrawStrip(reel, spin);
             }
 
+            lastBuyMessage = null;
             SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
             CoinLine(rollSub, rollCoin, locale.Get("ui.rolling"), false, false);
             GameSounds(EUISoundType.MenuCheckBox);
