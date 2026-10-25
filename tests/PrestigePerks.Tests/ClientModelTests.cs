@@ -379,6 +379,35 @@ public class ClientModelTests
         Assert.Equal("missing", locale.Get("missing"));
         Assert.Equal("{0} {1}", new PerkLocale(new() { ["x"] = "{0} {1}" }, null!).Format("x", 1));
     }
+
+    [Fact]
+    public void Locale_file_splits_game_texts_by_prefix()
+    {
+        var (texts, game) = PerkLocalePack.Split(new()
+        {
+            ["ui.title"] = "特典",
+            ["game:Prestige/ItemsTransfer/Header"] = "コイン",
+            ["game:"] = "ignored",
+        });
+
+        Assert.Equal(new Dictionary<string, string> { ["ui.title"] = "特典" }, texts);
+        Assert.Equal(new Dictionary<string, string> { ["Prestige/ItemsTransfer/Header"] = "コイン" }, game);
+    }
+
+    [Fact]
+    public void Locale_file_overrides_the_built_in_texts_and_missing_keys_fall_back_to_english()
+    {
+        var kr = LocaleFile("kr");
+        var pack = new Dictionary<string, string> { ["ui.title"] = "팩 제목" };
+        var locale = new PerkLocale(PerkLocalePack.Merge(kr, pack), LocaleFile("en"));
+
+        Assert.Equal("팩 제목", locale.Get("ui.title"));
+        Assert.Equal(kr["ui.list"], locale.Get("ui.list"));
+        Assert.NotEqual("팩 제목", kr["ui.title"]);
+
+        var partial = new PerkLocale(PerkLocalePack.Merge(null!, pack), LocaleFile("en"));
+        Assert.Equal(LocaleFile("en")["ui.list"], partial.Get("ui.list"));
+    }
 }
 
 public class ReelScheduleTests
