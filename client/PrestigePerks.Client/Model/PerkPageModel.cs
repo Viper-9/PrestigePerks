@@ -180,6 +180,13 @@ namespace PrestigePerks.Model
             return -1;
         }
 
+        /// <summary>슬롯에 든 특전 (0 부터). 닫힌 칸·빈 칸이면 0.</summary>
+        public static int PerkInSlot(PerkStateDto state, int index) => IsSlotOpen(state, index) ? Math.Max(0, state.Slots[index].Perk) : 0;
+
+        /// <summary>특전이 든 첫 열린 슬롯의 특전 (페이지를 열 때 자동 선택). 없으면 0.</summary>
+        public static int FirstSlotPerk(PerkStateDto state) =>
+            state == null ? 0 : Enumerable.Range(0, state.Slots.Count).Select(index => PerkInSlot(state, index)).FirstOrDefault(perk => perk > 0);
+
         /// <summary>보유한 단계. 없으면 0.</summary>
         public static int OwnedTier(PerkStateDto state, int perk) =>
             state?.Owned != null && state.Owned.TryGetValue(perk, out var tier) ? Math.Max(0, Math.Min(tier, MaxTier)) : 0;

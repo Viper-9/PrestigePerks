@@ -104,9 +104,10 @@ namespace PrestigePerks.UI
         private readonly List<Tab> tabs = new List<Tab>();
         private readonly List<Vector2> rowPlaces = new List<Vector2>();
 
-        // 선택한 특전 칸
+        // 선택한 특전 칸. 페이지를 열고 처음 그릴 때 한 번 첫 슬롯 특전을 고른다
         private Picked picked;
         private int selectedPerk;
+        private bool autoPicked;
 
         // 마지막으로 그린 상태 (선택·드래그·확인 시간이 바뀌면 다시 그린다). 구매 메시지는 선택한 특전 칸 구매 버튼 아래
         private PerkStateDto lastState;
@@ -782,6 +783,16 @@ namespace PrestigePerks.UI
                 return;
             }
 
+            // 페이지를 열고 처음 그릴 때 아무것도 고르지 않았으면 첫 슬롯의 특전을 고른다 (페이지는 열 때마다 새로 만든다)
+            if (!autoPicked)
+            {
+                autoPicked = true;
+                if (selectedPerk == 0)
+                {
+                    selectedPerk = PerkPageModel.FirstSlotPerk(state);
+                }
+            }
+
             var level = $"<size=24><b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Gold)}>{state.PrestigeLevel}</color></b></size>";
             var tierCap = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{TierName(PerkPageModel.TierCap(state))}</color></b>";
             var collection = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{PerkPageModel.OwnedCount(state)}</color></b>";
@@ -1115,6 +1126,15 @@ namespace PrestigePerks.UI
             }
 
             selectedPerk = perk;
+        }
+
+        /// <summary>특전을 조용히 고른다 (소리·다시 그리기 없음, 부르는 쪽이 그린다). 리롤이 끝난 뒤 첫 리롤 칸의 새 특전. 0 이면 그대로 둔다.</summary>
+        public void SelectPerk(int perk)
+        {
+            if (perk > 0)
+            {
+                Pick(perk);
+            }
         }
 
         // 누르면 바로 산다. 서버가 목표 단계를 받으므로 연달아 눌러도 한 번만 산다

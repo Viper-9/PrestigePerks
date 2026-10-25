@@ -375,6 +375,12 @@ namespace PrestigePerks
             page.CancelSpin();
             PerkGame.Sound(EUISoundType.TradeOperationComplete);
             busy = false;
+            // 첫 리롤 칸의 새 특전을 골라 "영구 보유" 버튼이 바로 보이게
+            if (targets.Count > 0)
+            {
+                page.SelectPerk(PerkPageModel.PerkInSlot(state, targets[0]));
+            }
+
             RenderPage(null);
             // 반짝임이 끝난 뒤 목록 색을 되돌린다
             yield return new WaitForSecondsRealtime(1f);
