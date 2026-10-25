@@ -197,4 +197,7 @@ public sealed record ModConfig
 
     [JsonPropertyName("safeCoins")]
     public SafeCoinConfig SafeCoins { get; init; } = new();
+
+    [JsonPropertyName("bossCoins")]
+    public BossCoinConfig BossCoins { get; init; } = new();
 }

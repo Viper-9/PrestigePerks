@@ -66,5 +66,10 @@
     "chance": 0.2,
     "minStack": 5,
     "maxStack": 10
+  },
+  "bossCoins": {
+    "chance": 1.0,
+    "minStack": 5,
+    "maxStack": 10
   }
 }
