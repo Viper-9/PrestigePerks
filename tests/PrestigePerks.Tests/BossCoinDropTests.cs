@@ -9,34 +9,17 @@ namespace PrestigePerks.Tests;
 public class BossCoinDropTests
 {
     private static readonly MongoId Coin = new(PrestigeCoinItem.TemplateId);
-    private static readonly MongoId LabsKeycard = new("5c94bbff86f7747ee735c08f");
-    private static readonly MongoId StashKey = new("5d08d21286f774736e7c94c3");
+    private static readonly MongoId GpCoin = new(BossCoinDrop.GpCoinTemplateId);
+    private static readonly MongoId Keycard = new("5c94bbff86f7747ee735c08f");
 
-    /// <summary>4.1.2 bosskojaniy 처럼 특수 아이템 2개를 항상 2개 뽑는 보스. special 이 없으면 4.1.2 보스 대부분처럼 0개.</summary>
-    private static BotType Boss(params MongoId[] special) =>
-        new()
-        {
-            BotInventory = new BotTypeInventory { Items = new ItemPools { SpecialLoot = special.ToDictionary(tpl => tpl, _ => 1.0) } },
-            BotGeneration = new Generation
-            {
-                Items = new GenerationWeightingItems
-                {
-                    SpecialItems = new GenerationData
-                    {
-                        Weights = special.Length == 0 ? new() { [0] = 1, [1] = 0 } : new() { [0] = 0, [special.Length] = 1 },
-                        Whitelist = [],
-                    },
-                },
-            },
-        };
-
-    private static GenerationData Special(BotType bot) => bot.BotGeneration!.Items!.SpecialItems!;
+    private static BotType Boss(Dictionary<MongoId, double> pockets) =>
+        new() { BotInventory = new BotTypeInventory { Items = new ItemPools { Pockets = pockets, SpecialLoot = [] } } };
 
     /// <summary>
-    /// SPT 4.1.2 BotLootGenerator.AddLootFromPool 의 특수 풀 뽑기: 개수를 가중치로 뽑고, 풀에서 가중치로 뽑되
-    /// 생성 한도(itemSpawnLimits)에 닿은 아이템은 풀에서 빼고 다시 뽑는다. 아이템이 하나면 가중치와 상관없이 그것.
+    /// SPT·APBS 화폐 뽑기: 개수를 가중치로 뽑고 화폐 풀에서 가중치로 복원 추출 (화폐 뽑기에는 생성 한도를 넘기지 않는다).
+    /// 아이템이 하나면 가중치와 상관없이 그것 (WeightedRandomHelper.GetWeightedValue).
     /// </summary>
-    private static List<MongoId> Draw(GenerationData special, IReadOnlyDictionary<MongoId, double> limits, Random random)
+    private static List<MongoId> DrawCurrency(Dictionary<double, double> counts, Dictionary<MongoId, double> pool, Random random)
     {
         T Weighted<T>(Dictionary<T, double> values) where T : notnull
         {
@@ -58,167 +41,59 @@ public class BossCoinDropTests
             return values.Keys.Last();
         }
 
-        var pool = new Dictionary<MongoId, double>(special.Whitelist);
-        var count = Weighted(special.Weights);
-        var spawned = new Dictionary<MongoId, int>();
-        var drawn = new List<MongoId>();
-        for (var i = 0; i < count && pool.Count > 0; i++)
-        {
-            var tpl = Weighted(pool);
-            if (limits.TryGetValue(tpl, out var limit) && spawned.GetValueOrDefault(tpl) + 1 > limit)
-            {
-                pool.Remove(tpl);
-                i--;
-                continue;
-            }
-
-            spawned[tpl] = spawned.GetValueOrDefault(tpl) + 1;
-            drawn.Add(tpl);
-        }
-
-        return drawn;
+        var count = Weighted(counts);
+        return Enumerable.Range(0, (int)count).Select(_ => Weighted(pool)).ToList();
     }
 
     [Fact]
-    public void Full_chance_adds_one_draw_to_every_count()
+    public void Pocket_coin_takes_the_gp_coin_weight_or_one()
     {
-        var shifted = BossCoinDrop.ShiftCounts(new() { [0] = 1, [1] = 0 }, 1);
+        var withGp = Boss(new() { [GpCoin] = 24719, [Keycard] = 100 });
+        var alone = Boss(new() { [Keycard] = 100 });
 
-        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, shifted);
+        Assert.True(BossCoinDrop.AddCoinToPockets(withGp));
+        Assert.False(BossCoinDrop.AddCoinToPockets(alone));
+
+        Assert.Equal(24719, withGp.BotInventory!.Items!.Pockets[Coin]);
+        Assert.Equal(1, alone.BotInventory!.Items!.Pockets[Coin]);
+        Assert.Empty(alone.BotInventory.Items.SpecialLoot);
     }
 
     [Fact]
-    public void Zero_weight_count_table_counts_as_zero_draws()
+    public void Coin_is_added_once_and_missing_data_is_left_alone()
     {
-        // 4.1.2 bossbully·bossgluhar·bosskilla·bosspartisan 의 specialItems.weights 는 {"0": 0} 이다 (게임 확인 때 이 4명만 코인 0)
-        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, BossCoinDrop.ShiftCounts(new() { [0] = 0 }, 1));
-        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, BossCoinDrop.ShiftCounts(new() { [0] = 0, [1] = 0 }, 1));
+        var bot = Boss([]);
+        BossCoinDrop.AddCoinToPockets(bot);
 
-        var half = BossCoinDrop.ShiftCounts(new() { [0] = 0 }, 0.5);
-        Assert.Equal(0.5, half[1], 9);
-        Assert.Equal(0.5, half[0], 9);
+        Assert.Null(BossCoinDrop.AddCoinToPockets(bot));
+        Assert.Single(bot.BotInventory!.Items!.Pockets);
+        Assert.Null(BossCoinDrop.AddCoinToPockets(null));
+        Assert.Null(BossCoinDrop.AddCoinToPockets(new BotType()));
     }
 
-    [Fact]
-    public void Boss_with_zero_weight_count_table_gets_the_coin()
-    {
-        var bot = Boss();
-        Special(bot).Weights = new() { [0] = 0 };
-        BossCoinDrop.AddCoin(bot, 1);
-        var limits = new Dictionary<MongoId, double> { [Coin] = 1 };
-        var random = new Random(3);
-
-        for (var i = 0; i < 200; i++)
-        {
-            Assert.Equal([Coin], Draw(Special(bot), limits, random));
-        }
-    }
-
-    [Fact]
-    public void Partial_chance_splits_each_count()
-    {
-        var shifted = BossCoinDrop.ShiftCounts(new() { [2] = 1 }, 0.4);
-
-        Assert.Equal(0.4, shifted[3], 9);
-        Assert.Equal(0.6, shifted[2], 9);
-    }
-
-    [Fact]
-    public void Coin_goes_to_the_whitelist_of_a_boss_without_special_items()
-    {
-        var bot = Boss();
-
-        Assert.True(BossCoinDrop.AddCoin(bot, 1));
-
-        Assert.Equal([Coin], Special(bot).Whitelist.Keys);
-        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, Special(bot).Weights);
-        // 인벤토리 SpecialLoot 에는 넣지 않는다 (합친 풀을 거쳐 화폐 뽑기에 섞이므로)
-        Assert.Empty(bot.BotInventory!.Items!.SpecialLoot);
-    }
-
-    [Fact]
-    public void Existing_special_items_move_to_the_whitelist_with_the_coin()
-    {
-        var bot = Boss(LabsKeycard, StashKey);
-
-        Assert.True(BossCoinDrop.AddCoin(bot, 1));
-
-        Assert.Equal(1, Special(bot).Whitelist[LabsKeycard]);
-        Assert.Equal(1, Special(bot).Whitelist[StashKey]);
-        Assert.Equal(BossCoinDrop.CoinWeight, Special(bot).Whitelist[Coin]);
-        Assert.Equal(new Dictionary<double, double> { [3] = 1 }, Special(bot).Weights);
-        Assert.DoesNotContain(Coin, bot.BotInventory!.Items!.SpecialLoot.Keys);
-    }
-
-    [Fact]
-    public void Coin_is_added_once_and_zero_chance_or_missing_data_is_left_alone()
-    {
-        var bot = Boss();
-        BossCoinDrop.AddCoin(bot, 1);
-
-        Assert.False(BossCoinDrop.AddCoin(bot, 1));
-        Assert.Equal(new Dictionary<double, double> { [1] = 1 }, Special(bot).Weights);
-
-        var untouched = Boss();
-        Assert.False(BossCoinDrop.AddCoin(untouched, 0));
-        Assert.Empty(Special(untouched).Whitelist);
-        Assert.False(BossCoinDrop.AddCoin(null, 1));
-        Assert.False(BossCoinDrop.AddCoin(new BotType(), 1));
-    }
-
+    /// <summary>4.1.2 보스는 원래 화폐가 없어 화폐 풀에는 코인(과 GP 코인)만 있다. 개수 표 {0:20, 1:5, 2:1} (APBS 모든 Tier 와 같음).</summary>
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(2)]
-    public void Every_generated_boss_gets_the_coin_and_keeps_its_special_items(int specialCount)
+    [InlineData(false, 6.0 / 26, 0)]
+    [InlineData(true, 3.25 / 26, 3.25 / 26)]
+    public void Currency_draw_gives_the_coin_to_about_23_or_12_percent(bool withGp, double coinChance, double gpChance)
     {
-        var special = new[] { LabsKeycard, StashKey }.Take(specialCount).ToArray();
-        var bot = Boss(special);
-        BossCoinDrop.AddCoin(bot, 1);
-        var limits = special.ToDictionary(tpl => tpl, _ => 1.0);
-        limits[Coin] = 1;
-        var random = new Random(1);
+        var bot = Boss(withGp ? new() { [GpCoin] = 500 } : []);
+        BossCoinDrop.AddCoinToPockets(bot);
+        var pool = new Dictionary<MongoId, double>(bot.BotInventory!.Items!.Pockets);
+        var counts = new Dictionary<double, double> { [0] = 20, [1] = 5, [2] = 1 };
+        var random = new Random(4);
+        int coin = 0, gp = 0;
+        const int bosses = 40000;
 
-        for (var i = 0; i < 2000; i++)
+        for (var i = 0; i < bosses; i++)
         {
-            var drawn = Draw(Special(bot), limits, random);
-
-            Assert.Single(drawn, tpl => tpl == Coin);
-            Assert.All(special, tpl => Assert.Contains(tpl, drawn));
-        }
-    }
-
-    [Fact]
-    public void Partial_chance_gives_the_coin_to_that_share_of_bosses_and_keys_stay()
-    {
-        var bot = Boss(LabsKeycard, StashKey);
-        BossCoinDrop.AddCoin(bot, 0.3);
-        var limits = new Dictionary<MongoId, double> { [LabsKeycard] = 1, [StashKey] = 1, [Coin] = 1 };
-        var random = new Random(2);
-        var withCoin = 0;
-
-        for (var i = 0; i < 10000; i++)
-        {
-            var drawn = Draw(Special(bot), limits, random);
-            withCoin += drawn.Contains(Coin) ? 1 : 0;
-            Assert.Contains(LabsKeycard, drawn);
-            Assert.Contains(StashKey, drawn);
+            var drawn = DrawCurrency(counts, pool, random);
+            coin += drawn.Contains(Coin) ? 1 : 0;
+            gp += drawn.Contains(GpCoin) ? 1 : 0;
         }
 
-        Assert.InRange(withCoin / 10000.0, 0.28, 0.32);
-    }
-
-    [Fact]
-    public void Spawn_limit_is_one_coin_per_boss()
-    {
-        var limits = new Dictionary<string, Dictionary<MongoId, double>> { ["bosskojaniy"] = new() { [StashKey] = 1 } };
-
-        BossCoinDrop.AddSpawnLimit(limits, "bosskojaniy");
-        BossCoinDrop.AddSpawnLimit(limits, "bossbully");
-
-        Assert.Equal(1, limits["bosskojaniy"][Coin]);
-        Assert.Equal(1, limits["bosskojaniy"][StashKey]);
-        Assert.Equal(1, limits["bossbully"][Coin]);
+        Assert.InRange(coin / (double)bosses, coinChance - 0.01, coinChance + 0.01);
+        Assert.InRange(gp / (double)bosses, gpChance - 0.01, gpChance + 0.01);
     }
 
     [Fact]
@@ -230,10 +105,10 @@ public class BossCoinDropTests
             ["default"] = new() { ["5449016a4bdc2d6f028b456f"] = new() { ["5000"] = 70 } },
         };
 
-        BossCoinDrop.AddStackSizes(sizes, "bossbully", 5, 10);
+        BossCoinDrop.AddStackSizes(sizes, "bossbully", 20, 25);
         BossCoinDrop.AddStackSizes(sizes, "assault", 2, 3);
 
-        Assert.Equal(["5", "6", "7", "8", "9", "10"], sizes["default"][PrestigeCoinItem.TemplateId].Keys);
+        Assert.Equal(["20", "21", "22", "23", "24", "25"], sizes["default"][PrestigeCoinItem.TemplateId].Keys);
         Assert.All(sizes["default"][PrestigeCoinItem.TemplateId].Values, weight => Assert.Equal(1, weight));
         Assert.Equal(70, sizes["default"]["5449016a4bdc2d6f028b456f"]["5000"]);
         Assert.Equal(["2", "3"], sizes["assault"][PrestigeCoinItem.TemplateId].Keys);
@@ -255,21 +130,23 @@ public class BossCoinDropTests
     }
 
     [Fact]
-    public void Shipped_config_gives_every_boss_five_to_ten_coins()
+    public void Shipped_config_stacks_with_and_without_the_gp_coin_mod()
     {
         var path = System.IO.Path.Combine(AppContext.BaseDirectory, "config", PerkConfigLoader.FileName);
         var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(File.ReadAllText(path)), warning => Assert.Fail(warning)).BossCoins;
 
         Assert.Equal(new BossCoinConfig(), config);
-        Assert.Equal(1, config.Chance);
-        Assert.Equal((5, 10), (config.MinStack, config.MaxStack));
+        Assert.True(config.Enabled);
+        Assert.Equal((20, 35), config.StackRange(sharedWithGp: false));
+        Assert.Equal((40, 60), config.StackRange(sharedWithGp: true));
     }
 
     [Theory]
-    [InlineData("""{ "bossCoins": { "chance": -0.1 } }""")]
     [InlineData("""{ "bossCoins": { "minStack": 0 } }""")]
-    [InlineData("""{ "bossCoins": { "minStack": 20, "maxStack": 10 } }""")]
+    [InlineData("""{ "bossCoins": { "minStack": 40, "maxStack": 30 } }""")]
     [InlineData("""{ "bossCoins": { "maxStack": 101 } }""")]
+    [InlineData("""{ "bossCoins": { "sharedMinStack": 70, "sharedMaxStack": 60 } }""")]
+    [InlineData("""{ "bossCoins": { "sharedMaxStack": 120 } }""")]
     public void Invalid_boss_coins_fall_back_to_defaults(string json)
     {
         var warnings = new List<string>();
@@ -281,21 +158,19 @@ public class BossCoinDropTests
     }
 
     [Fact]
-    public void Tally_counts_coins_stacks_and_kept_special_items()
+    public void Tally_counts_coins_gp_coins_and_double_stacks()
     {
-        var tally = new BossCoinTally([LabsKeycard]);
+        var tally = new BossCoinTally();
         Item Stack(MongoId tpl, int count) => new() { Id = new MongoId(), Template = tpl, Upd = new Upd { StackObjectsCount = count } };
 
-        tally.Add([Stack(Coin, 6), Stack(LabsKeycard, 1)]);
-        tally.Add([Stack(Coin, 5), Stack(Coin, 4)]);
+        tally.Add([Stack(Coin, 40), Stack(Keycard, 1)]);
+        tally.Add([Stack(Coin, 30), Stack(Coin, 25), Stack(GpCoin, 2)]);
         tally.Add([]);
 
-        Assert.Equal((3, 2, 1), (tally.Bots, tally.WithCoin, tally.MultiStack));
-        Assert.Equal((6, 9), (tally.MinCoins, tally.MaxCoins));
-        Assert.Equal(1, tally.SpecialFound[LabsKeycard]);
-        Assert.Equal("bosskojaniy: coin 2/3 bots, 6-9 coins (avg 7.5), 1 bots with 2+ coin stacks | special kept: labs 1/3",
-            tally.Format("bosskojaniy", new Dictionary<MongoId, string> { [LabsKeycard] = "labs" }));
-        Assert.Equal("followerbully: coin 0/0 bots", new BossCoinTally([]).Format("followerbully"));
+        Assert.Equal((3, 2, 1, 1), (tally.Bots, tally.WithCoin, tally.MultiStack, tally.WithGp));
+        Assert.Equal((40, 55), (tally.MinCoins, tally.MaxCoins));
+        Assert.Equal("bosskojaniy: coin 2/3 bots, 40-55 coins (avg 47.5), gp 1/3, 1 bots with 2+ coin stacks", tally.Format("bosskojaniy"));
+        Assert.Equal("followerbully: coin 0/0 bots, gp 0/0", new BossCoinTally().Format("followerbully"));
     }
 
     [Theory]
