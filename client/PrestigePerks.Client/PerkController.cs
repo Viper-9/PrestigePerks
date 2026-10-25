@@ -213,7 +213,7 @@ namespace PrestigePerks
                 page.LockClicked += slot => _ = ToggleLock(slot);
                 page.RollClicked += () => _ = Roll();
                 page.BuyClicked += (perk, tier, price) => _ = Buy(perk, tier, price);
-                page.EquipDropped += (perk, slot) => _ = Change(() => PerkApi.Equip(perk, slot), "equip");
+                page.EquipDropped += (perk, slot) => _ = Change(() => PerkApi.Equip(perk, slot), "equip", perk);
                 page.UnequipDropped += slot => _ = Change(() => PerkApi.Unequip(slot), "unequip");
                 page.CloseClicked += ClosePage;
                 RenderPage(null);
@@ -422,6 +422,8 @@ namespace PrestigePerks
                 Accept(fresh, "buy");
                 PerkGame.Sound(EUISoundType.TradeOperationComplete);
                 RenderPage(null);
+                // 슬롯 틀, 줄, 새로 산 단계 칸이 반짝인다
+                page?.Flash(perk, tier);
             }
             catch (Exception e)
             {
@@ -431,8 +433,11 @@ namespace PrestigePerks
             }
         }
 
-        /// <summary>확정 넣기·빼기 (무료). 효과가 바뀌므로 응답을 Accept 해 Bonus 와 패치 특전을 다시 넣는다.</summary>
-        private async Task Change(Func<Task<PerkStateDto>> request, string what)
+        /// <summary>
+        /// 확정 넣기·빼기 (무료). 효과가 바뀌므로 응답을 Accept 해 Bonus 와 패치 특전을 다시 넣는다.
+        /// flashPerk 가 있으면 (넣기) 성공 뒤 그 특전의 슬롯 틀과 줄이 반짝인다.
+        /// </summary>
+        private async Task Change(Func<Task<PerkStateDto>> request, string what, int flashPerk = 0)
         {
             if (busy || state == null)
             {
@@ -462,6 +467,10 @@ namespace PrestigePerks
                 Accept(fresh, what);
                 PerkGame.Sound(EUISoundType.MenuInstallMag);
                 RenderPage(null);
+                if (flashPerk > 0)
+                {
+                    page?.Flash(flashPerk, 0);
+                }
             }
             catch (Exception e)
             {

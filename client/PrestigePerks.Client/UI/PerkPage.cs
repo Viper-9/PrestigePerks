@@ -172,8 +172,13 @@ namespace PrestigePerks.UI
             public readonly Image[] TierFill = new Image[PerkPageModel.MaxTier];
             public readonly Image[] TierLine = new Image[PerkPageModel.MaxTier];
             public readonly TextMeshProUGUI[] TierLabel = new TextMeshProUGUI[PerkPageModel.MaxTier];
+
+            // 단계 칸 반짝임 (구매한 단계). Render 가 칸 색을 다시 칠해도 겹친 그림이라 지워지지 않는다
+            public readonly Image[] TierFlash = new Image[PerkPageModel.MaxTier];
+            public readonly Image[] TierFlashLine = new Image[PerkPageModel.MaxTier];
             public bool Hover, Target, Selected;
             public float FlashUntil;
+            public int FlashTier;
         }
 
         /// <summary>목록 머리줄의 보기 탭 (전체 / 도감). 고른 탭은 타르코프 기본 버튼, 아닌 탭은 어두운 보조 버튼.</summary>
@@ -592,6 +597,9 @@ namespace PrestigePerks.UI
                 row.TierFill[t] = UiKit.Image(cell, TierOffFill);
                 row.TierLine[t] = UiKit.Outline(cell, TierOffLine);
                 row.TierLabel[t] = UiKit.Label(cell, "Label", TierCellWidth / 2, TierCellHeight / 2, TierCellWidth, TierName(t + 1), 11, UiKit.Dim, TextAlignmentOptions.Center, FontStyles.Bold);
+                // 구매 반짝임: 칸과 글자 위에 겹친다 (Update)
+                row.TierFlash[t] = UiKit.Image(UiKit.Fill(cell, "Flash"), Color.clear);
+                row.TierFlashLine[t] = UiKit.Outline(cell, Color.clear);
             }
 
             row.Flash = UiKit.Image(UiKit.Fill(rect, "Flash"), Color.clear);
@@ -1400,6 +1408,39 @@ namespace PrestigePerks.UI
 
         public bool IsSpinning => spinning.Count > 0;
 
+        /// <summary>
+        /// 보유하기·단계 구매·넣기 뒤 반짝임 (리롤 결과와 같은 0.9초 금색): 특전이 든 슬롯 틀, 줄, tier 가 1 이상이면 새로 산 단계 칸.
+        /// 새 상태를 그린 뒤 부른다 (슬롯은 그린 상태에서 찾는다).
+        /// </summary>
+        public void Flash(int perk, int tier)
+        {
+            if (!rows.TryGetValue(perk, out var row))
+            {
+                return;
+            }
+
+            var until = Time.unscaledTime + FlashTime;
+            row.FlashUntil = until;
+            row.FlashTier = tier;
+            var slot = PerkPageModel.SlotOf(lastState, perk);
+            if (slot >= 0 && slot < reels.Count)
+            {
+                reels[slot].FlashUntil = until;
+                reels[slot].FlashColor = UiKit.GoldHi;
+            }
+        }
+
+        // 새로 산 단계 칸: 금색 채움(0.55f)과 금색 테두리(f). 다른 칸은 비운다
+        private static void DrawTierFlash(Row row, float f)
+        {
+            for (var t = 0; t < PerkPageModel.MaxTier; t++)
+            {
+                var on = f > 0 && t + 1 == row.FlashTier;
+                row.TierFlash[t].color = on ? new Color(UiKit.GoldHi.r, UiKit.GoldHi.g, UiKit.GoldHi.b, 0.55f * f) : Color.clear;
+                row.TierFlashLine[t].color = on ? new Color(UiKit.GoldHi.r, UiKit.GoldHi.g, UiKit.GoldHi.b, f) : Color.clear;
+            }
+        }
+
         private void Update()
         {
             var now = Time.unscaledTime;
@@ -1439,10 +1480,13 @@ namespace PrestigePerks.UI
                 {
                     var t = 1 - (row.FlashUntil - now) / FlashTime;
                     row.Flash.color = new Color(UiKit.GoldHi.r, UiKit.GoldHi.g, UiKit.GoldHi.b, 0.3f * (1 - t));
+                    DrawTierFlash(row, 1 - t);
                 }
                 else if (row.Flash.color.a > 0)
                 {
                     row.Flash.color = Color.clear;
+                    DrawTierFlash(row, 0);
+                    row.FlashTier = 0;
                 }
             }
 
@@ -1593,6 +1637,7 @@ namespace PrestigePerks.UI
             if (rows.TryGetValue(spin.Target, out var row))
             {
                 row.FlashUntil = now + FlashTime;
+                row.FlashTier = 0;
             }
 
             if (sound != null)
