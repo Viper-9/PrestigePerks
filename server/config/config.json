@@ -12,10 +12,9 @@
     "prestigeLevel4Slots": 4,
     "prestigeLevel5Slots": 5,
     "prestigeLevel6Slots": 6,
-    "shakeEnabled": true,
-    "shakeChance": 0.3,
-    "shakeReverseChance": 0.05,
-    "shakeWindowSeconds": 15
+    "tierEffectRatio": [0.5, 0.75, 1.0],
+    "tierCapByPrestige": [1, 1, 1, 2, 2, 3, 3],
+    "tierPrices": [40, 100, 200]
   },
   "prestige": {
     "stages": [

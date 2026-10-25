@@ -85,7 +85,7 @@ public static class PerkDataFile
         }
     }
 
-    /// <summary>schema 1 을 옮기고, 모르는 특전 번호·중복·잘못된 값을 정리한다. 정리한 내용은 warnings 에 남긴다.</summary>
+    /// <summary>schema 1 을 옮기고, 모르는 특전 번호·중복·잘못된 값을 정리한다. schema 2 는 그대로 읽혀 "보유 없음, 확정 없음"이 된다. 정리한 내용은 warnings 에 남긴다.</summary>
     internal static PerkData Normalize(PerkData data, List<string> warnings)
     {
         if (data.SchemaVersion > PerkData.CurrentSchemaVersion)
@@ -114,15 +114,53 @@ public static class PerkDataFile
         }
 #endif
 
-        var seen = new HashSet<int>();
-        var slots = data.Slots.Where(slot => slot is not null && PerkCatalog.IsKnown(slot.Perk) && seen.Add(slot.Perk)).ToList();
-        if (slots.Count != data.Slots.Count)
+        data.Owned ??= [];
+        var owned = data.Owned.Where(pair => PerkCatalog.IsKnown(pair.Key) && pair.Value >= 1)
+            .ToDictionary(pair => pair.Key, pair => Math.Min(pair.Value, PerkConfig.MaxTier));
+        if (owned.Count != data.Owned.Count || owned.Any(pair => data.Owned[pair.Key] != pair.Value))
         {
-            warnings.Add($"모르는 특전 번호나 중복 슬롯을 지웠습니다: [{string.Join(", ", data.Slots.Select(slot => slot?.Perk))}] → [{string.Join(", ", slots.Select(slot => slot.Perk))}]");
+            warnings.Add($"도감의 모르는 특전·잘못된 단계를 정리했습니다: {Describe(data.Owned)} → {Describe(owned)}");
+        }
+
+        data.Owned = owned;
+
+        // 빈 칸(0)은 남긴다. 모르는 번호·겹친 특전은 지금처럼 지워서 새 단계 진입(EnterLevel)이 무료로 다시 채운다
+        var seen = new HashSet<int>();
+        var before = DescribeSlots(data.Slots);
+        var fixedUp = false;
+        var slots = new List<PerkSlot>();
+        foreach (var slot in data.Slots)
+        {
+            if (slot is null || (!slot.IsEmpty && (!PerkCatalog.IsKnown(slot.Perk) || !seen.Add(slot.Perk))))
+            {
+                fixedUp = true;
+                continue;
+            }
+
+            // 확정 칸은 보유한 특전만, 잠금과 함께 켜지지 않는다. 빈 칸은 잠그거나 확정할 수 없다
+            var shouldFix = slot.Fixed && !slot.IsEmpty && owned.ContainsKey(slot.Perk);
+            var shouldLock = slot.Locked && !shouldFix && !slot.IsEmpty;
+            if (shouldFix != slot.Fixed || shouldLock != slot.Locked)
+            {
+                slot.Fixed = shouldFix;
+                slot.Locked = shouldLock;
+                fixedUp = true;
+            }
+
+            slots.Add(slot);
+        }
+
+        if (fixedUp)
+        {
+            warnings.Add($"모르는 특전 번호·중복 슬롯을 지우고 잘못된 칸 상태를 정리했습니다: [{before}] → [{DescribeSlots(slots)}]");
         }
 
         data.Slots = slots;
         data.UnseenNewPerks = data.UnseenNewPerks.Where(seen.Contains).Distinct().ToList();
+        if (data.UnseenTierCap is < 1 or > PerkConfig.MaxTier)
+        {
+            data.UnseenTierCap = null;
+        }
 
         var rerolls = data.Rerolls;
         if (rerolls.Level < 0 || rerolls.FreeLeft < 0 || rerolls.Paid < 0 || rerolls.FreeGranted < 0)
@@ -136,6 +174,11 @@ public static class PerkDataFile
 
         return data;
     }
+
+    private static string DescribeSlots(IEnumerable<PerkSlot?> slots) =>
+        string.Join(", ", slots.Select(slot => slot is null ? "null" : $"{slot.Perk}{(slot.Locked ? " locked" : "")}{(slot.Fixed ? " fixed" : "")}"));
+
+    private static string Describe(Dictionary<int, int> owned) => $"{{{string.Join(", ", owned.Select(pair => $"{pair.Key}:{pair.Value}"))}}}";
 
     private static bool TryParse(string path, out PerkData data, out string? error)
     {

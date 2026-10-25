@@ -10,7 +10,7 @@ public sealed record PerkState
     [JsonPropertyName("prestigeLevel")]
     public int PrestigeLevel { get; init; }
 
-    /// <summary>보유 특전과 잠금 (효과가 적용되는 슬롯만, 단계 수만큼).</summary>
+    /// <summary>슬롯 (효과가 적용되는 슬롯만, 단계 수만큼). 특전 0 은 빈 칸.</summary>
     [JsonPropertyName("slots")]
     public IReadOnlyList<PerkSlot> Slots { get; init; } = [];
 
@@ -59,32 +59,59 @@ public sealed record PerkState
     [JsonPropertyName("dev")]
     public bool Dev { get; init; }
 
-    /// <summary>흔들기가 한 칸 더 밀 확률 (0~1). 화면 안내용.</summary>
-    [JsonPropertyName("shakeChance")]
-    public double ShakeChance { get; init; }
-
-    /// <summary>흔들기를 켰는지 (config shakeEnabled). 끄면 화면에 흔들기 버튼이 나오지 않는다.</summary>
-    [JsonPropertyName("shakeEnabled")]
-    public bool ShakeEnabled { get; init; }
-
     /// <summary>슬롯 칸(6칸)마다 더 높은 어느 단계에서 열리는지. 열렸거나 열리지 않는 칸은 null (<see cref="PerkConfig.SlotOpensAt"/>).</summary>
     [JsonPropertyName("slotOpensAt")]
     public IReadOnlyList<int?> SlotOpensAt { get; init; } = [];
 
-    /// <summary>흔들기 응답: 결과 (<see cref="ShakeOutcome"/> 이름). 흔들기 응답이 아니면 null.</summary>
-    [JsonPropertyName("shakeOutcome")]
-    public string? ShakeOutcome { get; init; }
+    /// <summary>효과를 적용하는 특전과 단계 (1~3). 클라이언트 패치가 tierEffectRatio 로 효과량을 정한다.</summary>
+    [JsonPropertyName("activeTiers")]
+    public IReadOnlyDictionary<int, int> ActiveTiers { get; init; } = new Dictionary<int, int>();
+
+    /// <summary>도감: 보유한 특전과 산 단계.</summary>
+    [JsonPropertyName("owned")]
+    public IReadOnlyDictionary<int, int> Owned { get; init; } = new Dictionary<int, int>();
+
+    /// <summary>지금 프레스티지의 단계 상한 (1~3).</summary>
+    [JsonPropertyName("tierCap")]
+    public int TierCap { get; init; } = 1;
+
+    /// <summary>단계 II·III 이 열리는 프레스티지 (이미 열렸거나 열리지 않으면 null). [0] = II, [1] = III. 화면 "Available at Pn".</summary>
+    [JsonPropertyName("tierOpensAt")]
+    public IReadOnlyList<int?> TierOpensAt { get; init; } = [];
+
+    /// <summary>단계 I·II·III 가격 (config tierPrices).</summary>
+    [JsonPropertyName("tierPrices")]
+    public IReadOnlyList<int> TierPrices { get; init; } = [];
+
+    /// <summary>단계 I·II·III 효과 비율 (config tierEffectRatio).</summary>
+    [JsonPropertyName("tierEffectRatio")]
+    public IReadOnlyList<double> TierEffectRatio { get; init; } = [];
+
+    /// <summary>프레스티지로 올라 아직 알리지 않은 단계 상한. 클라이언트가 새 특전 알림에 붙인다.</summary>
+    [JsonPropertyName("newTierCap")]
+    public int? NewTierCap { get; init; }
+
+    /// <summary>구매에 쓴 코인 (구매 응답). 이미 가진 단계면 0.</summary>
+    [JsonPropertyName("buyCost")]
+    public int? BuyCost { get; init; }
 }
 
-public sealed record PerkShakeRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+public sealed record PerkEquipRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
 {
-    /// <summary>흔든 슬롯 번호 (0 부터). 멈추려는 릴.</summary>
+    /// <summary>넣을 보유 특전.</summary>
+    [JsonPropertyName("perk")]
+    public int Perk { get; init; }
+
+    /// <summary>놓을 슬롯 번호 (0 부터).</summary>
     [JsonPropertyName("slot")]
     public int Slot { get; init; }
+}
 
-    /// <summary>그 릴의 다음 칸에 보이는 특전. 한 칸 더 가면 이 특전이 된다.</summary>
-    [JsonPropertyName("next")]
-    public int Next { get; init; }
+public sealed record PerkUnequipRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    /// <summary>뺄 확정 칸 (0 부터).</summary>
+    [JsonPropertyName("slot")]
+    public int Slot { get; init; }
 }
 
 public sealed record PerkLockRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
@@ -110,6 +137,30 @@ public sealed record PerkRollRequest : BaseInteractionRequestData
     public int ExpectedCost { get; init; }
 
     /// <summary>먼저 쓸 코인 스택 ID (바닐라 결제처럼 우선순위만 정한다). 비워도 된다.</summary>
+    [JsonPropertyName("items")]
+    public List<string>? Items { get; init; }
+}
+
+/// <summary>
+/// 보유하기·단계 구매 아이템 이벤트 (Action = <see cref="ActionName"/>). 리롤처럼 인벤토리 코인으로 결제한다.
+/// 이미 그 단계를 가졌으면 결제 없이 성공으로 돌려준다 (두 번 눌림).
+/// </summary>
+public sealed record PerkBuyRequest : BaseInteractionRequestData
+{
+    public const string ActionName = "PrestigePerksBuy";
+
+    [JsonPropertyName("perk")]
+    public int Perk { get; init; }
+
+    /// <summary>사려는 단계 (1 = 보유하기).</summary>
+    [JsonPropertyName("tier")]
+    public int Tier { get; init; }
+
+    /// <summary>클라이언트가 화면에서 본 가격. 서버 값과 다르면 거부한다 (오래된 화면).</summary>
+    [JsonPropertyName("expectedCost")]
+    public int ExpectedCost { get; init; }
+
+    /// <summary>먼저 쓸 코인 스택 ID. 비워도 된다.</summary>
     [JsonPropertyName("items")]
     public List<string>? Items { get; init; }
 }

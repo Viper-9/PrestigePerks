@@ -51,21 +51,19 @@ public sealed record PerkConfig
     [JsonPropertyName("prestigeLevel6Slots")]
     public int PrestigeLevel6Slots { get; init; } = 6;
 
-    /// <summary>흔들기 켜기/끄기. 끄면 리롤 중 흔들기 버튼이 나오지 않고 서버도 받지 않는다.</summary>
-    [JsonPropertyName("shakeEnabled")]
-    public bool ShakeEnabled { get; init; } = true;
+    /// <summary>단계 I·II·III 의 효과 비율. 특전 수치(III)의 효과량에 곱한다 (×0.8 의 I 은 ×0.9).</summary>
+    [JsonPropertyName("tierEffectRatio")]
+    public List<double> TierEffectRatio { get; init; } = [0.5, 0.75, 1.0];
 
-    /// <summary>흔들기: 멈추려는 릴이 한 칸 더 가서 다음 칸 특전이 될 확률 (0~1).</summary>
-    [JsonPropertyName("shakeChance")]
-    public double ShakeChance { get; init; } = 0.3;
+    /// <summary>P0 ~ P6 에서 쓸 수 있는 가장 높은 단계 (1~3). 표보다 높은 단계는 마지막 값.</summary>
+    [JsonPropertyName("tierCapByPrestige")]
+    public List<int> TierCapByPrestige { get; init; } = [1, 1, 1, 2, 2, 3, 3];
 
-    /// <summary>흔들기: 리버스 (멈춘 뒤 거꾸로 돌아 다른 특전) 확률 (0~1). 나머지는 그대로 멈춘다.</summary>
-    [JsonPropertyName("shakeReverseChance")]
-    public double ShakeReverseChance { get; init; } = 0.05;
+    /// <summary>단계 I·II·III 가격 (코인). I 은 리롤로 나온 특전을 보유하는 값.</summary>
+    [JsonPropertyName("tierPrices")]
+    public List<int> TierPrices { get; init; } = [40, 100, 200];
 
-    /// <summary>흔들기는 리롤 뒤 이 시간(초) 안에만 받는다 (릴이 도는 동안).</summary>
-    [JsonPropertyName("shakeWindowSeconds")]
-    public int ShakeWindowSeconds { get; init; } = 15;
+    public const int MaxTier = 3;
 
     /// <summary>단계별 기본가. 표보다 높은 단계는 마지막 값을 쓴다.</summary>
     public int BasePrice(int prestigeLevel) =>
@@ -73,6 +71,32 @@ public sealed record PerkConfig
 
     /// <summary>이 단계에서 열리는 슬롯 수. 음수 단계는 0, P6 보다 높으면 P6 값.</summary>
     public int Slots(int prestigeLevel) => prestigeLevel < 0 ? 0 : LevelSlots[Math.Min(prestigeLevel, MaxLevel)];
+
+    /// <summary>이 단계의 단계 상한 (1~3). 칸이 열려 있으면 설정과 상관없이 최소 I 이라 열린 칸의 특전이 꺼지지 않는다.</summary>
+    public int TierCap(int prestigeLevel) =>
+        TierCapByPrestige is { Count: > 0 } caps
+            ? Math.Clamp(caps[Math.Clamp(prestigeLevel, 0, caps.Count - 1)], 1, MaxTier)
+            : 1;
+
+    /// <summary>tier 단계(1~3)의 효과 비율. 범위 밖이면 0 (효과 없음).</summary>
+    public double TierRatio(int tier) => tier >= 1 && tier <= TierEffectRatio.Count ? TierEffectRatio[tier - 1] : 0;
+
+    /// <summary>tier 단계(1~3)의 가격.</summary>
+    public int TierPrice(int tier) => TierPrices[Math.Clamp(tier, 1, MaxTier) - 1];
+
+    /// <summary>지금 단계보다 높은 어느 단계에서 tier 단계가 열리는지. 이미 열렸거나 열리지 않으면 null.</summary>
+    public int? TierOpensAt(int prestigeLevel, int tier)
+    {
+        for (var level = Math.Max(prestigeLevel, 0); level <= MaxLevel; level++)
+        {
+            if (TierCap(level) >= tier)
+            {
+                return level == Math.Max(prestigeLevel, 0) ? null : level;
+            }
+        }
+
+        return null;
+    }
 
     private int[] LevelSlots => [PrestigeLevel0Slots, PrestigeLevel1Slots, PrestigeLevel2Slots, PrestigeLevel3Slots, PrestigeLevel4Slots, PrestigeLevel5Slots, PrestigeLevel6Slots];
 
@@ -144,9 +168,19 @@ public sealed record PerkConfig
             return "lockCostStep >= 0, paidCostGrowth >= 1, paidCostCapRound >= 1 이어야 합니다";
         }
 
-        if (ShakeChance < 0 || ShakeReverseChance < 0 || ShakeChance + ShakeReverseChance > 1 || ShakeWindowSeconds < 1)
+        if (TierEffectRatio is not { Count: MaxTier } || TierEffectRatio.Any(ratio => ratio is < 0 or > 1))
         {
-            return "shakeChance, shakeReverseChance 는 0 이상이고 합이 1 이하, shakeWindowSeconds >= 1 이어야 합니다";
+            return "tierEffectRatio 는 0~1 값 3개여야 합니다";
+        }
+
+        if (TierPrices is not { Count: MaxTier } || TierPrices.Any(price => price < 0))
+        {
+            return "tierPrices 는 0 이상 값 3개여야 합니다";
+        }
+
+        if (TierCapByPrestige is null || TierCapByPrestige.Count == 0)
+        {
+            return "tierCapByPrestige 가 비어 있습니다";
         }
 
         return null;

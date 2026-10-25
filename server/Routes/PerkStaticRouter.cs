@@ -11,8 +11,9 @@ namespace PrestigePerks.Routes;
 /// 특전 페이지 라우트. 클라이언트 플러그인이 부른다. 응답은 <see cref="PerkState"/> JSON.
 ///   /prestigeperks/state    현재 상태 (새 단계면 처리). 새 특전 알림은 이 응답으로 넘기고 지운다
 ///   /prestigeperks/lock     { "slot": 0, "locked": true }
-///   /prestigeperks/shake    { "slot": 2, "next": 24 }  리롤 중 흔들기 (멈추려는 릴과 그 다음 칸 특전). 응답 shakeOutcome
-/// 리롤은 코인을 인벤토리에서 빼야 해서 아이템 이벤트(<see cref="PerkItemEventRouter"/>)로 받는다.
+///   /prestigeperks/equip    { "perk": 14, "slot": 0 }  보유 특전을 칸에 넣는다 (확정 칸이면 서로 바꾼다)
+///   /prestigeperks/unequip  { "slot": 0 }  확정 칸을 비운다
+/// 리롤과 구매는 코인을 인벤토리에서 빼야 해서 아이템 이벤트(<see cref="PerkItemEventRouter"/>)로 받는다.
 /// /client/game/start 는 같은 URL 의 라우터가 모두 차례로 실행되고 앞 응답이 output 으로 넘어오므로, output 을 그대로 돌려줘 바닐라 응답을 바꾸지 않는다.
 /// </summary>
 [Injectable]
@@ -20,7 +21,8 @@ public class PerkStaticRouter : StaticRouter
 {
     public const string StateRoute = "/prestigeperks/state";
     public const string LockRoute = "/prestigeperks/lock";
-    public const string ShakeRoute = "/prestigeperks/shake";
+    public const string EquipRoute = "/prestigeperks/equip";
+    public const string UnequipRoute = "/prestigeperks/unequip";
 
     public PerkStaticRouter(JsonUtil jsonUtil, HttpResponseUtil httpResponseUtil, PerkService perkService)
         : base(jsonUtil,
@@ -39,11 +41,16 @@ public class PerkStaticRouter : StaticRouter
                     ? await Respond(httpResponseUtil, perkService.SetLock(sessionId, request.Slot, request.Locked))
                     : await Respond(httpResponseUtil, new PerkState { Error = nameof(PerkError.InvalidSlot) }),
                 typeof(PerkLockRequest)),
-            new RouteAction(ShakeRoute,
-                async (_, info, sessionId, _, _) => info is PerkShakeRequest request
-                    ? await Respond(httpResponseUtil, perkService.Shake(sessionId, request.Slot, request.Next))
-                    : await Respond(httpResponseUtil, new PerkState { Error = nameof(PerkError.NoShake) }),
-                typeof(PerkShakeRequest)),
+            new RouteAction(EquipRoute,
+                async (_, info, sessionId, _, _) => info is PerkEquipRequest request
+                    ? await Respond(httpResponseUtil, perkService.Equip(sessionId, request.Perk, request.Slot))
+                    : await Respond(httpResponseUtil, new PerkState { Error = nameof(PerkError.InvalidSlot) }),
+                typeof(PerkEquipRequest)),
+            new RouteAction(UnequipRoute,
+                async (_, info, sessionId, _, _) => info is PerkUnequipRequest request
+                    ? await Respond(httpResponseUtil, perkService.Unequip(sessionId, request.Slot))
+                    : await Respond(httpResponseUtil, new PerkState { Error = nameof(PerkError.InvalidSlot) }),
+                typeof(PerkUnequipRequest)),
         ])
     {
     }

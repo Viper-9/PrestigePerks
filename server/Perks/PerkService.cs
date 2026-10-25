@@ -14,8 +14,8 @@ using SPTarkov.Server.Core.Utils;
 namespace PrestigePerks.Perks;
 
 /// <summary>
-/// 특전 흐름 (새 단계 진입·잠금·리롤). 규칙은 <see cref="PerkRules"/>, 저장은 <see cref="PerkDataStore"/>.
-/// HTTP 라우트(<c>PerkStaticRouter</c>), 리롤 아이템 이벤트(<c>PerkItemEventRouter</c>), 개발용 Commando 명령이 같이 쓴다.
+/// 특전 흐름 (새 단계 진입·잠금·리롤·보유하기·단계 구매·확정 넣기/빼기). 규칙은 <see cref="PerkRules"/>, 저장은 <see cref="PerkDataStore"/>.
+/// HTTP 라우트(<c>PerkStaticRouter</c>), 코인 아이템 이벤트(<c>PerkItemEventRouter</c>), 개발용 Commando 명령이 같이 쓴다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public class PerkService(
@@ -36,12 +36,6 @@ public class PerkService(
     private const bool DevBuild = false;
 #endif
 
-    /// <summary>
-    /// 흔들 수 있는 리롤: 리롤한 시각과 돌린 슬롯 (하나만 돌린 리롤만, <see cref="PerkRules.ShakeSlot"/>). 리롤마다 한 번, <see cref="PerkConfig.ShakeWindowSeconds"/> 안에만.
-    /// 릴이 도는 몇 초 동안만 의미가 있어 저장하지 않는다 (서버를 다시 켜면 사라진다).
-    /// </summary>
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<MongoId, (DateTime At, int Slot)> pendingShakes = new();
-
     private PerkConfig Config => configLoader.Config;
 
     /// <summary>게임 시작: 새 단계면 처리하고, 특전 Bonus 를 다시 넣는다 (다른 모드가 Bonuses 를 새로 만들었을 때 대비).</summary>
@@ -59,15 +53,18 @@ public class PerkService(
         }
     }
 
-    /// <summary>현재 상태. 새 단계면 처리한다. <paramref name="markNewPerksSeen"/> 면 새 특전 알림을 이번 응답으로 넘기고 지운다 (클라이언트 페이지용).</summary>
+    /// <summary>
+    /// 현재 상태. 새 단계면 처리한다. <paramref name="markNewPerksSeen"/> 면 새 특전·단계 상한 알림을 이번 응답으로 넘기고 지운다 (클라이언트 페이지용).
+    /// </summary>
     public PerkState GetState(MongoId sessionId, bool markNewPerksSeen = false) =>
         Run(sessionId, (profile, data, level) =>
         {
             EnterLevel(sessionId, profile);
             var state = BuildState(data, level);
-            if (markNewPerksSeen && data.UnseenNewPerks.Count > 0)
+            if (markNewPerksSeen && (data.UnseenNewPerks.Count > 0 || data.UnseenTierCap is not null))
             {
                 data.UnseenNewPerks.Clear();
+                data.UnseenTierCap = null;
                 store.Save(sessionId, data);
             }
 
@@ -85,6 +82,14 @@ public class PerkService(
 
             return BuildState(data, level, error);
         });
+
+    /// <summary>확정 넣기: 보유 특전을 리롤 칸·빈 칸·확정 칸에 놓는다 (무료).</summary>
+    public PerkState Equip(MongoId sessionId, int perk, int slotIndex) =>
+        Change(sessionId, (data, level) => PerkRules.Equip(data, Config.Slots(level), perk, slotIndex), $"넣기 {PerkCatalog.Describe(perk)} → 슬롯 {slotIndex + 1}");
+
+    /// <summary>확정 빼기: 그 칸은 빈 칸이 되어 다음 리롤 때 채워진다 (무료).</summary>
+    public PerkState Unequip(MongoId sessionId, int slotIndex) =>
+        Change(sessionId, (data, level) => PerkRules.Unequip(data, Config.Slots(level), slotIndex), $"빼기 슬롯 {slotIndex + 1}");
 
     /// <summary>
     /// 리롤 (아이템 이벤트). 유료면 인벤토리 코인을 바닐라 결제(<see cref="PaymentService.AddPaymentToOutput(PmcData, MongoId, double, MongoId, ItemEventRouterResponse, IReadOnlySet{MongoId})"/>)로
@@ -107,101 +112,85 @@ public class PerkService(
                 return BuildState(data, level, PerkError.CostChanged);
             }
 
-            if (cost > 0)
+            if (!Pay(sessionId, pmcData, cost, request.Items, output))
             {
-                var warningsBefore = output.Warnings?.Count ?? 0;
-                var preferred = (request.Items ?? []).Where(id => id.IsValidMongoId()).Select(id => new MongoId(id)).ToHashSet();
-                paymentService.AddPaymentToOutput(pmcData, new MongoId(PrestigeCoinItem.TemplateId), cost, sessionId, output, preferred);
-                if ((output.Warnings?.Count ?? 0) > warningsBefore)
-                {
-                    // 결제 함수가 이미 경고를 붙였다 (코인 부족). 인벤토리는 바뀌지 않았다
-                    return BuildState(data, level, PerkError.NotEnoughCoins);
-                }
+                return BuildState(data, level, PerkError.NotEnoughCoins);
             }
 
             var outcome = PerkRules.Roll(data, level, Config, random);
             store.Save(sessionId, data);
             PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
-            OfferShake(sessionId, data, level);
-            logger.Info($"[PrestigePerks] {sessionId}: 리롤 ({(cost == 0 ? "무료" : $"코인 {cost}")}) → [{string.Join(", ", PerkRules.ActivePerks(data, Config.Slots(level)))}]");
+            logger.Info($"[PrestigePerks] {sessionId}: 리롤 ({(cost == 0 ? "무료" : $"코인 {cost}")}) → [{DescribeSlots(data, level)}]");
             return BuildState(data, level) with { RollCost = outcome.Cost };
         });
 
-        if (state.Error is { } failure && failure != nameof(PerkError.NotEnoughCoins))
-        {
-            httpResponseUtil.AppendErrorToOutput(output, $"PrestigePerks: {failure}");
-        }
-
-        return output;
+        return Finish(state, output);
     }
 
     /// <summary>
-    /// 흔들기: 직전 리롤에서 하나만 돌린 슬롯(멈추려는 릴)을 확률로 한 칸 더(다음 칸 특전) 보내거나, 드물게 리버스(다른 특전)한다.
-    /// 리롤마다 한 번, <see cref="PerkConfig.ShakeWindowSeconds"/> 안에만.
+    /// 보유하기(단계 I)·단계 구매 (아이템 이벤트). 리롤과 같이 인벤토리 코인으로 결제한다.
+    /// 이미 그 단계를 가졌으면 결제 없이 성공 (두 번 눌림).
     /// </summary>
-    public PerkState Shake(MongoId sessionId, int slotIndex, int nextPerk) =>
-        Run(sessionId, (profile, data, level) =>
+    public ItemEventRouterResponse BuyWithCoins(MongoId sessionId, PmcData pmcData, PerkBuyRequest request, ItemEventRouterResponse output)
+    {
+        var state = Run(sessionId, (profile, data, level) =>
         {
-            if (!Config.ShakeEnabled
-                || !pendingShakes.TryRemove(sessionId, out var pending)
-                || DateTime.UtcNow - pending.At > TimeSpan.FromSeconds(Config.ShakeWindowSeconds)
-                || pending.Slot != slotIndex)
+            EnterLevel(sessionId, profile);
+            var error = PerkRules.CheckBuy(data, level, Config, request.Perk, request.Tier);
+            if (error == PerkError.AlreadyOwned)
             {
-                return BuildState(data, level, PerkError.NoShake);
+                return BuildState(data, level) with { BuyCost = 0 };
             }
 
-            var before = data.Slots[slotIndex].Perk;
-            var outcome = PerkRules.Shake(data, Config.Slots(level), slotIndex, nextPerk, Config.ShakeChance, Config.ShakeReverseChance, random);
-            if (outcome != ShakeOutcome.Stay)
+            if (error != PerkError.None)
             {
-                store.Save(sessionId, data);
-                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+                return BuildState(data, level, error);
             }
 
-            logger.Info($"[PrestigePerks] {sessionId}: 흔들기 슬롯 {slotIndex + 1} → {outcome} ({before} → {data.Slots[slotIndex].Perk})");
-            return BuildState(data, level) with { ShakeOutcome = outcome.ToString() };
+            var cost = Config.TierPrice(request.Tier);
+            if (cost != request.ExpectedCost)
+            {
+                return BuildState(data, level, PerkError.CostChanged);
+            }
+
+            if (!Pay(sessionId, pmcData, cost, request.Items, output))
+            {
+                return BuildState(data, level, PerkError.NotEnoughCoins);
+            }
+
+            PerkRules.Buy(data, level, Config, request.Perk, request.Tier);
+            store.Save(sessionId, data);
+            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+            logger.Info($"[PrestigePerks] {sessionId}: 구매 {PerkCatalog.Describe(request.Perk)} 단계 {request.Tier} (코인 {cost}) → [{DescribeSlots(data, level)}]");
+            return BuildState(data, level) with { BuyCost = cost };
         });
 
-    // 슬롯 하나만 돌린 리롤만 흔들 수 있다 (흔들기를 켰을 때). 아니면 직전 리롤의 흔들기도 지운다
-    private void OfferShake(MongoId sessionId, PerkData data, int level)
-    {
-        if (Config.ShakeEnabled && PerkRules.ShakeSlot(data, Config.Slots(level)) is int slot)
-        {
-            pendingShakes[sessionId] = (DateTime.UtcNow, slot);
-        }
-        else
-        {
-            pendingShakes.TryRemove(sessionId, out _);
-        }
+        return Finish(state, output);
     }
 
     /// <summary>개발용: 슬롯에 특전을 직접 넣는다 (특전 효과를 비교해 보려고). 다른 슬롯에 있던 특전이면 서로 바꾼다.</summary>
     public PerkState SetPerk(MongoId sessionId, int slotIndex, int perk) =>
-        Run(sessionId, (profile, data, level) =>
+        Change(sessionId, (data, level) => PerkRules.SetPerk(data, Config.Slots(level), slotIndex, perk), $"개발용 set 슬롯 {slotIndex + 1} → {perk}");
+
+    /// <summary>개발용: 보유 단계를 정한다 (0 이면 도감에서 뺀다). 결제 없이.</summary>
+    public PerkState SetOwnedTier(MongoId sessionId, int perk, int tier) =>
+        Change(sessionId, (data, _) => PerkRules.SetOwnedTier(data, perk, tier), $"개발용 tier {PerkCatalog.Describe(perk)} → {tier}");
+
+    /// <summary>개발용: 도감을 비운다 (확정 칸은 리롤 칸이 된다).</summary>
+    public PerkState ResetCollection(MongoId sessionId) =>
+        Change(sessionId, (data, _) =>
         {
-            EnterLevel(sessionId, profile);
-            var error = PerkRules.SetPerk(data, Config.Slots(level), slotIndex, perk);
-            if (error == PerkError.None)
-            {
-                store.Save(sessionId, data);
-                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
-                logger.Info($"[PrestigePerks] {sessionId}: 개발용 set 슬롯 {slotIndex + 1} → {perk}, [{string.Join(", ", PerkRules.ActivePerks(data, Config.Slots(level)))}]");
-            }
+            PerkRules.ResetCollection(data);
+            return PerkError.None;
+        }, "개발용 도감 초기화");
 
-            return BuildState(data, level, error);
-        });
-
-    /// <summary>개발용: 슬롯과 상관없이 모든 특전을 켜거나 끈다 (패치 특전 부하·대상 확인용). 게임 반영은 다음 state.</summary>
+    /// <summary>개발용: 슬롯과 상관없이 모든 특전을 III 으로 켜거나 끈다 (패치 특전 부하·대상 확인용). 게임 반영은 다음 state.</summary>
     public PerkState SetAllPerks(MongoId sessionId, bool on) =>
-        Run(sessionId, (profile, data, level) =>
+        Change(sessionId, (data, _) =>
         {
-            EnterLevel(sessionId, profile);
             data.DevAllPerks = on;
-            store.Save(sessionId, data);
-            PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
-            logger.Info($"[PrestigePerks] {sessionId}: 개발용 all {(on ? "on" : "off")} → [{string.Join(", ", PerkRules.ActivePerks(data, Config.Slots(level)))}]");
-            return BuildState(data, level);
-        });
+            return PerkError.None;
+        }, $"개발용 all {(on ? "on" : "off")}");
 
     /// <summary>개발용: 무료 리롤만 (서버는 인벤토리 코인을 뺄 수 없다).</summary>
     public PerkState RollFree(MongoId sessionId) =>
@@ -218,7 +207,6 @@ public class PerkService(
             {
                 store.Save(sessionId, data);
                 PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
-                OfferShake(sessionId, data, level);
             }
 
             return BuildState(data, level, outcome.Error);
@@ -234,7 +222,7 @@ public class PerkService(
             return BuildState(data, level);
         });
 
-    /// <summary>개발용: 특전 데이터를 빈 데이터로 덮어쓰고 Bonus 를 뺀다 (슬롯·잠금·무료/유료 리롤 모두). 직전 파일은 .bak 으로 남는다. 다음 state·게임 시작 때 새로 뽑는다.</summary>
+    /// <summary>개발용: 특전 데이터를 빈 데이터로 덮어쓰고 Bonus 를 뺀다 (슬롯·잠금·도감·무료/유료 리롤 모두). 직전 파일은 .bak 으로 남는다. 다음 state·게임 시작 때 새로 뽑는다.</summary>
     public PerkState Reset(MongoId sessionId) =>
         Run(sessionId, (profile, _, level) =>
         {
@@ -250,9 +238,50 @@ public class PerkService(
         TryGetProfile(sessionId, out var profile)
             ? (profile.CharacterData!.PmcData!.Bonuses ?? [])
                 .Where(PerkBonusApplier.IsPerkBonus)
-                .Select(bonus => $"{bonus.Type}{(bonus.SkillType is { } skill ? $"({skill})" : "")} {bonus.Value:+0;-0}")
+                .Select(bonus => $"{bonus.Type}{(bonus.SkillType is { } skill ? $"({skill})" : "")} {bonus.Value:+0.##;-0.##}")
                 .ToList()
             : [];
+
+    /// <summary>코인 결제. 0 이면 아무것도 하지 않는다. 결제 함수가 경고를 붙였으면(코인 부족) 인벤토리는 바뀌지 않았고 false.</summary>
+    private bool Pay(MongoId sessionId, PmcData pmcData, int cost, List<string>? items, ItemEventRouterResponse output)
+    {
+        if (cost <= 0)
+        {
+            return true;
+        }
+
+        var warningsBefore = output.Warnings?.Count ?? 0;
+        var preferred = (items ?? []).Where(id => id.IsValidMongoId()).Select(id => new MongoId(id)).ToHashSet();
+        paymentService.AddPaymentToOutput(pmcData, new MongoId(PrestigeCoinItem.TemplateId), cost, sessionId, output, preferred);
+        return (output.Warnings?.Count ?? 0) <= warningsBefore;
+    }
+
+    // 코인 부족은 결제 함수가 이미 경고를 붙였다. 다른 실패만 오류로 붙인다
+    private ItemEventRouterResponse Finish(PerkState state, ItemEventRouterResponse output)
+    {
+        if (state.Error is { } failure && failure != nameof(PerkError.NotEnoughCoins))
+        {
+            httpResponseUtil.AppendErrorToOutput(output, $"PrestigePerks: {failure}");
+        }
+
+        return output;
+    }
+
+    /// <summary>코인이 들지 않는 변경: 새 단계를 처리하고, 바꾸고, 성공하면 저장하고 Bonus 를 다시 넣는다.</summary>
+    private PerkState Change(MongoId sessionId, Func<PerkData, int, PerkError> change, string what) =>
+        Run(sessionId, (profile, data, level) =>
+        {
+            EnterLevel(sessionId, profile);
+            var error = change(data, level);
+            if (error == PerkError.None)
+            {
+                store.Save(sessionId, data);
+                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+                logger.Info($"[PrestigePerks] {sessionId}: {what} → [{DescribeSlots(data, level)}]");
+            }
+
+            return BuildState(data, level, error);
+        });
 
     private PerkState Run(MongoId sessionId, Func<SptProfile, PerkData, int, PerkState> action)
     {
@@ -298,22 +327,37 @@ public class PerkService(
         new()
         {
             PrestigeLevel = level,
-            Slots = PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot => new PerkSlot { Perk = slot.Perk, Locked = slot.Locked }).ToList(),
+            Slots = PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot => new PerkSlot { Perk = slot.Perk, Locked = slot.Locked, Fixed = slot.Fixed }).ToList(),
             ActivePerks = PerkRules.ActivePerks(data, Config.Slots(level)),
+            ActiveTiers = PerkRules.ActiveTiers(data, level, Config),
+            Owned = new Dictionary<int, int>(data.Owned),
+            TierCap = Config.TierCap(level),
+            TierOpensAt = [Config.TierOpensAt(level, 2), Config.TierOpensAt(level, 3)],
+            TierPrices = Config.TierPrices,
+            TierEffectRatio = Config.TierEffectRatio,
             FreeRerollsLeft = data.Rerolls.FreeLeft,
             FreeRerolls = Config.FreeRerolls,
             PaidRerolls = data.Rerolls.Paid,
             NextRerollCost = PerkRules.NextRerollCost(Config, level, data),
             CostFixed = data.Rerolls.FreeLeft <= 0 && data.Rerolls.Paid + 1 >= Config.PaidCostCapRound,
             NewPerks = data.UnseenNewPerks.ToList(),
-            Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActivePerks(data, Config.Slots(level))),
+            NewTierCap = data.UnseenTierCap,
+            Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActiveScales(data, level, Config)),
             BonusIds = BonusIds,
-            ShakeChance = Config.ShakeChance,
-            ShakeEnabled = Config.ShakeEnabled,
             SlotOpensAt = Config.SlotOpensAt(level),
             Dev = DevBuild,
             Error = error == PerkError.None ? null : error.ToString(),
         };
+
+    /// <summary>"control(14) II fixed, empty, reload(29) I locked" (로그용).</summary>
+    private string DescribeSlots(PerkData data, int level)
+    {
+        var tiers = PerkRules.ActiveTiers(data, level, Config);
+        return string.Join(", ", PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot =>
+            slot.IsEmpty ? "empty" : $"{PerkCatalog.Describe(slot.Perk)} {TierName(tiers.GetValueOrDefault(slot.Perk, 1))}{(slot.Fixed ? " fixed" : slot.Locked ? " locked" : "")}"));
+    }
+
+    internal static string TierName(int tier) => tier switch { 1 => "I", 2 => "II", 3 => "III", _ => "-" };
 
     private bool TryGetProfile(MongoId sessionId, out SptProfile profile)
     {
