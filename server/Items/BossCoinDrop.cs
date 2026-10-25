@@ -6,6 +6,8 @@ namespace PrestigePerks.Items;
 /// <summary>
 /// 보스 봇 데이터에 코인을 넣는다 (순수 함수, 단위 테스트). 근거는 SPT 4.1.2 BotLootGenerator·BotLootCacheService 디컴파일.
 /// 주머니 루트는 0개를 뽑을 수 있어 100% 가 안 되므로, 루트 중 가장 먼저 채워지는 특수 아이템 칸(specialItems)을 쓴다.
+/// 루트보다 무기·예비 탄창이 먼저 들어가므로 빈칸이 없으면 코인은 빠진다: 조끼·배낭 없이 1×2 주머니 5칸뿐인 레쉘라(bossbully)는
+/// 약 35~40% 만 받는다 (2026-10-26 확인 11/30). 100% 로 하려면 탄창 칸을 빼앗아야 해서 그대로 둔다.
 /// - 코인은 specialItems.whitelist 에 넣는다. 인벤토리 SpecialLoot 에 넣으면 합친 풀을 거쳐 화폐 뽑기(currency)에도 섞인다
 /// - whitelist 가 있으면 SPT 는 SpecialLoot 대신 whitelist 만 특수 풀로 쓰므로, 비어 있으면 SpecialLoot 를 먼저 옮긴다
 /// - 뽑는 개수 분포를 chance 만큼 1 늘린다. 아이템마다 생성 한도(itemSpawnLimits)가 1 이면 같은 아이템은 다시 뽑히지 않아
@@ -32,9 +34,17 @@ public static class BossCoinDrop
 
     public static bool IsBoss(string role) => Roles.Contains(role.ToLowerInvariant());
 
-    /// <summary>뽑는 개수 분포를 chance 만큼 1 늘린다: P'(k+1) += chance × P(k), P'(k) += (1 − chance) × P(k). 가중치 0 은 뺀다.</summary>
+    /// <summary>
+    /// 뽑는 개수 분포를 chance 만큼 1 늘린다: P'(k+1) += chance × P(k), P'(k) += (1 − chance) × P(k). 가중치 0 은 뺀다.
+    /// 가중치 합이 0 이면 (4.1.2 레쉘라·글루하르·킬라·파르티잔의 {"0": 0}) SPT 는 항목이 하나뿐이라 그 개수(0)를 고르므로 {0: 1} 로 본다.
+    /// </summary>
     internal static Dictionary<double, double> ShiftCounts(Dictionary<double, double> weights, double chance)
     {
+        if (weights.Values.Sum() <= 0)
+        {
+            weights = new Dictionary<double, double> { [weights.Count == 1 ? weights.Keys.First() : 0] = 1 };
+        }
+
         var shifted = new Dictionary<double, double>();
         void Add(double count, double weight)
         {
@@ -50,7 +60,7 @@ public static class BossCoinDrop
             Add(count, weight * (1 - chance));
         }
 
-        return shifted.Count > 0 ? shifted : new Dictionary<double, double>(weights);
+        return shifted;
     }
 
     /// <summary>보스 봇 데이터의 특수 아이템 칸에 코인을 넣는다. 이미 있거나, chance 가 0 이거나, 특수 아이템 설정이 없으면 그대로 둔다.</summary>
