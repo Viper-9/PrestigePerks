@@ -37,7 +37,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.CarryingWeight(__result);
+                    __result = PerkPatchMath.CarryingWeight(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -76,7 +76,7 @@ namespace PrestigePerks.Patches
 
                 var health = player.HealthController;
                 var vanilla = (1f + (float)player.Skills.StrengthBuffLiftWeightInc) * health.CarryingWeightRelativeModifier;
-                var perk = PerkPatchMath.CarryingWeight(1f + (float)player.Skills.StrengthBuffLiftWeightInc) * health.CarryingWeightRelativeModifier;
+                var perk = PerkPatchMath.CarryingWeight(1f + (float)player.Skills.StrengthBuffLiftWeightInc, PerkEffects.Scale(Perk)) * health.CarryingWeightRelativeModifier;
                 var absolute = health.CarryingWeightAbsoluteModifier;
                 var stamina = Singleton<GlobalConfiguration>.Instance.Stamina;
                 var before = __instance.BaseOverweightLimits.x;
@@ -118,7 +118,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance._player))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.StaminaCapacity(__result, baseValue);
+                    __result = PerkPatchMath.StaminaCapacity(__result, baseValue, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -153,7 +153,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance.HealthController?.Player))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.Consumption(__result);
+                    __result = PerkPatchMath.Consumption(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -219,7 +219,7 @@ namespace PrestigePerks.Patches
                 if (__instance is Mastering)
                 {
                     var before = val;
-                    val = PerkPatchMath.Mastering(val);
+                    val = PerkPatchMath.Mastering(val, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, val);
                 }
             }
@@ -253,7 +253,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.AttentionLootSpeed(__result);
+                    __result = PerkPatchMath.AttentionLootSpeed(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -283,7 +283,7 @@ namespace PrestigePerks.Patches
             {
                 if (PerkTarget.IsPmc(__instance))
                 {
-                    __result = PerkPatchMath.SearchBuffSpeed(__result);
+                    __result = PerkPatchMath.SearchBuffSpeed(__result, PerkEffects.Scale(Perk));
                 }
             }
             catch (Exception e)
@@ -375,7 +375,7 @@ namespace PrestigePerks.Patches
                 || ReferenceEquals(__instance, ApplyDamageScopePatch.HeavyBleeding) || ReferenceEquals(__instance, ApplyDamageScopePatch.LightBleeding))
             {
                 var before = cap;
-                cap = PerkPatchMath.ChanceCap(cap);
+                cap = PerkPatchMath.ChanceCap(cap, PerkEffects.Scale(11));
                 PerkEffects.Record(11, before, cap);
             }
         }
@@ -401,7 +401,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance))
                 {
                     var before = __result.RecoilSupression.x;
-                    __result.RecoilSupression.x = PerkPatchMath.RecoilSuppression(__result.RecoilSupression.x);
+                    __result.RecoilSupression.x = PerkPatchMath.RecoilSuppression(__result.RecoilSupression.x, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result.RecoilSupression.x);
                 }
             }
@@ -435,7 +435,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance))
                 {
                     var before = __result.ReloadSpeed;
-                    __result.ReloadSpeed = PerkPatchMath.ReloadSpeed(__result.ReloadSpeed);
+                    __result.ReloadSpeed = PerkPatchMath.ReloadSpeed(__result.ReloadSpeed, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result.ReloadSpeed);
                 }
             }
@@ -472,7 +472,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(player) && !player.MovementContext.PhysicalConditionContainsAny(ArmDamaged))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.Ergonomics(__result);
+                    __result = PerkPatchMath.Ergonomics(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -506,11 +506,11 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmc(__instance._player))
                 {
                     var before = __result;
-                    durabilityMalfChance = PerkPatchMath.Malfunction(durabilityMalfChance);
-                    magMalfChance = PerkPatchMath.Malfunction(magMalfChance);
-                    ammoMalfChance = PerkPatchMath.Malfunction(ammoMalfChance);
-                    overheatMalfChance = PerkPatchMath.Malfunction(overheatMalfChance);
-                    __result = PerkPatchMath.Malfunction(__result);
+                    durabilityMalfChance = PerkPatchMath.Malfunction(durabilityMalfChance, PerkEffects.Scale(Perk));
+                    magMalfChance = PerkPatchMath.Malfunction(magMalfChance, PerkEffects.Scale(Perk));
+                    ammoMalfChance = PerkPatchMath.Malfunction(ammoMalfChance, PerkEffects.Scale(Perk));
+                    overheatMalfChance = PerkPatchMath.Malfunction(overheatMalfChance, PerkEffects.Scale(Perk));
+                    __result = PerkPatchMath.Malfunction(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -541,7 +541,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmcOwnerId(__instance.Owner?.ID))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.ShotOverheat(__result);
+                    __result = PerkPatchMath.ShotOverheat(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -572,7 +572,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmcOwnerId(__instance.Owner?.ID))
                 {
                     var before = skillWeaponTreatmentFactor;
-                    skillWeaponTreatmentFactor = PerkPatchMath.WeaponTreatmentFactor(skillWeaponTreatmentFactor);
+                    skillWeaponTreatmentFactor = PerkPatchMath.WeaponTreatmentFactor(skillWeaponTreatmentFactor, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, skillWeaponTreatmentFactor);
                 }
             }
@@ -606,7 +606,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmcOwnerId(__instance.Item?.Owner?.ID))
                 {
                     var before = armorDamage;
-                    armorDamage = PerkPatchMath.ArmorDamage(armorDamage);
+                    armorDamage = PerkPatchMath.ArmorDamage(armorDamage, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, armorDamage);
                 }
             }
@@ -643,8 +643,8 @@ namespace PrestigePerks.Patches
                 if ((state == EPlayerState.Run || state == EPlayerState.Sprint) && PerkTarget.IsPmc(__instance.SkillManager))
                 {
                     var before = motion.x;
-                    motion.x = PerkPatchMath.MoveDistance(motion.x);
-                    motion.z = PerkPatchMath.MoveDistance(motion.z);
+                    motion.x = PerkPatchMath.MoveDistance(motion.x, PerkEffects.Scale(Perk));
+                    motion.z = PerkPatchMath.MoveDistance(motion.z, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, motion.x);
                 }
             }
@@ -720,7 +720,7 @@ namespace PrestigePerks.Patches
                 if (health.IsBodyPartDestroyed(bodyPart) && __instance.AffectsAny(DestroyedPart))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.SurgeryTime(__result, health._skills.SurgerySpeed.Value);
+                    __result = PerkPatchMath.SurgeryTime(__result, health._skills.SurgerySpeed.Value, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -760,7 +760,7 @@ namespace PrestigePerks.Patches
                 if (PerkTarget.IsPmcOwnerId(inventoryController?.ID))
                 {
                     var before = loadOneAmmoSpeed;
-                    loadOneAmmoSpeed = PerkPatchMath.LoadOneAmmoSpeed(loadOneAmmoSpeed);
+                    loadOneAmmoSpeed = PerkPatchMath.LoadOneAmmoSpeed(loadOneAmmoSpeed, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, loadOneAmmoSpeed);
                 }
             }
@@ -799,7 +799,7 @@ namespace PrestigePerks.Patches
                 if (__instance is ItemsProducer || (__instance is PermanentProducer && !(__instance is BitcoinProducer)))
                 {
                     var before = __result;
-                    __result = PerkPatchMath.CraftReduction(__result);
+                    __result = PerkPatchMath.CraftReduction(__result, PerkEffects.Scale(Perk));
                     PerkEffects.Record(Perk, before, __result);
                 }
             }
@@ -828,7 +828,7 @@ namespace PrestigePerks.Patches
             try
             {
                 var before = __result;
-                __result = PerkPatchMath.CraftReduction(__result);
+                __result = PerkPatchMath.CraftReduction(__result, PerkEffects.Scale(Perk));
                 PerkEffects.Record(Perk, before, __result);
             }
             catch (Exception e)
@@ -856,7 +856,7 @@ namespace PrestigePerks.Patches
             try
             {
                 var before = __result;
-                __result = PerkPatchMath.BitcoinSpeed(__result);
+                __result = PerkPatchMath.BitcoinSpeed(__result, PerkEffects.Scale(Perk));
                 PerkEffects.Record(Perk, before, __result);
             }
             catch (Exception e)
