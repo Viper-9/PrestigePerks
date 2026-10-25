@@ -36,7 +36,7 @@ $ClientResources = @{
 $DevOnlyTypes = @('PrestigeCommandoCommand')
 
 # 테스터용(-Dev) zip 에 넣을 도구. zip 의 <ModName>-dev-tools/ 에 들어간다
-$DevTools = @('tools\set-prestige-level.ps1', 'tools\set-prestige-level.bat', 'TESTING.md')
+$DevTools = @('tools\set-prestige-level.ps1', 'tools\set-prestige-level.bat')
 
 # zip 에서 뺄 파일
 $Exclude = @('*.pdb', '*.deps.json', '*.staticwebassets.*.json', '.gitkeep')
