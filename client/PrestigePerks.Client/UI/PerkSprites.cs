@@ -24,6 +24,9 @@ namespace PrestigePerks.UI
 
         public static Sprite Lock => Load("Sprites.Seasons_PerkTemplate_Icon-lock", true);
 
+        /// <summary>작업 표시줄 "특전" 버튼 아이콘: 슬롯 배지 육각 + 별 (흰색, 색은 버튼 애니메이션이 입힌다).</summary>
+        public static Sprite TaskbarIcon => Load("Sprites.Taskbar_Perk", true);
+
         /// <summary>풀린 자물쇠: Icon-lock 에서 고리를 올리고 오른쪽 다리를 끊어 그렸다.</summary>
         public static Sprite Unlock => Load("Sprites.Seasons_PerkTemplate_Icon-unlock", true);
 
