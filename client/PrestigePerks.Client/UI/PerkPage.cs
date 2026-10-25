@@ -12,9 +12,9 @@ using UnityEngine.UI;
 namespace PrestigePerks.UI
 {
     /// <summary>
-    /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 2안): 왼쪽 위 장착 슬롯 카드 6장, 왼쪽 아래 특전 20줄 (두 열), 오른쪽 코인·리롤.
+    /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 2안 + 개편 3안): 왼쪽 위 장착 슬롯 6칸, 왼쪽 아래 특전 20줄 (두 열), 오른쪽 코인·리롤·선택한 특전.
     /// 줄과 카드는 5.0 시즌 특전 줄과 프레스티지 보상 카드 스프라이트를 겹쳐 그린다 (<see cref="PerkSprites"/>).
-    /// 그리기만 하고 서버 호출은 <see cref="PerkController"/> 가 한다. 열 때마다 화면 크기에 맞춰 다시 만든다.
+    /// 그리기와 선택·드래그만 하고 서버 호출은 <see cref="PerkController"/> 가 한다. 열 때마다 화면 크기에 맞춰 다시 만든다.
     /// </summary>
     internal sealed class PerkPage : MonoBehaviour
     {
@@ -29,6 +29,9 @@ namespace PrestigePerks.UI
         private const int RowsPerColumn = 10;
         private const float FlashTime = 0.9f;
 
+        // 특전 줄 오른쪽 단계 칸 (I II III)
+        private const float TierCellWidth = 24, TierCellHeight = 18, TierCellGap = 4;
+
         // 릴 띠: 육각 안쪽에서 아이콘이 흐르고 위아래 칸이 조금 비친다
         private const float StripStep = 66;
         private const int StripRows = 5;
@@ -36,37 +39,71 @@ namespace PrestigePerks.UI
         private static readonly Color32 RowBase = new Color32(19, 23, 25, 255);
         private static readonly Color32 SquareTop = new Color32(40, 45, 47, 255), SquareBottom = new Color32(26, 30, 32, 255);
         private static readonly Color RowGlowTint = new Color(96 / 255f, 170 / 255f, 84 / 255f, 0.22f);
-        // 잠근 슬롯 배지: 푸른 틀·빛과 아이콘, 리롤 대상: 금색 틀과 아이콘
+        // 잠근 칸·확정 칸 배지: 푸른 틀·빛과 아이콘, 리롤 칸·빈 칸: 금색 틀과 아이콘
         private static readonly Color LockedFrame = new Color32(150, 205, 240, 255), LockedIcon = new Color32(220, 236, 246, 255);
         private static readonly Color LockedGlow = new Color(110 / 255f, 170 / 255f, 215 / 255f, 0.45f);
         private static readonly Color TargetIcon = new Color32(246, 226, 180, 255);
         private static readonly Color HoverLine = new Color32(150, 156, 158, 255);
+        private static readonly Color SelectedLine = new Color32(232, 234, 230, 255);
+        // 단계 칸: 미보유(흐림), 보유(밝음). 적용 중이면 초록 테두리
+        // 보유한 칸이 한눈에 보이게 대비를 크게 둔다 (2026-10-25 게임 확인 뒤)
+        private static readonly Color32 TierOffFill = new Color32(18, 21, 23, 255), TierOnFill = new Color32(96, 104, 106, 255);
+        private static readonly Color32 TierOffLine = new Color32(40, 46, 49, 255), TierOnLine = new Color32(176, 182, 184, 255);
+        private static readonly Color TierOffText = new Color32(64, 70, 73, 255), TierOnText = new Color32(240, 242, 238, 255);
 
         public event Action<int> LockClicked;
         public event Action RollClicked;
         public event Action CloseClicked;
 
-        /// <summary>리롤 중 흔들기. 멈추려는 릴(슬롯)과 그 다음 칸에 보이는 특전을 넘긴다.</summary>
-        public event Action<int, int> ShakeClicked;
+        /// <summary>보유하기(단계 1)·단계 구매. 특전, 단계, 화면에서 본 가격.</summary>
+        public event Action<int, int, int> BuyClicked;
+
+        /// <summary>장착 안 된 보유 특전을 슬롯에 놓았다. 특전, 슬롯 (0 부터).</summary>
+        public event Action<int, int> EquipDropped;
+
+        /// <summary>확정 칸을 목록에 놓았다. 슬롯 (0 부터).</summary>
+        public event Action<int> UnequipDropped;
 
         private PerkLocale locale;
         private RectTransform root;
-        private TextMeshProUGUI levelLabel, coinsValue, freeValue, nextValue, lockedValue, rollLabel, rollSub, messageLabel;
-        private RectTransform freeDots, nextDots, lockedDots;
-        private float freeDotsStart, nextDotsStart, lockedDotsStart, sideWidth;
+        private TextMeshProUGUI levelLabel, coinsValue, freeValue, nextValue, lockedValue, fixedValue, rollLabel, rollSub, messageLabel;
+        private RectTransform freeDots, nextDots, lockedDots, fixedDots;
+        private float freeDotsStart, nextDotsStart, lockedDotsStart, fixedDotsStart, sideWidth;
         private Image coinIcon;
         private Button rollButton;
         private Image rollFill, rollOutline;
         private readonly Dictionary<int, Row> rows = new Dictionary<int, Row>();
         private readonly List<Reel> reels = new List<Reel>();
 
+        // 목록 패널: 확정 칸을 끌면 테두리와 "여기에 놓으면 빠집니다"
+        private RectTransform listPanel;
+        private Image listDropOutline;
+        private TextMeshProUGUI listDropLabel;
+
+        // 목록 보기: 전체(20줄 고정 자리) 또는 보유만 (보유한 줄을 같은 두 열 순서로 위에서부터 채운다). 페이지를 열면 전체
+        private bool ownedOnly;
+        private TextMeshProUGUI listTitle, listCount, ownedTab, listEmpty;
+        private readonly List<Vector2> rowPlaces = new List<Vector2>();
+
+        // 선택한 특전 칸
+        private Picked picked;
+        private int selectedPerk;
+
+        // 마지막으로 그린 상태 (선택·드래그·확인 시간이 바뀌면 다시 그린다)
+        private PerkStateDto lastState;
+        private int lastCoins;
+        private bool lastBusy;
+        private string lastMessage;
+
+        // 드래그: 목록의 보유 특전(dragPerk) 또는 확정 칸(dragSlot). 끄는 동안 작은 카드가 마우스를 따라온다
+        private int dragPerk, dragSlot = -1, dropReel = -1;
+        private bool overList;
+        private int dragEndFrame = -10;
+        private RectTransform ghost;
+
         // 릴 연출: 띠가 위에서 아래로 흐른다. 결과가 오면 감속해 멈추고, 가짜 멈춤이면 한 칸 지나쳤다가 위로 되돌아간다
         private readonly Dictionary<int, Spin> spinning = new Dictionary<int, Spin>();
         private readonly System.Random random = new System.Random();
-        private bool shakeReady, shakeUsed, shakeShown;
-        // 흔들기를 켰고(config shakeEnabled) 슬롯 하나만 돌린 리롤만 흔들 수 있다 (서버도 같은 규칙)
-        private bool shakeEnabled = true, shakeAllowed;
-        private double shakeChance;
 
         private enum SpinPhase
         {
@@ -76,20 +113,18 @@ namespace PrestigePerks.UI
             SnapBack,
             ReverseHold,
             ReverseSpin,
-            NudgeHold,
-            Nudge,
         }
 
         private enum ButtonLook
         {
             Roll,
-            Shake,
             Disabled,
         }
 
         private sealed class Spin
         {
             public readonly List<int> Strip = new List<int>();
+            public IReadOnlyList<int> Pool;
             public float Pos, LastPos;
             public SpinPhase Phase;
             public float Started, PhaseStart, From, To, Duration;
@@ -98,17 +133,19 @@ namespace PrestigePerks.UI
             public bool Locked;
             public ReelEffect Effect;
             public ICollection<int> Held;
-            public int? NudgeTo; // 흔들기로 한 칸 더 갈 특전 (멈추는 순간 적용)
-            public int? ReverseTo; // 흔들기 리버스로 갈 특전 (멈춘 뒤 거꾸로 돈다)
         }
 
-        /// <summary>목록 한 줄 (5.0 PersonalPerkTemplate 처럼 아이콘 칸 + 이름 + 효과 + 설명).</summary>
+        /// <summary>목록 한 줄 (5.0 PersonalPerkTemplate 처럼 아이콘 칸 + 이름 + 효과 + 단계 칸).</summary>
         private sealed class Row
         {
-            public Image Glow, Square, Icon, Outline, Flash, LockIcon;
-            public TextMeshProUGUI Name, Effect, Slot;
-            public float Width;
-            public bool Hover, Target;
+            public RectTransform Rect;
+            public CanvasGroup Group;
+            public Image Glow, Square, Icon, Outline, Flash;
+            public TextMeshProUGUI Name, Effect;
+            public readonly Image[] TierFill = new Image[PerkPageModel.MaxTier];
+            public readonly Image[] TierLine = new Image[PerkPageModel.MaxTier];
+            public readonly TextMeshProUGUI[] TierLabel = new TextMeshProUGUI[PerkPageModel.MaxTier];
+            public bool Hover, Target, Selected;
             public float FlashUntil;
         }
 
@@ -116,14 +153,17 @@ namespace PrestigePerks.UI
         private sealed class Reel
         {
             public RectTransform Box;
-            public Vector2 BoxHome;
-            public Image Glow, Fill, Frame, Flash, Hover, FaceIcon, LockIcon;
+            public CanvasGroup Group;
+            public Image Glow, Fill, Frame, Flash, Hover, FaceIcon, LockIcon, FixedMark;
             public TextMeshProUGUI Header, Name, Effect, Closed;
+            public RectTransform TierBox;
+            public Image TierFill, TierLine;
+            public TextMeshProUGUI TierLabel;
             public Button LockButton;
             public bool LockHover;
             public float FlashUntil;
             public Color FlashColor = UiKit.GoldHi;
-            public float WobbleUntil;
+            public SlotKind Kind;
             public bool Locked;
             public bool Open;
             public int CurrentPerk;
@@ -139,6 +179,18 @@ namespace PrestigePerks.UI
             public RectTransform Rect;
             public CanvasGroup Group;
             public Image Icon;
+        }
+
+        /// <summary>오른쪽 "선택한 특전" 칸. 상태와 상관없이 모양은 하나이고 글자와 버튼만 바뀐다.</summary>
+        private sealed class Picked
+        {
+            public RectTransform Body;
+            public Image Square, Icon, StatusLock, StatusMark;
+            public TextMeshProUGUI Empty, Name, Status, Subject, Value, Tier, Next, Hint, BuyLabel, BuySub;
+            public RectTransform Buy;
+            public Image BuyFill, BuyOutline;
+            public Button BuyButton;
+            public float Width;
         }
 
         public static PerkPage Create(PerkLocale locale, float bottomInsetPixels)
@@ -193,7 +245,7 @@ namespace PrestigePerks.UI
             UiKit.Outline(header, UiKit.Line);
             var title = UiKit.Label(header, "Title", 16, 23, 300, locale.Get("ui.title"), 26, UiKit.Text);
             var titleWidth = UiKit.Width(title, title.text);
-            levelLabel = UiKit.Label(header, "Level", 16 + titleWidth + 24, 24, 700, "", 16, UiKit.Muted);
+            levelLabel = UiKit.Label(header, "Level", 16 + titleWidth + 24, 24, 900, "", 16, UiKit.Muted);
             // 프레스티지 숫자를 크게 넣으므로 칸을 넘어도 지우지 않는다
             levelLabel.overflowMode = TextOverflowModes.Overflow;
 
@@ -210,11 +262,17 @@ namespace PrestigePerks.UI
         {
             var panel = UiKit.Rect(root, name, x, y, width, height);
             UiKit.Image(panel, new Color32(17, 21, 23, 230));
-            UiKit.Sprite(UiKit.Rect(panel, "Head", 0, 0, width, PanelHead), PerkSprites.Gradient(new Color32(46, 56, 62, 240), new Color32(24, 29, 32, 240), true), Color.white);
-            UiKit.Image(UiKit.Rect(panel, "HeadLine", 0, PanelHead, width, 1), new Color32(10, 12, 13, 255));
+            Head(panel, 0, width, title);
             UiKit.Outline(panel, UiKit.Line);
-            UiKit.Label(panel, "Title", 16, 23, width / 2, title, 22, UiKit.Text);
             return panel;
+        }
+
+        /// <summary>패널 머리띠 (청회색 가로 그라데이션 + 아래 선 + 제목).</summary>
+        private static void Head(RectTransform panel, float y, float width, string title)
+        {
+            UiKit.Sprite(UiKit.Rect(panel, "Head", 0, y, width, PanelHead), PerkSprites.Gradient(new Color32(46, 56, 62, 240), new Color32(24, 29, 32, 240), true), Color.white);
+            UiKit.Image(UiKit.Rect(panel, "HeadLine", 0, y + PanelHead, width, 1), new Color32(10, 12, 13, 255));
+            UiKit.Label(panel, "Title", 16, y + 23, width / 2, title, 22, UiKit.Text);
         }
 
         private void BuildSlots(float x, float y, float width)
@@ -229,13 +287,13 @@ namespace PrestigePerks.UI
 
         private Reel BuildReel(RectTransform panel, int index, float x, float y, float width)
         {
-            // 카드 바탕·틀 없이 "슬롯 n"과 육각 배지만 둔다. 칸 전체가 잠금 버튼이다
+            // 카드 바탕·틀 없이 "슬롯 n"과 육각 배지, 그 아래 단계 배지만 둔다. 칸 전체가 버튼이다
             var card = UiKit.Rect(panel, $"Slot{index}", x, y, width, CardHeight);
             var hexHeight = Mathf.Round(HexWidth * 436 / 376);
             var reel = new Reel
             {
                 Box = card,
-                BoxHome = card.anchoredPosition,
+                Group = card.gameObject.AddComponent<CanvasGroup>(),
                 Header = UiKit.Label(card, "Header", width / 2, 12, width - 20, locale.Format("ui.slotN", index + 1), 14, UiKit.Muted, TextAlignmentOptions.Center),
                 Name = UiKit.Label(card, "Name", width / 2, 160, width - 20, "", 15, UiKit.Text, TextAlignmentOptions.Center),
                 Effect = UiKit.Label(card, "Effect", width / 2, 160, width - 20, "", 13, UiKit.Green, TextAlignmentOptions.Center),
@@ -275,20 +333,40 @@ namespace PrestigePerks.UI
             reel.Flash = UiKit.Sprite(UiKit.Fill(frame, "Flash"), PerkSprites.HexFrame, Color.clear);
             reel.Closed = UiKit.Label(card, "Closed", width / 2, HexTop + hexHeight / 2, HexWidth - 10, "", 13, UiKit.Dim, TextAlignmentOptions.Center);
 
-            // 자물쇠는 표시만 한다 (잠금 = 흰색, 안 잠김 = 흐리게). "슬롯 n" 오른쪽에 붙인다 (RenderReel)
+            // 단계 배지: 육각 아래 가운데에 걸친 작은 칸 (그 칸에 지금 적용 중인 단계)
+            reel.TierBox = UiKit.Rect(card, "Tier", (width - 34) / 2, HexTop + hexHeight - 11, 34, 20);
+            reel.TierFill = UiKit.Image(reel.TierBox, UiKit.Dark);
+            reel.TierLine = UiKit.Outline(reel.TierBox, UiKit.Gold);
+            reel.TierLabel = UiKit.Label(reel.TierBox, "Label", 17, 10, 34, "", 13, UiKit.Text, TextAlignmentOptions.Center, FontStyles.Bold);
+
+            // 자물쇠(잠금·풀림)나 ◆(확정)는 표시만 한다. "슬롯 n" 오른쪽에 붙인다 (RenderReel)
             reel.LockIcon = UiKit.Sprite(UiKit.Rect(card, "Lock", 0, 5, 14, 14), PerkSprites.Lock, Color.white);
             reel.LockIcon.gameObject.SetActive(false);
+            reel.FixedMark = Diamond(card, "Fixed", 0, 13, 8);
+            reel.FixedMark.gameObject.SetActive(false);
             var hit = UiKit.Image(UiKit.Fill(card, "Hit"), Color.clear);
             reel.LockButton = UiKit.Button(hit);
             reel.LockButton.transition = Selectable.Transition.None;
-            reel.LockButton.onClick.AddListener(() => LockClicked?.Invoke(index));
+            reel.LockButton.onClick.AddListener(() => OnSlotClicked(index));
             OnHover(hit.gameObject, on =>
             {
                 reel.LockHover = on;
                 RefreshLock(reel);
             });
+            On(hit.gameObject, EventTriggerType.BeginDrag, data => BeginSlotDrag(index, data));
+            On(hit.gameObject, EventTriggerType.Drag, MoveDrag);
+            On(hit.gameObject, EventTriggerType.EndDrag, EndDrag);
             hit.gameObject.SetActive(false);
             return reel;
+        }
+
+        /// <summary>◆ 표시: 45도 돌린 작은 정사각형. centerY 는 세로 가운데.</summary>
+        private static Image Diamond(RectTransform parent, string name, float x, float centerY, float size)
+        {
+            var rect = UiKit.Rect(parent, name, x, centerY, size, size);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.localRotation = Quaternion.Euler(0, 0, 45);
+            return UiKit.Image(rect, UiKit.Text);
         }
 
         /// <summary>아이콘 칸: 어두운 칸에 아이콘 (장착하지 않은 특전은 아이콘을 흐리게). 칸 그림과 아이콘을 돌려준다.</summary>
@@ -305,14 +383,26 @@ namespace PrestigePerks.UI
 
         private void BuildList(float x, float y, float width, float height)
         {
-            var panel = Panel("List", x, y, width, height, locale.Get("ui.list"));
-            var title = panel.Find("Title").GetComponent<TextMeshProUGUI>();
-            UiKit.Label(panel, "Count", 16 + UiKit.Width(title, title.text) + 12, 24, 80, PerkPageModel.AllPerks.Length.ToString(), 18, UiKit.Muted);
+            listPanel = Panel("List", x, y, width, height, locale.Get("ui.list"));
+            // 머리줄 제목이 보기 전환이다: "특전 목록 20 · 보유 3". 고른 쪽은 밝게, 아닌 쪽은 흐리게
+            listTitle = listPanel.Find("Title").GetComponent<TextMeshProUGUI>();
+            var titleWidth = UiKit.Width(listTitle, listTitle.text);
+            listCount = UiKit.Label(listPanel, "Count", 16 + titleWidth + 12, 24, 80, PerkPageModel.AllPerks.Length.ToString(), 18, UiKit.Muted);
+            var allWidth = titleWidth + 12 + UiKit.Width(listCount, listCount.text);
+            var dotX = 16 + allWidth + 14;
+            UiKit.Label(listPanel, "Dot", dotX, 23, 20, "·", 22, UiKit.Dim);
+            ownedTab = UiKit.Label(listPanel, "Owned", dotX + 22, 23, 200, "", 22, UiKit.Dim);
+            Tab(listPanel, "AllHit", 8, allWidth + 16, false);
+            Tab(listPanel, "OwnedHit", dotX + 14, 160, true);
+            listEmpty = UiKit.Label(listPanel, "Empty", width / 2, height / 2, width - 32, locale.Get("ui.ownedEmpty"), 16, UiKit.Muted, TextAlignmentOptions.Center);
+            listEmpty.enabled = false;
+            listDropLabel = UiKit.Label(listPanel, "Drop", width - 16, 23, width / 2, locale.Get("ui.dropUnequip"), 16, SelectedLine, TextAlignmentOptions.Right);
+            listDropLabel.enabled = false;
 
             var rowWidth = (width - 32 - ColumnGap) / 2;
             // 효과는 이름 칸 오른쪽에 맞춰 세운다. 영어 이름이 길어도 겹치지 않게 가장 긴 이름에 맞춘다
             var nameColumn = 66f;
-            var measure = UiKit.Label(panel, "Measure", 0, 0, 10, "", 18, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            var measure = UiKit.Label(listPanel, "Measure", 0, 0, 10, "", 18, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             foreach (var perk in PerkPageModel.AllPerks)
             {
                 nameColumn = Mathf.Max(nameColumn, UiKit.Width(measure, locale.PerkName(perk)) + 14);
@@ -323,7 +413,54 @@ namespace PrestigePerks.UI
             for (var i = 0; i < PerkPageModel.AllPerks.Length; i++)
             {
                 var perk = PerkPageModel.AllPerks[i];
-                rows[perk] = BuildRow(panel, perk, 16 + i / RowsPerColumn * (rowWidth + ColumnGap), 58 + i % RowsPerColumn * (RowHeight + RowGap), rowWidth, nameColumn);
+                rowPlaces.Add(new Vector2(16 + i / RowsPerColumn * (rowWidth + ColumnGap), -(58 + i % RowsPerColumn * (RowHeight + RowGap))));
+                rows[perk] = BuildRow(listPanel, perk, rowPlaces[i].x, -rowPlaces[i].y, rowWidth, nameColumn);
+            }
+
+            // 확정 칸을 끄는 동안 목록 전체 테두리 (줄 위에 그린다)
+            listDropOutline = UiKit.Outline(listPanel, Color.clear);
+        }
+
+        /// <summary>머리줄 보기 전환의 누르는 자리 (글자 위 투명 칸).</summary>
+        private void Tab(RectTransform panel, string name, float x, float width, bool owned)
+        {
+            var hit = UiKit.Image(UiKit.Rect(panel, name, x, 0, width, PanelHead), Color.clear, raycast: true);
+            On(hit.gameObject, EventTriggerType.PointerClick, _ =>
+            {
+                if (ownedOnly == owned || ghost != null)
+                {
+                    return;
+                }
+
+                ownedOnly = owned;
+                GameSounds(EUISoundType.ButtonOver);
+                Rerender();
+            });
+        }
+
+        // 보기 전환 글자와 줄 자리. 전체는 고정 자리, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다
+        private void RenderListView(PerkStateDto state)
+        {
+            var owned = PerkPageModel.OwnedCount(state);
+            listTitle.color = ownedOnly ? UiKit.Dim : UiKit.Text;
+            listCount.color = ownedOnly ? UiKit.Dim : UiKit.Muted;
+            var countColor = ColorUtility.ToHtmlStringRGB(ownedOnly ? UiKit.Muted : UiKit.Dim);
+            ownedTab.text = locale.Format("ui.ownedTab", $"<size=18><color=#{countColor}>{owned}</color></size>");
+            ownedTab.color = ownedOnly ? UiKit.Text : UiKit.Dim;
+            // 확정 칸을 끄는 동안에는 오른쪽에 "여기에 놓으면 빠집니다"가 나온다
+            listEmpty.enabled = ownedOnly && owned == 0;
+
+            var place = 0;
+            foreach (var perk in PerkPageModel.AllPerks)
+            {
+                var row = rows[perk];
+                var show = !ownedOnly || PerkPageModel.OwnedTier(state, perk) > 0;
+                row.Rect.gameObject.SetActive(show);
+                if (show)
+                {
+                    row.Rect.anchoredPosition = rowPlaces[ownedOnly ? place : Array.IndexOf(PerkPageModel.AllPerks, perk)];
+                    place++;
+                }
             }
         }
 
@@ -333,7 +470,7 @@ namespace PrestigePerks.UI
             UiKit.Image(rect, RowBase, raycast: true);
             UiKit.Sprite(UiKit.Fill(rect, "Gradient"), PerkSprites.RowGradient, new Color(1, 1, 1, 0.9f));
             UiKit.Sprite(UiKit.Fill(rect, "Grid"), PerkSprites.Grid, new Color(1, 1, 1, 0.55f), Image.Type.Tiled);
-            var row = new Row { Width = width };
+            var row = new Row { Rect = rect, Group = rect.gameObject.AddComponent<CanvasGroup>() };
             // 5.0 '선택' 줄처럼 왼쪽에서 번지는 초록 (장착한 특전)
             row.Glow = UiKit.Sprite(UiKit.Rect(rect, "Glow", 0, 0, width * 0.55f, RowHeight), PerkSprites.RowGlow, RowGlowTint);
             UiKit.Sprite(UiKit.Rect(rect, "Shadow", width - width / 3, 0, width / 3, RowHeight), PerkSprites.RowShadow, new Color(1, 1, 1, 0.7f));
@@ -344,13 +481,19 @@ namespace PrestigePerks.UI
             row.Icon.sprite = PerkSprites.Icon(perk);
             var x0 = size + 18;
             var effectX = x0 + nameColumn;
-            // 이름·효과 한 줄 (설명 줄은 뺐다, 2026-10-20)
+            var tiersWidth = PerkPageModel.MaxTier * TierCellWidth + (PerkPageModel.MaxTier - 1) * TierCellGap;
+            // 이름·효과 한 줄 (설명 줄은 뺐다, 2026-10-20). 오른쪽 끝에 단계 칸 I II III
             var middle = RowHeight / 2;
             row.Name = UiKit.Label(rect, "Name", x0, middle, nameColumn, locale.PerkName(perk), 18, UiKit.Muted, TextAlignmentOptions.Left, FontStyles.Bold);
-            row.Effect = UiKit.Label(rect, "Effect", effectX, middle, width - effectX - 110, locale.PerkEffect(perk), 15, UiKit.GreenDim, TextAlignmentOptions.Left, FontStyles.Bold);
-            row.Slot = UiKit.Label(rect, "Slot", width - 14, middle, 100, "", 14, UiKit.Text, TextAlignmentOptions.Right);
-            row.LockIcon = UiKit.Sprite(UiKit.Rect(rect, "Lock", 0, middle - 6.5f, 13, 13), PerkSprites.Lock, Color.white);
-            row.LockIcon.enabled = false;
+            row.Effect = UiKit.Label(rect, "Effect", effectX, middle, width - effectX - tiersWidth - 28, "", 15, UiKit.GreenDim, TextAlignmentOptions.Left, FontStyles.Bold);
+            for (var t = 0; t < PerkPageModel.MaxTier; t++)
+            {
+                var cell = UiKit.Rect(rect, $"Tier{t + 1}", width - 14 - tiersWidth + t * (TierCellWidth + TierCellGap), middle - TierCellHeight / 2, TierCellWidth, TierCellHeight);
+                row.TierFill[t] = UiKit.Image(cell, TierOffFill);
+                row.TierLine[t] = UiKit.Outline(cell, TierOffLine);
+                row.TierLabel[t] = UiKit.Label(cell, "Label", TierCellWidth / 2, TierCellHeight / 2, TierCellWidth, TierName(t + 1), 11, UiKit.Dim, TextAlignmentOptions.Center, FontStyles.Bold);
+            }
+
             row.Flash = UiKit.Image(UiKit.Fill(rect, "Flash"), Color.clear);
             row.Outline = UiKit.Outline(rect, Color.clear);
             OnHover(rect.gameObject, on =>
@@ -358,6 +501,10 @@ namespace PrestigePerks.UI
                 row.Hover = on;
                 RefreshOutline(row);
             });
+            On(rect.gameObject, EventTriggerType.PointerClick, _ => OnRowClicked(perk));
+            On(rect.gameObject, EventTriggerType.BeginDrag, data => BeginRowDrag(perk, data));
+            On(rect.gameObject, EventTriggerType.Drag, MoveDrag);
+            On(rect.gameObject, EventTriggerType.EndDrag, EndDrag);
             SetEquipped(row, false);
             return row;
         }
@@ -381,15 +528,21 @@ namespace PrestigePerks.UI
             coinsValue = UiKit.Label(art, "Value", 126, 84, w - 146, "", 46, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             UiKit.Image(UiKit.Rect(panel, "Line1", 1, 179, w - 2, 1), UiKit.Line);
 
-            (freeValue, freeDots, freeDotsStart) = KeyValue(panel, 216, "ui.free");
-            (nextValue, nextDots, nextDotsStart) = KeyValue(panel, 268, "ui.next");
-            (lockedValue, lockedDots, lockedDotsStart) = KeyValue(panel, 320, "ui.lockedSlots");
+            (freeValue, freeDots, freeDotsStart) = KeyValue(panel, 212, "ui.free");
+            (nextValue, nextDots, nextDotsStart) = KeyValue(panel, 256, "ui.next");
+            (lockedValue, lockedDots, lockedDotsStart) = KeyValue(panel, 300, "ui.lockedSlots");
+            (fixedValue, fixedDots, fixedDotsStart) = KeyValue(panel, 344, "ui.fixedSlots");
 
-            UiKit.Image(UiKit.Rect(panel, "Line2", 1, 372, w - 2, 1), UiKit.Line);
+            // 선택한 특전 칸: 패널 안의 두 번째 머리띠
+            const float pickTop = 378;
+            UiKit.Image(UiKit.Rect(panel, "Line2", 1, pickTop - 1, w - 2, 1), UiKit.Line);
+            var pick = UiKit.Rect(panel, "Picked", 0, pickTop, w, PanelHead + 240);
+            Head(pick, 0, w, locale.Get("ui.selected"));
+            BuildPicked(pick, w);
 
             // 맨 아래: 리롤 버튼. 메시지는 그 바로 위 (리롤 대상은 슬롯의 금색 틀로 보인다)
             var buttonY = height - 16 - 92;
-            messageLabel = UiKit.Label(UiKit.Rect(panel, "Message", 18, buttonY - 12 - 72, w - 36, 72), "", 15, UiKit.Bad, TextAlignmentOptions.BottomLeft);
+            messageLabel = UiKit.Label(UiKit.Rect(panel, "Message", 18, buttonY - 8 - 48, w - 36, 48), "", 15, UiKit.Bad, TextAlignmentOptions.BottomLeft);
             messageLabel.enableWordWrapping = true;
             messageLabel.overflowMode = TextOverflowModes.Overflow;
 
@@ -399,29 +552,43 @@ namespace PrestigePerks.UI
             rollLabel = UiKit.Label(roll, "Label", (w - 32) / 2, 46 - 12, w - 48, locale.Get("ui.roll"), 38, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
             rollSub = UiKit.Label(roll, "Sub", (w - 32) / 2, 46 + 26, w - 48, "", 16, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
             rollButton = UiKit.Button(rollFill);
-            SetRollLook(ButtonLook.Disabled);
-            // 도는 중에는 흔들기 버튼이 된다 (리롤마다 한 번). 다 멈춰야 다시 리롤할 수 있다
+            SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
             rollButton.onClick.AddListener(() =>
             {
                 if (spinning.Count == 0)
                 {
                     RollClicked?.Invoke();
-                    return;
                 }
-
-                var target = ShakeTarget();
-                if (!CanShake || target < 0)
-                {
-                    return;
-                }
-
-                var spin = spinning[target];
-                shakeUsed = true;
-                Wobble(new[] { target });
-                GameSounds(EUISoundType.MenuWeaponDisassemble);
-                RenderShake();
-                ShakeClicked?.Invoke(target, spin.Strip[spin.Stop + 1]);
             });
+        }
+
+        private void BuildPicked(RectTransform pick, float w)
+        {
+            var top = PanelHead;
+            picked = new Picked { Width = w, Body = UiKit.Rect(pick, "Body", 0, top, w, 240) };
+            var body = picked.Body;
+            picked.Empty = UiKit.Label(body, "Empty", w / 2, 90, w - 32, locale.Get("ui.selectNone"), 16, UiKit.Muted, TextAlignmentOptions.Center);
+
+            (picked.Square, picked.Icon) = IconSquare(body, "Square", 16, 16, 50);
+            picked.Name = UiKit.Label(body, "Name", 80, 30, w - 96 - 130, "", 20, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            picked.Status = UiKit.Label(body, "Status", w - 16, 30, 130, "", 14, UiKit.Muted, TextAlignmentOptions.Right);
+            picked.StatusLock = UiKit.Sprite(UiKit.Rect(body, "StatusLock", 0, 23.5f, 13, 13), PerkSprites.Lock, Color.white);
+            picked.StatusMark = Diamond(body, "StatusMark", 0, 30, 7);
+            picked.Subject = UiKit.Label(body, "Subject", 80, 54, w - 96, "", 14, UiKit.Muted);
+
+            picked.Value = UiKit.Label(body, "Value", 16, 100, 160, "", 30, UiKit.Green, TextAlignmentOptions.Left, FontStyles.Bold);
+            picked.Tier = UiKit.Label(body, "Tier", 16, 103, 120, "", 15, UiKit.Muted);
+            picked.Next = UiKit.Label(body, "Next", w - 16, 103, 160, "", 15, UiKit.Muted, TextAlignmentOptions.Right);
+            picked.Hint = UiKit.Label(UiKit.Rect(body, "Hint", 16, 124, w - 32, 40), "", 14, UiKit.Muted, TextAlignmentOptions.TopLeft);
+            picked.Hint.enableWordWrapping = true;
+
+            picked.Buy = UiKit.Rect(body, "Buy", 16, 166, w - 32, 62);
+            picked.BuyFill = UiKit.Sprite(picked.Buy, null, Color.white);
+            picked.BuyOutline = UiKit.Outline(picked.Buy, Color.clear);
+            picked.BuyLabel = UiKit.Label(picked.Buy, "Label", (w - 32) / 2, 23, w - 48, "", 22, UiKit.Dark, TextAlignmentOptions.Center, FontStyles.Bold);
+            picked.BuySub = UiKit.Label(picked.Buy, "Sub", (w - 32) / 2, 46, w - 48, "", 13, UiKit.Dark, TextAlignmentOptions.Center);
+            picked.BuyButton = UiKit.Button(picked.BuyFill);
+            picked.BuyButton.onClick.AddListener(OnBuyClicked);
         }
 
         /// <summary>점선으로 이은 이름·값 한 줄. 점선은 값 폭에 맞춰 Render 에서 늘인다.</summary>
@@ -452,25 +619,39 @@ namespace PrestigePerks.UI
 
         private static void OnHover(GameObject target, Action<bool> changed)
         {
-            var trigger = target.AddComponent<EventTrigger>();
-            var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-            enter.callback.AddListener(_ => changed(true));
-            var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
-            exit.callback.AddListener(_ => changed(false));
-            trigger.triggers.Add(enter);
-            trigger.triggers.Add(exit);
+            On(target, EventTriggerType.PointerEnter, _ => changed(true));
+            On(target, EventTriggerType.PointerExit, _ => changed(false));
         }
 
-        // 리롤 대상이면 얇은 금색 테두리, 마우스를 올리면 밝은 테두리
-        private static void RefreshOutline(Row row) =>
-            row.Outline.color = row.Target ? UiKit.Gold : row.Hover ? HoverLine : Color.clear;
-
-        // 슬롯에 마우스를 올리면 자물쇠와 육각 틀이 밝아진다 (누르면 잠금 토글)
-        private static void RefreshLock(Reel reel)
+        /// <summary>마우스 이벤트 하나를 단다. 한 오브젝트의 EventTrigger 하나에 모은다.</summary>
+        private static void On(GameObject target, EventTriggerType type, Action<PointerEventData> handler)
         {
-            var hover = reel.LockHover && reel.LockButton.interactable;
-            reel.LockIcon.color = new Color(1, 1, 1, reel.Locked ? 1f : hover ? 0.7f : 0.32f);
-            reel.Hover.color = hover ? new Color(1, 1, 1, 0.45f) : Color.clear;
+            var trigger = target.GetComponent<EventTrigger>() ?? target.AddComponent<EventTrigger>();
+            var entry = new EventTrigger.Entry { eventID = type };
+            entry.callback.AddListener(data => handler(data as PointerEventData));
+            trigger.triggers.Add(entry);
+        }
+
+        // 선택한 줄은 흰 테두리, 리롤 대상은 얇은 금색 테두리, 마우스를 올리면 밝은 테두리
+        private static void RefreshOutline(Row row) =>
+            row.Outline.color = row.Selected ? SelectedLine : row.Target ? UiKit.Gold : row.Hover ? HoverLine : Color.clear;
+
+        // 슬롯에 마우스를 올리면 표시와 육각 틀이 밝아진다 (리롤 칸·잠긴 칸은 누르면 잠금 토글, 확정 칸은 선택). 드래그 중에는 놓을 곳 표시가 우선이다
+        private void RefreshLock(Reel reel)
+        {
+            var hover = reel.LockHover && reel.LockButton.interactable && reel.Kind != SlotKind.Empty;
+            // 잠근 칸은 닫힌 자물쇠, 리롤 칸은 풀린 자물쇠 (흐리게, 마우스를 올리면 밝게)
+            reel.LockIcon.sprite = reel.Locked ? PerkSprites.Lock : PerkSprites.Unlock;
+            reel.LockIcon.color = new Color(1, 1, 1, reel.Locked ? 1f : hover ? 0.8f : 0.45f);
+            var index = reels.IndexOf(reel);
+            if (dragPerk > 0)
+            {
+                // 놓을 수 있는 칸은 흰 테두리, 마우스가 올라간 칸은 더 밝게
+                reel.Hover.color = PerkPageModel.CanDrop(lastState, index) ? new Color(1, 1, 1, index == dropReel ? 1f : 0.45f) : Color.clear;
+                return;
+            }
+
+            reel.Hover.color = hover && dragSlot < 0 ? new Color(1, 1, 1, 0.45f) : Color.clear;
         }
 
         private static void SetEquipped(Row row, bool equipped)
@@ -481,27 +662,38 @@ namespace PrestigePerks.UI
             row.Effect.color = equipped ? UiKit.Green : UiKit.GreenDim;
         }
 
+        internal static string TierName(int tier) => tier == 1 ? "I" : tier == 2 ? "II" : tier == 3 ? "III" : "";
+
         /// <summary>상태를 그린다. 돌고 있는 릴의 아이콘·이름은 연출이 맡는다.</summary>
         public void Render(PerkStateDto state, int coins, bool busy, string message)
         {
+            lastState = state;
+            lastCoins = coins;
+            lastBusy = busy;
+            lastMessage = message;
             if (state == null)
             {
                 levelLabel.text = locale.Get("ui.loading");
-                SetRollLook(ButtonLook.Disabled);
+                SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
                 rollLabel.text = locale.Get("ui.roll");
                 rollSub.text = "";
                 messageLabel.text = message ?? "";
+                RenderPicked(null, coins, busy);
                 return;
             }
 
             var level = $"<size=24><b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Gold)}>{state.PrestigeLevel}</color></b></size>";
-            levelLabel.text = locale.Format("ui.level", level, state.Slots.Count);
+            var tierCap = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{TierName(PerkPageModel.TierCap(state))}</color></b>";
+            var collection = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{PerkPageModel.OwnedCount(state)}</color></b>";
+            levelLabel.text = locale.Format("ui.level", level, state.Slots.Count, tierCap, collection, PerkPageModel.AllPerks.Length);
             coinsValue.text = coins.ToString();
 
             foreach (var pair in rows)
             {
                 RenderRow(pair.Key, pair.Value, state);
             }
+
+            RenderListView(state);
 
             for (var i = 0; i < reels.Count; i++)
             {
@@ -524,50 +716,60 @@ namespace PrestigePerks.UI
             }
 
             lockedValue.text = $"{PerkPageModel.LockedCount(state)} / {state.Slots.Count}";
+            fixedValue.text = $"{PerkPageModel.FixedCount(state)} / {state.Slots.Count}";
             SetDots(freeDots, freeDotsStart, freeValue);
             SetDots(nextDots, nextDotsStart, nextValue);
             SetDots(lockedDots, lockedDotsStart, lockedValue);
+            SetDots(fixedDots, fixedDotsStart, fixedValue);
 
-            shakeChance = state.ShakeChance;
-            shakeEnabled = state.ShakeEnabled;
             rollLabel.text = locale.Get("ui.roll");
             var block = PerkPageModel.CheckRoll(state, coins, busy);
-            SetRollLook(block == RollBlock.None ? ButtonLook.Roll : ButtonLook.Disabled);
-            messageLabel.color = UiKit.Bad;
-            messageLabel.text = message ?? BlockMessage(block, state, coins);
+            SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, block == RollBlock.None ? ButtonLook.Roll : ButtonLook.Disabled);
             if (spinning.Count > 0)
             {
-                RenderShake();
+                rollSub.text = locale.Get("ui.rolling");
             }
+
+            messageLabel.color = UiKit.Bad;
+            messageLabel.text = message ?? BlockMessage(block, state, coins);
+            RenderPicked(state, coins, busy);
+            RenderDragMarks();
         }
+
+        private void Rerender() => Render(lastState, lastCoins, lastBusy, lastMessage);
 
         private void RenderRow(int perk, Row row, PerkStateDto state)
         {
             var slot = PerkPageModel.SlotOf(state, perk);
             // 돌고 있는 슬롯에 있던 특전은 잠시 장착 표시를 비운다
             var equipped = slot >= 0 && !spinning.ContainsKey(slot);
-            var locked = equipped && state.Slots[slot].Locked;
             SetEquipped(row, equipped);
-            row.Target = equipped && !locked;
+            row.Target = equipped && PerkPageModel.KindOf(state, slot) == SlotKind.Roll;
+            row.Selected = perk == selectedPerk;
             RefreshOutline(row);
-            row.LockIcon.enabled = locked;
-            if (!equipped)
-            {
-                row.Slot.text = "";
-                return;
-            }
 
-            // 리롤 대상은 금색 테두리만, 잠금은 자물쇠만 더한다
-            row.Slot.text = locale.Format("ui.slotN", slot + 1);
-            row.LockIcon.rectTransform.anchoredPosition = new Vector2(row.Width - 14 - UiKit.Width(row.Slot, row.Slot.text) - 20, row.LockIcon.rectTransform.anchoredPosition.y);
+            var shown = PerkPageModel.ShownTier(state, perk);
+            row.Effect.text = locale.PerkEffect(perk, PerkPageModel.EffectValue(state, perk, shown));
+            // 단계 칸: 흐림 = 미보유, 밝음 = 보유, 초록 테두리 = 지금 적용 중
+            var owned = PerkPageModel.OwnedTier(state, perk);
+            var applied = equipped ? shown : 0;
+            for (var t = 1; t <= PerkPageModel.MaxTier; t++)
+            {
+                var on = t <= owned;
+                row.TierFill[t - 1].color = on ? TierOnFill : TierOffFill;
+                row.TierLine[t - 1].color = t == applied ? UiKit.Green : on ? TierOnLine : TierOffLine;
+                row.TierLabel[t - 1].color = t == applied && !on ? UiKit.Green : on ? TierOnText : TierOffText;
+            }
         }
 
         private void RenderReel(int index, PerkStateDto state, bool busy)
         {
             var reel = reels[index];
-            reel.Open = PerkPageModel.IsSlotOpen(state, index);
+            reel.Kind = PerkPageModel.KindOf(state, index);
+            reel.Open = reel.Kind != SlotKind.Closed;
             reel.LockButton.gameObject.SetActive(reel.Open);
-            reel.LockIcon.gameObject.SetActive(reel.Open);
+            reel.LockIcon.gameObject.SetActive(reel.Open && (reel.Kind == SlotKind.Roll || reel.Kind == SlotKind.Locked));
+            reel.FixedMark.gameObject.SetActive(reel.Kind == SlotKind.Fixed);
             if (!reel.Open)
             {
                 // 아직 닫힌 슬롯: 흐린 빈 육각에 "P{n}에서 열림"
@@ -576,6 +778,7 @@ namespace PrestigePerks.UI
                 reel.Frame.color = new Color(1, 1, 1, 0.35f);
                 reel.Fill.color = new Color(1, 1, 1, 0.6f);
                 reel.FaceIcon.gameObject.SetActive(false);
+                reel.TierBox.gameObject.SetActive(false);
                 reel.Closed.text = PerkPageModel.OpensAt(state, index) is int level ? locale.Format("ui.opensAt", level) : locale.Get("ui.slotClosed");
                 reel.Name.text = "";
                 reel.Effect.text = "";
@@ -583,24 +786,38 @@ namespace PrestigePerks.UI
             }
 
             var slot = state.Slots[index];
+            var blue = reel.Kind == SlotKind.Locked || reel.Kind == SlotKind.Fixed;
             reel.Header.color = UiKit.Muted;
             reel.Fill.color = Color.white;
             reel.Closed.text = "";
             reel.Locked = slot.Locked;
             reel.CurrentPerk = slot.Perk;
-            // 잠근 슬롯은 푸른 틀과 빛, 리롤 대상은 금색 틀 (한 겹 선)
-            reel.Glow.enabled = slot.Locked;
-            reel.Frame.color = slot.Locked ? LockedFrame : UiKit.Gold;
-            reel.FaceIcon.color = slot.Locked ? LockedIcon : TargetIcon;
+            // 잠근 칸·확정 칸은 푸른 틀과 빛, 리롤 칸·빈 칸은 금색 틀 (한 겹 선)
+            reel.Glow.enabled = blue;
+            reel.Frame.color = blue ? LockedFrame : UiKit.Gold;
+            reel.FaceIcon.color = blue ? LockedIcon : TargetIcon;
             foreach (var row in reel.Rows)
             {
                 row.Icon.color = reel.FaceIcon.color;
             }
 
             var headerWidth = UiKit.Width(reel.Header, reel.Header.text);
-            reel.LockIcon.rectTransform.anchoredPosition = new Vector2(reel.Box.rect.width / 2 + headerWidth / 2 + 6, reel.LockIcon.rectTransform.anchoredPosition.y);
+            var markX = reel.Box.rect.width / 2 + headerWidth / 2 + 6;
+            reel.LockIcon.rectTransform.anchoredPosition = new Vector2(markX, reel.LockIcon.rectTransform.anchoredPosition.y);
+            reel.FixedMark.rectTransform.anchoredPosition = new Vector2(markX + 4, reel.FixedMark.rectTransform.anchoredPosition.y);
             reel.LockButton.interactable = !busy;
             RefreshLock(reel);
+
+            // 단계 배지: 빈 칸과 도는 칸은 비운다
+            var showTier = !slot.IsEmpty && !spinning.ContainsKey(index);
+            reel.TierBox.gameObject.SetActive(showTier);
+            if (showTier)
+            {
+                reel.TierLabel.text = TierName(PerkPageModel.ShownTier(state, slot.Perk));
+                reel.TierLine.color = reel.Frame.color;
+                reel.TierLabel.color = blue ? LockedIcon : TargetIcon;
+            }
+
             if (spinning.ContainsKey(index))
             {
                 return;
@@ -611,10 +828,15 @@ namespace PrestigePerks.UI
 
         private void ShowFace(Reel reel, int perk)
         {
+            if (perk <= 0)
+            {
+                HideFace(reel);
+                return;
+            }
+
             reel.FaceIcon.gameObject.SetActive(true);
             reel.FaceIcon.sprite = PerkSprites.Icon(perk);
             reel.Name.text = locale.PerkName(perk);
-            reel.Effect.text = locale.PerkEffect(perk);
         }
 
         private static void HideFace(Reel reel)
@@ -624,130 +846,90 @@ namespace PrestigePerks.UI
             reel.Effect.text = "";
         }
 
-        private void SetRollLook(ButtonLook look)
+        /// <summary>오른쪽 "선택한 특전" 칸. 안내 한 줄과 코인을 쓰는 버튼 하나 (넣기·빼기는 드래그).</summary>
+        private void RenderPicked(PerkStateDto state, int coins, bool busy)
+        {
+            var pick = PerkPageModel.Select(state, selectedPerk, coins);
+            var none = pick.Kind == SelectionKind.None;
+            picked.Empty.gameObject.SetActive(none);
+            foreach (Transform child in picked.Body)
+            {
+                if (child != picked.Empty.transform)
+                {
+                    child.gameObject.SetActive(!none);
+                }
+            }
+
+            if (none)
+            {
+                return;
+            }
+
+            var perk = pick.Perk;
+            var equipped = pick.Slot >= 0;
+            picked.Icon.sprite = PerkSprites.Icon(perk);
+            picked.Icon.color = new Color(1, 1, 1, equipped ? 1f : 0.5f);
+            picked.Name.text = locale.PerkName(perk);
+            picked.Subject.text = locale.PerkSubject(perk);
+
+            // 상태: "슬롯 n" (잠금이면 자물쇠, 확정이면 ◆), 장착 안 됨, 미보유
+            picked.Status.text = equipped ? locale.Format("ui.slotN", pick.Slot + 1)
+                : pick.Kind == SelectionKind.Owned ? locale.Get("ui.notEquipped") : locale.Get("ui.notOwned");
+            // 표시는 슬롯 머리줄처럼 글자 오른쪽에 둔다: 표시 자리만큼 글자를 왼쪽으로 민다
+            var locked = pick.Kind == SelectionKind.LockedSlot;
+            var fixedSlot = pick.Kind == SelectionKind.Fixed;
+            var markSpace = locked ? 20 : fixedSlot ? 16 : 0;
+            picked.Status.margin = new Vector4(0, 0, markSpace, 0);
+            var textRight = picked.Width - 16 - markSpace;
+            picked.StatusLock.gameObject.SetActive(locked);
+            picked.StatusLock.rectTransform.anchoredPosition = new Vector2(textRight + 6, picked.StatusLock.rectTransform.anchoredPosition.y);
+            picked.StatusMark.gameObject.SetActive(fixedSlot);
+            picked.StatusMark.rectTransform.anchoredPosition = new Vector2(textRight + 10, picked.StatusMark.rectTransform.anchoredPosition.y);
+
+            picked.Value.text = PerkPageModel.EffectValue(state, perk, pick.Tier);
+            picked.Value.color = equipped ? UiKit.Green : UiKit.GreenDim;
+            picked.Tier.text = locale.Format("ui.tier", TierName(pick.Tier));
+            picked.Tier.rectTransform.anchoredPosition = new Vector2(16 + UiKit.Width(picked.Value, picked.Value.text) + 10, picked.Tier.rectTransform.anchoredPosition.y);
+            // 다음 단계 값 (II·III 구매가 남았을 때)
+            picked.Next.text = pick.NextTier > 1 ? locale.Format("ui.nextTier", PerkPageModel.EffectValue(state, perk, pick.NextTier)) : "";
+
+            // 안내 줄은 보유 여부만 보인다
+            var owned = pick.Kind == SelectionKind.Fixed || pick.Kind == SelectionKind.Owned;
+            picked.Hint.text = locale.Get(owned ? "ui.hintOwned" : "ui.notOwned");
+
+            picked.Buy.gameObject.SetActive(pick.NextTier > 0);
+            if (pick.NextTier == 0)
+            {
+                return;
+            }
+
+            picked.BuyLabel.text = pick.NextTier == 1 ? locale.Get("ui.keep")
+                : locale.Format("ui.buyTier", TierName(pick.NextTier));
+            picked.BuySub.text = pick.Block == BuyBlock.Capped && pick.OpensAt is int at ? locale.Format("ui.availableAt", at) : locale.Format("ui.price", pick.Price);
+            var enabled = pick.Block == BuyBlock.None && !busy && spinning.Count == 0;
+            SetLook(picked.BuyFill, picked.BuyOutline, picked.BuyLabel, picked.BuySub, picked.BuyButton,
+                enabled ? ButtonLook.Roll : ButtonLook.Disabled);
+        }
+
+        private static void SetLook(Image fill, Image outline, TextMeshProUGUI label, TextMeshProUGUI sub, Button button, ButtonLook look)
         {
             switch (look)
             {
                 case ButtonLook.Roll:
                     // 타르코프 기본 버튼: 조금 어두운 회색 그라데이션에 어두운 글자
-                    rollFill.sprite = PerkSprites.Gradient(new Color32(158, 162, 158, 255), new Color32(98, 102, 102, 255));
-                    rollOutline.color = new Color32(186, 190, 186, 255);
-                    rollLabel.color = UiKit.Dark;
-                    rollSub.color = new Color32(30, 34, 36, 255);
-                    break;
-                case ButtonLook.Shake:
-                    rollFill.sprite = PerkSprites.Gradient(new Color32(238, 196, 110, 255), new Color32(172, 122, 46, 255));
-                    rollOutline.color = new Color32(250, 222, 156, 255);
-                    rollLabel.color = UiKit.Dark;
-                    rollSub.color = new Color32(64, 46, 20, 255);
+                    fill.sprite = PerkSprites.Gradient(new Color32(158, 162, 158, 255), new Color32(98, 102, 102, 255));
+                    outline.color = new Color32(186, 190, 186, 255);
+                    label.color = UiKit.Dark;
+                    sub.color = new Color32(30, 34, 36, 255);
                     break;
                 default:
-                    rollFill.sprite = PerkSprites.Gradient(new Color32(50, 56, 60, 255), new Color32(32, 36, 39, 255));
-                    rollOutline.color = UiKit.Line;
-                    rollLabel.color = rollSub.color = UiKit.Dim;
+                    fill.sprite = PerkSprites.Gradient(new Color32(50, 56, 60, 255), new Color32(32, 36, 39, 255));
+                    outline.color = UiKit.Line;
+                    label.color = sub.color = UiKit.Dim;
                     break;
             }
 
-            rollButton.interactable = look != ButtonLook.Disabled;
-        }
-
-        // 흔들 릴: 감속 중인 릴 중 가장 먼저 멈출 릴. 없으면 -1
-        private int ShakeTarget()
-        {
-            var best = -1;
-            var bestEnd = float.MaxValue;
-            foreach (var pair in spinning)
-            {
-                var spin = pair.Value;
-                var end = spin.PhaseStart + spin.Duration;
-                if (spin.Phase == SpinPhase.Landing && spin.Effect == ReelEffect.Normal && spin.NudgeTo == null && spin.ReverseTo == null && end < bestEnd)
-                {
-                    best = pair.Key;
-                    bestEnd = end;
-                }
-            }
-
-            return best;
-        }
-
-        private bool CanShake => shakeAllowed && shakeReady && !shakeUsed;
-
-        private void RenderShake()
-        {
-            var available = CanShake && ShakeTarget() >= 0;
-            shakeShown = available;
-            SetRollLook(available ? ButtonLook.Shake : ButtonLook.Disabled);
-            if (!shakeEnabled)
-            {
-                // 흔들기를 끈 설정: 도는 동안 꺼진 리롤 버튼만
-                rollLabel.text = locale.Get("ui.roll");
-                rollSub.text = locale.Get("ui.rolling");
-                return;
-            }
-
-            rollLabel.text = locale.Get("ui.shake");
-            rollSub.text = !shakeAllowed ? locale.Get("ui.shakeOneSlot")
-                : shakeUsed ? locale.Get("ui.shaken")
-                : shakeReady ? locale.Format("ui.shakeSub", Mathf.RoundToInt((float)(shakeChance * 100)))
-                : locale.Get("ui.rolling");
-        }
-
-        /// <summary>결과가 와서 흔들 수 있다 (서버가 이 리롤의 흔들기를 받는다).</summary>
-        public void EnableShake()
-        {
-            shakeReady = true;
-            if (spinning.Count > 0)
-            {
-                RenderShake();
-            }
-        }
-
-        private void Wobble(IEnumerable<int> slots)
-        {
-            foreach (var slot in slots)
-            {
-                reels[slot].WobbleUntil = Time.unscaledTime + 0.4f;
-            }
-        }
-
-        /// <summary>흔들기 결과 한 칸 더: 멈추려던 칸에서 한 칸 더 넘어가 perk 에서 멈춘다.</summary>
-        public void Nudge(int slot, int perk, bool locked) => Redirect(slot, perk, locked, reverse: false);
-
-        /// <summary>흔들기 결과 리버스: 멈춘 뒤 갑자기 거꾸로 돌아 perk 에서 멈춘다.</summary>
-        public void Reverse(int slot, int perk, bool locked) => Redirect(slot, perk, locked, reverse: true);
-
-        // 도는 릴이면 멈추는 순간 적용하고, 이미 멈춘 릴이면 (응답이 늦은 경우) 지금 칸에서 바로 시작한다
-        private void Redirect(int slot, int perk, bool locked, bool reverse)
-        {
-            if (!spinning.TryGetValue(slot, out var spin))
-            {
-                var reel = reels[slot];
-                spin = new Spin { Started = Time.unscaledTime, Target = reel.CurrentPerk, LandAt = 0 };
-                // 거꾸로 돌 칸이 있도록 앞을 채운다
-                ReelSchedule.Fill(spin.Strip, ReelSchedule.ReverseItems + 2, random, PerkPageModel.AllPerks, reel.CurrentPerk);
-                spin.Strip.Add(reel.CurrentPerk);
-                spin.Pos = spin.LastPos = spin.Strip.Count - 1;
-                spin.Phase = SpinPhase.Landing;
-                spin.Duration = float.MaxValue;
-                spinning[slot] = spin;
-                HideFace(reel);
-            }
-
-            spin.Locked = locked;
-            if (reverse)
-            {
-                spin.ReverseTo = perk;
-            }
-            else
-            {
-                spin.NudgeTo = perk;
-            }
-
-            if (spin.Duration == float.MaxValue)
-            {
-                Settle(reels[slot], spin, Time.unscaledTime, null);
-                DrawStrip(reels[slot], spin);
-            }
+            button.interactable = look != ButtonLook.Disabled;
         }
 
         private string BlockMessage(RollBlock block, PerkStateDto state, int coins)
@@ -756,6 +938,10 @@ namespace PrestigePerks.UI
             {
                 case RollBlock.NoSlots:
                     return locale.Get("ui.noSlots");
+                case RollBlock.NothingToRoll:
+                    return locale.Get("ui.nothingToRoll");
+                case RollBlock.CollectionComplete:
+                    return locale.Get("ui.collectionComplete");
                 case RollBlock.NotEnoughCoins:
                     return locale.Format("ui.notEnoughCoins", state.NextRerollCost, coins);
                 default:
@@ -769,31 +955,237 @@ namespace PrestigePerks.UI
             messageLabel.color = color;
         }
 
-        /// <summary>릴을 돌리기 시작한다 (서버 결과가 오기 전부터 빨리 돈다). 지금 특전에서 출발한다.</summary>
+        // ---- 선택·구매 ----
+
+        private bool JustDragged => Time.frameCount - dragEndFrame <= 1;
+
+        private void OnRowClicked(int perk)
+        {
+            if (JustDragged)
+            {
+                return;
+            }
+
+            Select(perk);
+        }
+
+        private void OnSlotClicked(int index)
+        {
+            if (JustDragged || lastState == null)
+            {
+                return;
+            }
+
+            switch (PerkPageModel.KindOf(lastState, index))
+            {
+                case SlotKind.Fixed:
+                    // 확정 칸은 잠글 필요가 없어 누르면 그 특전을 고른다
+                    Select(lastState.Slots[index].Perk);
+                    break;
+                case SlotKind.Roll:
+                case SlotKind.Locked:
+                    LockClicked?.Invoke(index);
+                    break;
+            }
+        }
+
+        private void Select(int perk)
+        {
+            selectedPerk = perk;
+            GameSounds(EUISoundType.ButtonOver);
+            Rerender();
+        }
+
+        // 누르면 바로 산다. 서버가 목표 단계를 받으므로 연달아 눌러도 한 번만 산다
+        private void OnBuyClicked()
+        {
+            var pick = PerkPageModel.Select(lastState, selectedPerk, lastCoins);
+            if (pick.NextTier == 0 || pick.Block != BuyBlock.None || lastBusy || spinning.Count > 0)
+            {
+                return;
+            }
+
+            BuyClicked?.Invoke(pick.Perk, pick.NextTier, pick.Price);
+        }
+
+        // ---- 드래그 ----
+
+        private bool CanStartDrag => lastState != null && !lastBusy && spinning.Count == 0;
+
+        private void BeginRowDrag(int perk, PointerEventData data)
+        {
+            if (!CanStartDrag || !PerkPageModel.CanDragRow(lastState, perk))
+            {
+                return;
+            }
+
+            dragPerk = perk;
+            selectedPerk = perk;
+            BeginGhost(perk, data);
+        }
+
+        private void BeginSlotDrag(int index, PointerEventData data)
+        {
+            if (!CanStartDrag || !PerkPageModel.CanDragSlot(lastState, index))
+            {
+                return;
+            }
+
+            dragSlot = index;
+            selectedPerk = lastState.Slots[index].Perk;
+            BeginGhost(selectedPerk, data);
+        }
+
+        // 작은 카드 (아이콘, 이름, 값 · 단계)가 마우스를 따라온다
+        private void BeginGhost(int perk, PointerEventData data)
+        {
+            var tier = PerkPageModel.ShownTier(lastState, perk);
+            ghost = UiKit.Rect(root, "Ghost", 0, 0, 210, 52);
+            ghost.anchorMin = ghost.anchorMax = new Vector2(0.5f, 0.5f);
+            var group = ghost.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            UiKit.Image(ghost, new Color32(17, 21, 23, 240));
+            UiKit.Outline(ghost, SelectedLine);
+            var (_, icon) = IconSquare(ghost, "Square", 7, 7, 38);
+            icon.sprite = PerkSprites.Icon(perk);
+            UiKit.Label(ghost, "Name", 54, 17, 150, locale.PerkName(perk), 15, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            UiKit.Label(ghost, "Value", 54, 36, 150, $"{PerkPageModel.EffectValue(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
+            GameSounds(EUISoundType.MenuInstallModFunc);
+            MoveDrag(data);
+        }
+
+        private void MoveDrag(PointerEventData data)
+        {
+            if (ghost == null || data == null)
+            {
+                return;
+            }
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(root, data.position, null, out var local))
+            {
+                ghost.anchoredPosition = local + new Vector2(14, -14);
+            }
+
+            var reel = dragPerk > 0 ? ReelAt(data.position) : -1;
+            var list = dragSlot >= 0 && RectTransformUtility.RectangleContainsScreenPoint(listPanel, data.position, null);
+            if (reel != dropReel || list != overList)
+            {
+                dropReel = reel;
+                overList = list;
+                RenderDragMarks();
+            }
+        }
+
+        private void EndDrag(PointerEventData data)
+        {
+            if (ghost == null)
+            {
+                return;
+            }
+
+            var perk = dragPerk;
+            var slot = dragSlot;
+            var target = data != null && perk > 0 ? ReelAt(data.position) : -1;
+            var toList = data != null && slot >= 0 && RectTransformUtility.RectangleContainsScreenPoint(listPanel, data.position, null);
+            CancelDrag();
+            dragEndFrame = Time.frameCount;
+
+            // 잠긴 칸·닫힌 칸에는 놓을 수 없다. 확정 칸은 목록 어디에 놓아도 빠진다. 확인 창은 없다
+            if (perk > 0 && target >= 0 && PerkPageModel.CanDrop(lastState, target))
+            {
+                EquipDropped?.Invoke(perk, target);
+            }
+            else if (slot >= 0 && toList)
+            {
+                UnequipDropped?.Invoke(slot);
+            }
+            else
+            {
+                Rerender();
+            }
+        }
+
+        private void CancelDrag()
+        {
+            if (ghost != null)
+            {
+                Destroy(ghost.gameObject);
+                ghost = null;
+            }
+
+            dragPerk = 0;
+            dragSlot = -1;
+            dropReel = -1;
+            overList = false;
+            RenderDragMarks();
+        }
+
+        private int ReelAt(Vector2 screen)
+        {
+            for (var i = 0; i < reels.Count; i++)
+            {
+                if (reels[i].Open && RectTransformUtility.RectangleContainsScreenPoint(reels[i].Box, screen, null))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        // 끄는 동안: 놓을 수 있는 칸 흰 테두리, 잠긴 칸 어둡게, 원래 줄·칸 흐리게. 확정 칸을 끌면 목록 전체 테두리와 "여기에 놓으면 빠집니다"
+        private void RenderDragMarks()
+        {
+            if (lastState == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < reels.Count; i++)
+            {
+                var reel = reels[i];
+                var dim = (dragPerk > 0 && reel.Open && !PerkPageModel.CanDrop(lastState, i)) || i == dragSlot;
+                reel.Group.alpha = dim ? 0.35f : 1f;
+                RefreshLock(reel);
+            }
+
+            foreach (var pair in rows)
+            {
+                pair.Value.Group.alpha = pair.Key == dragPerk ? 0.4f : 1f;
+            }
+
+            listDropLabel.enabled = dragSlot >= 0;
+            listDropOutline.color = dragSlot >= 0 ? new Color(SelectedLine.r, SelectedLine.g, SelectedLine.b, overList ? 1f : 0.55f) : Color.clear;
+        }
+
+        // ---- 릴 ----
+
+        /// <summary>릴을 돌리기 시작한다 (서버 결과가 오기 전부터 빨리 돈다). 지금 특전에서 출발한다. 띠에는 리롤 후보(미보유)만 흐른다.</summary>
         public void StartSpin(IEnumerable<int> slots)
         {
+            CancelDrag();
             var now = Time.unscaledTime;
-            var list = slots.ToList();
-            foreach (var slot in list)
+            var pool = PerkPageModel.RollPool(lastState);
+            IReadOnlyList<int> strip = pool.Count >= 3 ? pool : PerkPageModel.AllPerks;
+            foreach (var slot in slots)
             {
                 var reel = reels[slot];
-                var spin = new Spin { Started = now };
-                ReelSchedule.Fill(spin.Strip, 2, random, PerkPageModel.AllPerks, reel.CurrentPerk);
+                var spin = new Spin { Started = now, Pool = strip };
+                ReelSchedule.Fill(spin.Strip, 2, random, strip, reel.CurrentPerk);
                 spin.Strip.Add(reel.CurrentPerk);
                 spin.Pos = spin.LastPos = 2;
                 spinning[slot] = spin;
                 HideFace(reel);
+                reel.TierBox.gameObject.SetActive(false);
                 DrawStrip(reel, spin);
             }
 
-            shakeAllowed = shakeEnabled && list.Count == 1;
-            shakeReady = false;
-            shakeUsed = false;
-            RenderShake();
+            rollSub.text = locale.Get("ui.rolling");
+            SetLook(rollFill, rollOutline, rollLabel, rollSub, rollButton, ButtonLook.Disabled);
             GameSounds(EUISoundType.MenuCheckBox);
         }
 
-        /// <summary>결과가 왔다. delay 초 뒤부터 감속해 perk 에서 멈춘다. effect 는 멈춤 연출 (<see cref="ReelEffect"/>).</summary>
+        /// <summary>결과가 왔다. delay 초 뒤부터 감속해 perk 에서 멈춘다 (0 이면 빈 칸). effect 는 멈춤 연출 (<see cref="ReelEffect"/>).</summary>
         public void Land(int slot, int perk, bool locked, float delay, ReelEffect effect, ICollection<int> held = null)
         {
             if (!spinning.TryGetValue(slot, out var spin))
@@ -840,23 +1232,8 @@ namespace PrestigePerks.UI
                 }
             }
 
-            if (spinning.Count > 0 && shakeShown != (CanShake && ShakeTarget() >= 0))
-            {
-                RenderShake();
-            }
-
             foreach (var reel in reels)
             {
-                if (now < reel.WobbleUntil)
-                {
-                    var left = (reel.WobbleUntil - now) / 0.4f;
-                    reel.Box.anchoredPosition = reel.BoxHome + new Vector2(Mathf.Sin(now * 70f) * 7f * left, Mathf.Cos(now * 53f) * 2f * left);
-                }
-                else if (reel.Box.anchoredPosition != reel.BoxHome)
-                {
-                    reel.Box.anchoredPosition = reel.BoxHome;
-                }
-
                 if (now < reel.FlashUntil)
                 {
                     var t = 1 - (reel.FlashUntil - now) / FlashTime;
@@ -883,7 +1260,15 @@ namespace PrestigePerks.UI
 
             if (Input.GetKeyDown(KeyCode.Escape))
             {
-                CloseClicked?.Invoke();
+                if (ghost != null)
+                {
+                    CancelDrag();
+                    Rerender();
+                }
+                else
+                {
+                    CloseClicked?.Invoke();
+                }
             }
         }
 
@@ -895,10 +1280,10 @@ namespace PrestigePerks.UI
             {
                 case SpinPhase.Fast:
                     spin.Pos += ReelSchedule.Speed * Mathf.Clamp01((now - spin.Started) / ReelSchedule.SpinUp) * dt;
-                    ReelSchedule.Fill(spin.Strip, Mathf.CeilToInt(spin.Pos) + 3, random, PerkPageModel.AllPerks, -1);
+                    ReelSchedule.Fill(spin.Strip, Mathf.CeilToInt(spin.Pos) + 3, random, spin.Pool, -1);
                     if (now >= spin.LandAt)
                     {
-                        (spin.Result, spin.Stop) = ReelSchedule.Extend(spin.Strip, Mathf.CeilToInt(spin.Pos), spin.Target, spin.Effect, random, PerkPageModel.AllPerks, spin.Held);
+                        (spin.Result, spin.Stop) = ReelSchedule.Extend(spin.Strip, Mathf.CeilToInt(spin.Pos), spin.Target, spin.Effect, random, spin.Pool, spin.Held);
                         Begin(spin, SpinPhase.Landing, now, spin.Pos, spin.Stop, ReelSchedule.LandingDuration(spin.Stop - spin.Pos) * (spin.Effect == ReelEffect.FakeOut ? ReelSchedule.FakeLandingStretch : 1f));
                     }
 
@@ -918,21 +1303,12 @@ namespace PrestigePerks.UI
                         spin.Pos = spin.To;
                         if (spin.Effect == ReelEffect.Normal)
                         {
-                            return Settle(reel, spin, now, EUISoundType.MenuInstallMag);
+                            return Finish(reel, spin, now, EUISoundType.MenuInstallMag);
                         }
 
-                        if (spin.Effect == ReelEffect.Reverse)
-                        {
-                            // 결과처럼 멈춘다 (효과 문구까지). 잠시 뒤 갑자기 거꾸로 돈다
-                            Begin(spin, SpinPhase.ReverseHold, now, spin.Pos, spin.Pos, ReelSchedule.ReverseHold);
-                            reel.Effect.text = locale.PerkEffect(spin.Strip[spin.Stop]);
-                            GameSounds(EUISoundType.MenuInstallMag);
-                            break;
-                        }
-
-                        // 결과처럼 멈춘다 (효과 문구까지). 결과 칸은 바로 아래에 걸려 보인다
-                        Begin(spin, SpinPhase.FakeHold, now, spin.Pos, spin.Pos, ReelSchedule.FakeHold);
-                        reel.Effect.text = locale.PerkEffect(spin.Strip[spin.Stop]);
+                        // 결과처럼 멈춘다. 잠시 뒤 갑자기 거꾸로 돌거나(역회전), 결과 칸으로 끌려 올라간다(가짜 멈춤)
+                        Begin(spin, spin.Effect == ReelEffect.Reverse ? SpinPhase.ReverseHold : SpinPhase.FakeHold, now, spin.Pos, spin.Pos,
+                            spin.Effect == ReelEffect.Reverse ? ReelSchedule.ReverseHold : ReelSchedule.FakeHold);
                         GameSounds(EUISoundType.MenuInstallMag);
                     }
 
@@ -953,7 +1329,6 @@ namespace PrestigePerks.UI
                     if (held >= 1)
                     {
                         // 갑자기 위로 끌려 올라가 결과 칸으로 돌아온다
-                        reel.Effect.text = "";
                         Begin(spin, SpinPhase.SnapBack, now, spin.Stop, spin.Result, ReelSchedule.SnapBackTime);
                         GameSounds(EUISoundType.MenuInstallModFunc);
                     }
@@ -962,7 +1337,6 @@ namespace PrestigePerks.UI
                 case SpinPhase.ReverseHold:
                     if (now - spin.PhaseStart >= spin.Duration)
                     {
-                        reel.Effect.text = "";
                         reel.FlashUntil = now + FlashTime * 0.5f;
                         reel.FlashColor = UiKit.Bad;
                         Begin(spin, SpinPhase.ReverseSpin, now, spin.Stop, spin.Result, ReelSchedule.ReverseDuration(spin.Stop - spin.Result));
@@ -981,28 +1355,6 @@ namespace PrestigePerks.UI
                     if (r >= 1)
                     {
                         spin.Pos = spin.To;
-                        return Settle(reel, spin, now, EUISoundType.MenuWeaponAssemble);
-                    }
-
-                    break;
-                case SpinPhase.NudgeHold:
-                    if (now - spin.PhaseStart >= spin.Duration)
-                    {
-                        // 툭 하고 한 칸 더 넘어간다
-                        reel.Effect.text = "";
-                        reel.FlashUntil = now + FlashTime * 0.5f;
-                        reel.FlashColor = UiKit.Bad;
-                        Begin(spin, SpinPhase.Nudge, now, spin.Pos, Mathf.Round(spin.Pos) + 1, ReelSchedule.NudgeTime);
-                        GameSounds(EUISoundType.MenuInstallModGear);
-                    }
-
-                    break;
-                case SpinPhase.Nudge:
-                    var n = (now - spin.PhaseStart) / spin.Duration;
-                    spin.Pos = Mathf.LerpUnclamped(spin.From, spin.To, ReelSchedule.EaseOutBack(n, 1.6f));
-                    if (n >= 1)
-                    {
-                        spin.Pos = spin.To;
                         return Finish(reel, spin, now, EUISoundType.MenuWeaponAssemble);
                     }
 
@@ -1015,10 +1367,11 @@ namespace PrestigePerks.UI
                     {
                         GameSounds(EUISoundType.ButtonOver);
                     }
+
                     if (back >= 1)
                     {
                         spin.Pos = spin.To;
-                        return Settle(reel, spin, now, EUISoundType.MenuWeaponAssemble);
+                        return Finish(reel, spin, now, EUISoundType.MenuWeaponAssemble);
                     }
 
                     break;
@@ -1038,60 +1391,6 @@ namespace PrestigePerks.UI
             spin.From = from;
             spin.To = to;
             spin.Duration = Mathf.Max(duration, 0.01f);
-        }
-
-        // 멈추는 순간. 흔들기로 바뀐 릴이면 멈춘 듯 서 있다가 한 칸 더 간다 (false). 아니면 끝 (true)
-        private bool Settle(Reel reel, Spin spin, float now, EUISoundType? sound)
-        {
-            if (spin.ReverseTo is int other)
-            {
-                // 멈춘 척 서 있다가 거꾸로 돈다. 결과는 지나간 칸에 심는다 (보이는 범위 밖)
-                spin.ReverseTo = null;
-                var stop = Mathf.RoundToInt(spin.Pos);
-                spin.Pos = stop;
-                var result = Mathf.Max(stop - ReelSchedule.ReverseItems, 0);
-                spin.Strip[result] = other;
-                for (var k = Mathf.Max(result - 1, 0); k <= result + 1; k++)
-                {
-                    if (k != result && spin.Strip[k] == other)
-                    {
-                        spin.Strip[k] = spin.Strip[stop];
-                    }
-                }
-
-                spin.Stop = stop;
-                spin.Result = result;
-                spin.Target = other;
-                Begin(spin, SpinPhase.ReverseHold, now, stop, stop, ReelSchedule.ReverseHold);
-                reel.Effect.text = locale.PerkEffect(spin.Strip[stop]);
-                GameSounds(EUISoundType.MenuInstallMag);
-                return false;
-            }
-
-            if (spin.NudgeTo is not int next)
-            {
-                return Finish(reel, spin, now, sound);
-            }
-
-            spin.NudgeTo = null;
-            var here = Mathf.RoundToInt(spin.Pos);
-            spin.Pos = here;
-            ReelSchedule.Fill(spin.Strip, here + 4, random, PerkPageModel.AllPerks, next);
-            spin.Strip[here + 1] = next;
-            if (spin.Strip[here + 2] == next)
-            {
-                spin.Strip[here + 2] = spin.Strip[here];
-            }
-
-            spin.Target = next;
-            Begin(spin, SpinPhase.NudgeHold, now, here, here, ReelSchedule.NudgeHold);
-            reel.Effect.text = locale.PerkEffect(spin.Strip[here]);
-            if (sound != null)
-            {
-                GameSounds(EUISoundType.MenuInstallMag);
-            }
-
-            return false;
         }
 
         // sound 가 null 이면 소리 없이
@@ -1116,7 +1415,7 @@ namespace PrestigePerks.UI
             return true;
         }
 
-        // 위치 Pos 의 칸이 가운데. 다음 칸은 위, 지난 칸은 아래에 비친다. 이름 자리에는 가운데에 가장 가까운 칸의 이름
+        // 위치 Pos 의 칸이 가운데. 다음 칸은 위, 지난 칸은 아래에 비친다. 빈 칸(0)은 그림 없이 지나간다
         private void DrawStrip(Reel reel, Spin spin)
         {
             reel.Strip.gameObject.SetActive(true);
@@ -1128,7 +1427,7 @@ namespace PrestigePerks.UI
                 var offset = index - spin.Pos;
                 var row = reel.Rows[k];
                 row.Rect.anchoredPosition = reel.RowHome + new Vector2(0, offset * StripStep);
-                var inStrip = index >= 0 && index < spin.Strip.Count;
+                var inStrip = index >= 0 && index < spin.Strip.Count && spin.Strip[index] > 0;
                 row.Group.alpha = inStrip ? Mathf.Lerp(0.25f, bright, Mathf.Clamp01(1 - Mathf.Abs(offset))) : 0;
                 if (inStrip)
                 {
@@ -1137,7 +1436,7 @@ namespace PrestigePerks.UI
             }
 
             var center = Mathf.Clamp(Mathf.RoundToInt(spin.Pos), 0, spin.Strip.Count - 1);
-            reel.Name.text = locale.PerkName(spin.Strip[center]);
+            reel.Name.text = spin.Strip[center] > 0 ? locale.PerkName(spin.Strip[center]) : "";
             reel.Name.color = spin.Phase == SpinPhase.Fast ? UiKit.Muted : UiKit.Text;
         }
 

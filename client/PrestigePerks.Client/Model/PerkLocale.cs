@@ -61,7 +61,11 @@ namespace PrestigePerks.Model
 
         public string PerkName(int perk) => Get($"perk.{perk}.name");
 
-        public string PerkEffect(int perk) => Get($"perk.{perk}.effect");
+        /// <summary>효과 한 줄. 문구의 {0} 에 수치(<see cref="PerkAmounts.Format"/>)를 넣는다. 문구에 숫자를 직접 적지 않는다.</summary>
+        public string PerkEffect(int perk, string value) => Format($"perk.{perk}.effect", value);
+
+        /// <summary>수치를 뺀 효과 이름 ("반동"). 선택한 특전 칸의 부제.</summary>
+        public string PerkSubject(int perk) => Format($"perk.{perk}.effect", "").Trim();
 
         public string PerkDetail(int perk) => Get($"perk.{perk}.detail");
     }

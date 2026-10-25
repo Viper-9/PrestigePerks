@@ -13,7 +13,7 @@ using UnityEngine;
 namespace PrestigePerks
 {
     /// <summary>
-    /// 특전 페이지 흐름: 작업 표시줄 버튼 → 페이지, 잠금·리롤 → 서버 → 다시 그리기, 메인 메뉴 진입 때 Bonus 반영과 새 특전 알림.
+    /// 특전 페이지 흐름: 작업 표시줄 버튼 → 페이지, 잠금·리롤·구매·넣기/빼기 → 서버 → 다시 그리기, 메인 메뉴 진입 때 Bonus 반영과 새 특전·단계 상한 알림.
     /// 규칙은 서버가 정하고 여기서는 응답을 그대로 보여 준다 (dev-docs 2_특전.md 2절, 6절).
     /// </summary>
     internal sealed class PerkController : MonoBehaviour
@@ -155,17 +155,28 @@ namespace PrestigePerks
         {
             state = fresh;
             PerkBonusSync.Apply(state);
-            PerkEffects.Set(state.ActivePerks, state.Dev);
-            if (state.NewPerks.Count == 0)
+            PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio, state.Dev);
+            if (state.NewPerks.Count == 0 && state.NewTierCap == null)
             {
                 return;
             }
 
-            var names = string.Join(", ", state.NewPerks.Select(Locale.PerkName));
-            Log.Info($"new perks ({source}): {string.Join(", ", state.NewPerks)}");
+            // 새 특전과 단계 상한을 알림 한 줄에 함께 보인다
+            var parts = new System.Collections.Generic.List<string>();
+            if (state.NewPerks.Count > 0)
+            {
+                parts.Add(Locale.Format("ui.newPerk", string.Join(", ", state.NewPerks.Select(Locale.PerkName))));
+            }
+
+            if (state.NewTierCap is int cap)
+            {
+                parts.Add(Locale.Format("ui.newTierCap", PerkPage.TierName(cap)));
+            }
+
+            Log.Info($"new perks ({source}): {string.Join(", ", state.NewPerks)}, tier cap {state.NewTierCap?.ToString() ?? "-"}");
             try
             {
-                NotificationManager.DisplayMessageNotification(Locale.Format("ui.newPerk", names), ENotificationDurationType.Long);
+                NotificationManager.DisplayMessageNotification(string.Join("  ·  ", parts), ENotificationDurationType.Long);
                 PerkGame.Sound(EUISoundType.QuestCompleted);
             }
             catch (Exception e)
@@ -201,7 +212,9 @@ namespace PrestigePerks
                 page = PerkPage.Create(Locale, bottomInset);
                 page.LockClicked += slot => _ = ToggleLock(slot);
                 page.RollClicked += () => _ = Roll();
-                page.ShakeClicked += (slot, next) => _ = Shake(slot, next);
+                page.BuyClicked += (perk, tier, price) => _ = Buy(perk, tier, price);
+                page.EquipDropped += (perk, slot) => _ = Change(() => PerkApi.Equip(perk, slot), "equip");
+                page.UnequipDropped += slot => _ = Change(() => PerkApi.Unequip(slot), "unequip");
                 page.CloseClicked += ClosePage;
                 RenderPage(null);
                 _ = Reload();
@@ -337,7 +350,7 @@ namespace PrestigePerks
             // 왼쪽 릴부터 차례로 느려지며 멈춘다. 가끔 마지막 릴은 한 칸 지나쳐 멈춘 척하다가 되돌아간다
             var first = Mathf.Max(0, FirstStopDelay - (Time.unscaledTime - started));
             var effect = ReelSchedule.PickEffect(random);
-            // 흔들면 갈 다음 칸에 다른 슬롯 특전이 나오지 않게
+            // 멈출 칸 바로 위에 다른 슬롯 특전이 나오지 않게
             var held = new System.Collections.Generic.HashSet<int>(state.Slots.Select(slot => slot.Perk));
             for (var i = 0; i < targets.Count; i++)
             {
@@ -348,7 +361,6 @@ namespace PrestigePerks
                 }
             }
 
-            page?.EnableShake();
             while (page != null && page.IsSpinning)
             {
                 yield return null;
@@ -368,57 +380,103 @@ namespace PrestigePerks
             RenderPage(null);
         }
 
-        /// <summary>흔들기: 서버가 확률로 한 칸 더(다음 칸 특전), 리버스(다른 특전), 그대로 중 하나를 정한다.</summary>
-        private async Task Shake(int slot, int next)
+        /// <summary>
+        /// 보유하기·단계 구매 (코인). 리롤처럼 아이템 이벤트로 보내고 결과는 state 로 받는다.
+        /// 이미 그 단계를 가졌으면 서버가 결제 없이 성공으로 돌려준다 (두 번 눌림).
+        /// </summary>
+        private async Task Buy(int perk, int tier, int price)
         {
+            if (busy || state == null || page == null || page.IsSpinning)
+            {
+                return;
+            }
+
+            busy = true;
+            RenderPage("");
             try
             {
-                var fresh = await PerkApi.Shake(slot, next);
-                if (fresh == null || fresh.Error != null)
+                var result = await PerkApi.Buy(perk, tier, price);
+                busy = false;
+                if (result == null || result.Failed)
                 {
-                    Log.Warn($"shake refused: {fresh?.Error ?? "no response"}");
+                    await Reload();
+                    RenderPage(BuyError(result?.Error, price));
+                    PerkGame.Sound(EUISoundType.ErrorMessage);
                     return;
                 }
 
-                Accept(fresh, "shake");
-                if (page == null || slot >= fresh.Slots.Count)
+                var fresh = await PerkApi.GetState();
+                if (fresh == null)
                 {
+                    RenderPage(Locale.Get("ui.network"));
                     return;
                 }
 
-                var result = fresh.Slots[slot];
-                switch (fresh.ShakeOutcome)
-                {
-                    case "Next":
-                        page.Nudge(slot, result.Perk, result.Locked);
-                        break;
-                    case "Reverse":
-                        page.Reverse(slot, result.Perk, result.Locked);
-                        break;
-                    default:
-                        return;
-                }
-
-                // 릴이 다 멈춘 뒤 응답이 왔으면 리롤 흐름이 이미 끝났으므로 따로 다시 그린다
-                if (!busy)
-                {
-                    StartCoroutine(RenderWhenStopped());
-                }
+                Accept(fresh, "buy");
+                PerkGame.Sound(EUISoundType.TradeOperationComplete);
+                RenderPage(null);
             }
             catch (Exception e)
             {
-                Log.Warn($"shake failed: {e.Message}");
+                Log.Warn($"buy failed: {e}");
+                busy = false;
+                RenderPage(Locale.Get("ui.network"));
             }
         }
 
-        private IEnumerator RenderWhenStopped()
+        /// <summary>확정 넣기·빼기 (무료). 효과가 바뀌므로 응답을 Accept 해 Bonus 와 패치 특전을 다시 넣는다.</summary>
+        private async Task Change(Func<Task<PerkStateDto>> request, string what)
         {
-            while (page != null && page.IsSpinning)
+            if (busy || state == null)
             {
-                yield return null;
+                return;
             }
 
-            RenderPage(null);
+            busy = true;
+            try
+            {
+                var fresh = await request();
+                busy = false;
+                if (fresh == null)
+                {
+                    RenderPage(Locale.Get("ui.network"));
+                    return;
+                }
+
+                if (fresh.Error != null)
+                {
+                    Log.Warn($"{what} refused: {fresh.Error}");
+                    state = fresh;
+                    RenderPage(fresh.Error);
+                    PerkGame.Sound(EUISoundType.ErrorMessage);
+                    return;
+                }
+
+                Accept(fresh, what);
+                PerkGame.Sound(EUISoundType.MenuInstallMag);
+                RenderPage(null);
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"{what} failed: {e.Message}");
+                busy = false;
+                RenderPage(Locale.Get("ui.network"));
+            }
+        }
+
+        private string BuyError(string error, int price)
+        {
+            if (error != null && error.Contains("CostChanged"))
+            {
+                return Locale.Get("ui.costChanged");
+            }
+
+            if (error != null && error.Contains("NotEnoughCoins"))
+            {
+                return Locale.Format("ui.notEnoughCoinsBuy", price, PerkGame.CountCoins());
+            }
+
+            return Locale.Format("ui.buyFailed", error ?? Locale.Get("ui.network"));
         }
 
         private string RollError(string error)
@@ -431,6 +489,16 @@ namespace PrestigePerks
             if (error != null && error.Contains("NoSlots"))
             {
                 return Locale.Get("ui.noSlots");
+            }
+
+            if (error != null && error.Contains("NothingToRoll"))
+            {
+                return Locale.Get("ui.nothingToRoll");
+            }
+
+            if (error != null && error.Contains("CollectionComplete"))
+            {
+                return Locale.Get("ui.collectionComplete");
             }
 
             return Locale.Format("ui.rollFailed", error ?? Locale.Get("ui.network"));

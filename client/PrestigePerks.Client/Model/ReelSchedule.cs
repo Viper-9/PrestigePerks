@@ -32,9 +32,6 @@ namespace PrestigePerks.Model
         /// <summary>결과가 오면 결과 칸까지 지나가는 칸 수.</summary>
         public const int LandingItems = 14;
 
-        /// <summary>흔들기로 한 칸 더 갈 때: 멈춘 듯 서 있는 시간, 한 칸 넘어가는 시간(초).</summary>
-        public const float NudgeHold = 0.35f, NudgeTime = 0.4f;
-
         /// <summary>가짜로 멈춰 있는 시간, 되돌아가는 시간(초).</summary>
         public const float FakeHold = 1.0f, SnapBackTime = 0.3f;
 
@@ -61,8 +58,8 @@ namespace PrestigePerks.Model
         public const int ReverseItems = 9;
 
         /// <summary>
-        /// 일반 리롤의 랜덤 연출은 끈다 (2026-10-18). 흔들기와 겹쳐 헷갈려서, 결과를 바꾸는 흔들기만 남겼다.
-        /// 리버스 연출은 흔들기 결과(<c>ShakeOutcome.Reverse</c>)로 쓴다. 가짜 멈춤 코드는 다시 쓸 수 있게 남겨 둔다.
+        /// 일반 리롤의 랜덤 연출은 끈다 (2026-10-18, 흔들기와 겹쳐 헷갈려서). 흔들기는 2026-10-25 개편에서 뺐다.
+        /// 가짜 멈춤·역회전 코드는 다시 쓸 수 있게 남겨 둔다.
         /// </summary>
         public static ReelEffect PickEffect(Random random)
         {
@@ -142,7 +139,7 @@ namespace PrestigePerks.Model
                 default:
                     strip.Add(target);
                     result = stop = first;
-                    // 멈출 칸 바로 위(다음 칸)는 흔들면 갈 수 있는 특전이다. 다른 슬롯이 가진 특전은 두지 않는다
+                    // 멈출 칸 바로 위(다음 칸)에는 다른 슬롯이 가진 특전을 두지 않는다 (겹쳐 보이지 않게)
                     strip.Add(PickFree(random, pool, target, held));
                     break;
             }

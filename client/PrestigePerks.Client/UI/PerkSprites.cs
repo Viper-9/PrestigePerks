@@ -24,6 +24,9 @@ namespace PrestigePerks.UI
 
         public static Sprite Lock => Load("Sprites.Seasons_PerkTemplate_Icon-lock", true);
 
+        /// <summary>풀린 자물쇠: Icon-lock 에서 고리를 올리고 오른쪽 다리를 끊어 그렸다.</summary>
+        public static Sprite Unlock => Load("Sprites.Seasons_PerkTemplate_Icon-unlock", true);
+
         /// <summary>
         /// 슬롯 육각 배지: 안쪽 바탕, 한 겹 틀(흰색, 색을 입혀 쓴다), 틀 바깥 빛(흰색, 틀보다 1.3배). 목업 1안 모양을
         /// 게임 그림(94px)을 늘리면 흐려서 4배 크기로 다시 그렸다 (tools/draw-hex-badge.py).
