@@ -1,6 +1,6 @@
 ﻿# 배포 zip 만들기. SPT 설치 폴더에 그대로 풀면 되는 구조로 묶는다.
 #   .\tools\package.ps1        상용: 서버 Release (개발용 명령 없음). 명령 코드가 섞여 있으면 멈춘다
-#   .\tools\package.ps1 -Dev   테스터용: 서버 Dev (개발용 명령 포함) + 테스터 도구(PrestigePerks-dev-tools/). zip 이름 끝에 -dev
+#   .\tools\package.ps1 -Dev   테스터용: 서버 Dev (개발용 명령 포함). zip 이름 끝에 -dev
 #   dist\<ModName>-<버전>.zip
 #     SPT_Runtime/user/mods/<ModName>/...   서버 모드 (DLL + Data, bundles 등)
 #     BepInEx/plugins/<ModName>/...         클라 플러그인 DLL
@@ -37,9 +37,6 @@ $ClientResources = @{
 
 # 상용 빌드 서버 DLL 에 있으면 안 되는 형식 이름 (개발용 명령)
 $DevOnlyTypes = @('PrestigeCommandoCommand')
-
-# 테스터용(-Dev) zip 에 넣을 도구. zip 의 <ModName>-dev-tools/ 에 들어간다
-$DevTools = @('tools\set-prestige-level.ps1', 'tools\set-prestige-level.bat')
 
 # zip 에서 뺄 파일
 $Exclude = @('*.pdb', '*.deps.json', '*.staticwebassets.*.json', '.gitkeep')
@@ -125,12 +122,6 @@ if ($clientPaths) {
         New-Item -ItemType Directory -Force $folderStage | Out-Null
         Copy-Item (Join-Path (Join-Path $root $folder) '*') $folderStage
     }
-}
-
-if ($Dev) {
-    $toolsStage = Join-Path $stage "$ModName-dev-tools"
-    New-Item -ItemType Directory -Force $toolsStage | Out-Null
-    foreach ($tool in $DevTools) { Copy-Item (Join-Path $root $tool) $toolsStage }
 }
 
 # 4) zip (항목 경로는 '/' — PowerShell 5.1 Compress-Archive 는 '\' 를 써서 리눅스 도구가 한 파일 이름으로 읽는다)
