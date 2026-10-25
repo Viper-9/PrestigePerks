@@ -1,3 +1,4 @@
+using PrestigePerks.Logging;
 using PrestigePerks.Perks;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -11,7 +12,7 @@ namespace PrestigePerks.Saving;
 /// SaveServer 가 이 라우터를 주입받으므로 SaveServer 를 쓰는 서비스에 의존하면 안 된다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
-public class PerkSaveLoadRouter(ISptLogger<PerkSaveLoadRouter> logger, PerkDataStore store, PerkConfigLoader configLoader) : SaveLoadRouter
+public class PerkSaveLoadRouter(ISptLogger<PerksFileLogger> logger, PerkDataStore store, PerkConfigLoader configLoader) : SaveLoadRouter
 {
     protected override IEnumerable<HandledRoute> GetHandledRoutes() => [new HandledRoute("prestigeperks-profile", false)];
 

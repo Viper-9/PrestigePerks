@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using PrestigePerks.Logging;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Models.Common;
@@ -10,7 +11,7 @@ namespace PrestigePerks.Perks;
 /// SaveServer 가 SaveLoadRouter 를 거쳐 이 클래스를 쓰므로 SPT 서비스에 의존하지 않는다 (순환 의존 방지).
 /// </summary>
 [Injectable(InjectionType.Singleton)]
-public class PerkDataStore(ISptLogger<PerkDataStore> logger)
+public class PerkDataStore(ISptLogger<PerksFileLogger> logger)
 {
     public const string FileName = "PrestigePerks.json";
     private const string ProfileDataDirectory = "user/profileData";

@@ -1,4 +1,5 @@
 using PrestigePerks.Items;
+using PrestigePerks.Logging;
 using PrestigePerks.Saving;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -19,7 +20,7 @@ namespace PrestigePerks.Perks;
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public class PerkService(
-    ISptLogger<PerkService> logger,
+    ISptLogger<PerksFileLogger> logger,
     PerkDataStore store,
     PerkConfigLoader configLoader,
     SaveServer saveServer,

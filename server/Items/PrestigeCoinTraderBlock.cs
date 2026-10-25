@@ -1,3 +1,4 @@
+using PrestigePerks.Logging;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
@@ -12,7 +13,7 @@ namespace PrestigePerks.Items;
 /// 다른 모드의 상인은 건드리지 않는다. 상인이 코인을 받고 물건을 파는 물물교환(프레스티지 상인)은 이 목록과 상관없다.
 /// </summary>
 [Injectable(TypePriority = OnLoadOrder.Preload + 10)]
-public class PrestigeCoinTraderBlock(ISptLogger<PrestigeCoinTraderBlock> logger, TradersTable tradersTable) : IOnLoad
+public class PrestigeCoinTraderBlock(ISptLogger<PerksFileLogger> logger, TradersTable tradersTable) : IOnLoad
 {
     /// <summary>
     /// SPT 기본 데이터베이스(database/traders)에서 아이템을 사들이는 상인.

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using PrestigePerks.Items;
+using PrestigePerks.Logging;
 using PrestigePerks.Prestiges;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -9,7 +10,7 @@ namespace PrestigePerks.Perks;
 
 /// <summary>모드 폴더의 config/config.json 을 처음 쓸 때 한 번 읽는다. 없거나 잘못되면 기본값을 쓰고 경고한다.</summary>
 [Injectable(InjectionType.Singleton)]
-public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper modHelper)
+public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modHelper)
 {
     public const string FileName = "config.json";
 
@@ -29,7 +30,7 @@ public class PerkConfigLoader(ISptLogger<PerkConfigLoader> logger, ModHelper mod
 
     public BossCoinConfig BossCoins => config.Value.BossCoins;
 
-    private static ModConfig Load(ISptLogger<PerkConfigLoader> logger, ModHelper modHelper)
+    private static ModConfig Load(ISptLogger<PerksFileLogger> logger, ModHelper modHelper)
     {
         var path = Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PerkConfigLoader).Assembly), "config", FileName);
         if (!File.Exists(path))

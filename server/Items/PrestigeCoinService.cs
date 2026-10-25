@@ -1,3 +1,4 @@
+using PrestigePerks.Logging;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Helpers.Profile;
@@ -14,7 +15,7 @@ namespace PrestigePerks.Items;
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public class PrestigeCoinService(
-    ISptLogger<PrestigeCoinService> logger,
+    ISptLogger<PerksFileLogger> logger,
     TemplateTable templateTable,
     HandbookHelper handbookHelper,
     TimeUtil timeUtil,

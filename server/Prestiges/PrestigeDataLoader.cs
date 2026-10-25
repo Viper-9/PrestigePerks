@@ -1,3 +1,4 @@
+using PrestigePerks.Logging;
 using PrestigePerks.Perks;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -9,7 +10,7 @@ namespace PrestigePerks.Prestiges;
 /// 모드 로드 때(Preload + 10, 백포트 모드 + 3 뒤) 프레스티지 조건을 설정값으로 바꾸고 전달 창 문구를 덮어쓴다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
-public class PrestigeDataLoader(ISptLogger<PrestigeDataLoader> logger, TemplateTable templateTable, LocaleTable localeTable, PerkConfigLoader configLoader)
+public class PrestigeDataLoader(ISptLogger<PerksFileLogger> logger, TemplateTable templateTable, LocaleTable localeTable, PerkConfigLoader configLoader)
 {
     public void Load()
     {

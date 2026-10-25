@@ -1,3 +1,4 @@
+using PrestigePerks.Logging;
 using PrestigePerks.Perks;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -16,7 +17,7 @@ namespace PrestigePerks.Items;
 /// </summary>
 [Injectable(TypePriority = OnLoadOrder.Preload + 10)]
 public class PrestigeCoinItem(
-    ISptLogger<PrestigeCoinItem> logger,
+    ISptLogger<PerksFileLogger> logger,
     CustomItemService customItemService,
     ModHelper modHelper,
     PerkConfigLoader configLoader) : IOnLoad
