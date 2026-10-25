@@ -97,7 +97,8 @@ namespace PrestigePerks.UI
 
         // 목록 보기: 전체(20줄 고정 자리) 또는 보유만 (보유한 줄을 같은 두 열 순서로 위에서부터 채운다). 페이지를 열면 전체
         private bool ownedOnly;
-        private TextMeshProUGUI listTitle, listCount, ownedTab, listEmpty;
+        private TextMeshProUGUI listEmpty;
+        private readonly List<Tab> tabs = new List<Tab>();
         private readonly List<Vector2> rowPlaces = new List<Vector2>();
 
         // 선택한 특전 칸
@@ -162,6 +163,15 @@ namespace PrestigePerks.UI
             public readonly TextMeshProUGUI[] TierLabel = new TextMeshProUGUI[PerkPageModel.MaxTier];
             public bool Hover, Target, Selected;
             public float FlashUntil;
+        }
+
+        /// <summary>목록 머리줄의 보기 탭 (전체 / 도감). 고른 탭은 타르코프 기본 버튼, 아닌 탭은 어두운 보조 버튼.</summary>
+        private sealed class Tab
+        {
+            public bool Owned, Hover;
+            public Button Button;
+            public Image Fill, Outline;
+            public TextMeshProUGUI Label;
         }
 
         /// <summary>장착 슬롯 (육각 배지). 리롤 때 육각 안에서 릴이 돈다.</summary>
@@ -427,28 +437,30 @@ namespace PrestigePerks.UI
         private void BuildList(float x, float y, float width, float height)
         {
             listPanel = Panel("List", x, y, width, height, locale.Get("ui.list"));
-            // 머리줄 제목이 보기 전환이다: "특전 목록 20 · 보유 3". 고른 쪽은 밝게, 아닌 쪽은 흐리게
-            listTitle = listPanel.Find("Title").GetComponent<TextMeshProUGUI>();
-            var titleWidth = UiKit.Width(listTitle, listTitle.text);
-            listCount = UiKit.Label(listPanel, "Count", 16 + titleWidth + 12, 24, 80, PerkPageModel.AllPerks.Length.ToString(), 18, UiKit.Muted);
-            var allWidth = titleWidth + 12 + UiKit.Width(listCount, listCount.text);
-            var dotX = 16 + allWidth + 14;
-            UiKit.Label(listPanel, "Dot", dotX, 23, 20, "·", 22, UiKit.Dim);
-            ownedTab = UiKit.Label(listPanel, "Owned", dotX + 22, 23, 200, "", 22, UiKit.Dim);
-            Tab(listPanel, "AllHit", 8, allWidth + 16, false);
-            Tab(listPanel, "OwnedHit", dotX + 14, 160, true);
+            // 머리줄 제목 오른쪽에 보기 탭 두 개: 전체 / 도감 (보유만). 보유 수는 맨 위 머리줄 "도감 n / 20" 에만 둔다
+            var title = listPanel.Find("Title").GetComponent<TextMeshProUGUI>();
+            var measure = UiKit.Label(listPanel, "Measure", 0, 0, 10, "", 14, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            var tabX = 16 + UiKit.Width(title, title.text) + 22;
+            foreach (var owned in new[] { false, true })
+            {
+                var text = locale.Get(owned ? "ui.tabCollection" : "ui.tabAll");
+                var tabWidth = UiKit.Width(measure, text) + 26;
+                tabs.Add(BuildTab(listPanel, tabX, tabWidth, text, owned));
+                tabX += tabWidth + 6;
+            }
+
             listEmpty = UiKit.Label(listPanel, "Empty", width / 2, height / 2, width - 32, locale.Get("ui.ownedEmpty"), 16, UiKit.Muted, TextAlignmentOptions.Center);
             listEmpty.enabled = false;
             listDropLabel = UiKit.Label(listPanel, "Drop", width - 16, 23, width / 2, locale.Get("ui.dropUnequip"), 16, SelectedLine, TextAlignmentOptions.Right);
             listDropLabel.enabled = false;
 
             var rowWidth = (width - 32 - ColumnGap) / 2;
-            // 효과는 이름 칸 오른쪽에 맞춰 세운다. 영어 이름이 길어도 겹치지 않게 가장 긴 이름에 맞춘다
+            // 효과는 이름 칸 오른쪽에 맞춰 세운다. 영어 이름이 길어도 겹치지 않게 가장 긴 이름에 맞추고 28 띄운다
             var nameColumn = 66f;
-            var measure = UiKit.Label(listPanel, "Measure", 0, 0, 10, "", 18, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            measure.fontSize = 18;
             foreach (var perk in PerkPageModel.AllPerks)
             {
-                nameColumn = Mathf.Max(nameColumn, UiKit.Width(measure, locale.PerkName(perk)) + 14);
+                nameColumn = Mathf.Max(nameColumn, UiKit.Width(measure, locale.PerkName(perk)) + 28);
             }
 
             Destroy(measure.gameObject);
@@ -464,11 +476,17 @@ namespace PrestigePerks.UI
             listDropOutline = UiKit.Outline(listPanel, Color.clear);
         }
 
-        /// <summary>머리줄 보기 전환의 누르는 자리 (글자 위 투명 칸).</summary>
-        private void Tab(RectTransform panel, string name, float x, float width, bool owned)
+        /// <summary>목록 보기 탭 하나 (머리줄 y 9, 높이 28). 누르면 그 보기로 바꾼다.</summary>
+        private Tab BuildTab(RectTransform panel, float x, float width, string text, bool owned)
         {
-            var hit = UiKit.Image(UiKit.Rect(panel, name, x, 0, width, PanelHead), Color.clear, raycast: true);
-            On(hit.gameObject, EventTriggerType.PointerClick, _ =>
+            var (button, fill, outline, label) = SmallButton(panel, owned ? "TabOwned" : "TabAll", x, 9, width, 28, text, 14);
+            var tab = new Tab { Owned = owned, Button = button, Fill = fill, Outline = outline, Label = label };
+            OnHover(fill.gameObject, on =>
+            {
+                tab.Hover = on;
+                RefreshTab(tab);
+            });
+            button.onClick.AddListener(() =>
             {
                 if (ownedOnly == owned || ghost != null)
                 {
@@ -479,19 +497,30 @@ namespace PrestigePerks.UI
                 GameSounds(EUISoundType.ButtonOver);
                 Rerender();
             });
+            RefreshTab(tab);
+            return tab;
         }
 
-        // 보기 전환 글자와 줄 자리. 전체는 고정 자리, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다
+        // 고른 탭은 타르코프 기본 버튼 (밝은 회색, 어두운 글자), 아닌 탭은 어두운 보조 버튼 (마우스를 올리면 밝은 테두리·글자)
+        private void RefreshTab(Tab tab)
+        {
+            var on = tab.Owned == ownedOnly;
+            tab.Fill.sprite = on ? PerkSprites.Gradient(ButtonTop, ButtonBottom) : PerkSprites.Gradient(DarkTop, DarkBottom);
+            tab.Outline.color = on ? ButtonLine : tab.Hover ? HoverLine : UiKit.Line;
+            tab.Label.color = on ? UiKit.Dark : tab.Hover ? UiKit.Text : UiKit.Muted;
+            SetTint(tab.Button, on ? ButtonTint : DarkTint);
+        }
+
+        // 보기 탭과 줄 자리. 전체는 고정 자리, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다
         private void RenderListView(PerkStateDto state)
         {
-            var owned = PerkPageModel.OwnedCount(state);
-            listTitle.color = ownedOnly ? UiKit.Dim : UiKit.Text;
-            listCount.color = ownedOnly ? UiKit.Dim : UiKit.Muted;
-            var countColor = ColorUtility.ToHtmlStringRGB(ownedOnly ? UiKit.Muted : UiKit.Dim);
-            ownedTab.text = locale.Format("ui.ownedTab", $"<size=18><color=#{countColor}>{owned}</color></size>");
-            ownedTab.color = ownedOnly ? UiKit.Text : UiKit.Dim;
+            foreach (var tab in tabs)
+            {
+                RefreshTab(tab);
+            }
+
             // 확정 칸을 끄는 동안에는 오른쪽에 "여기에 놓으면 빠집니다"가 나온다
-            listEmpty.enabled = ownedOnly && owned == 0;
+            listEmpty.enabled = ownedOnly && PerkPageModel.OwnedCount(state) == 0;
 
             var place = 0;
             foreach (var perk in PerkPageModel.AllPerks)
