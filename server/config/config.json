@@ -16,6 +16,18 @@
     "tierCapByPrestige": [1, 1, 1, 2, 2, 3, 3],
     "tierPrices": [40, 100, 200]
   },
+  "safeCoins": {
+    "chance": 0.2,
+    "minStack": 5,
+    "maxStack": 10
+  },
+  "bossCoins": {
+    "enabled": true,
+    "minStack": 20,
+    "maxStack": 35,
+    "sharedMinStack": 40,
+    "sharedMaxStack": 60
+  },
   "prestige": {
     "stages": [
       { "level": 15, "hideout": {}, "roubles": 5000000, "transferMultiplier": 0.9, "newBeginningLevel": 15, "extraQuests": [] },
@@ -61,15 +73,5 @@
         "extraQuests": []
       }
     ]
-  },
-  "safeCoins": {
-    "chance": 0.2,
-    "minStack": 5,
-    "maxStack": 10
-  },
-  "bossCoins": {
-    "chance": 1.0,
-    "minStack": 5,
-    "maxStack": 10
   }
 }
