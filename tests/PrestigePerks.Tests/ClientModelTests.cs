@@ -193,6 +193,22 @@ public class ClientModelTests
     }
 
     [Fact]
+    public void Auto_select_takes_the_first_slot_with_a_perk()
+    {
+        // [빈 칸] [강인 잠김] [제어]: 빈 칸을 건너뛰고 강인
+        var state = State(0, (0, false), (11, true), (14, false));
+        Assert.Equal(11, PerkPageModel.FirstSlotPerk(state));
+        Assert.Equal(0, PerkPageModel.PerkInSlot(state, 0));
+        Assert.Equal(14, PerkPageModel.PerkInSlot(state, 2));
+        Assert.Equal(0, PerkPageModel.PerkInSlot(state, 3)); // 닫힌 칸
+        Assert.Equal(0, PerkPageModel.PerkInSlot(state, -1));
+
+        Assert.Equal(0, PerkPageModel.FirstSlotPerk(State(0, (0, false), (0, false))));
+        Assert.Equal(0, PerkPageModel.FirstSlotPerk(State(0)));
+        Assert.Equal(0, PerkPageModel.FirstSlotPerk(null!));
+    }
+
+    [Fact]
     public void Roll_is_blocked_when_the_collection_is_complete()
     {
         var state = State(0, (0, false));
@@ -265,6 +281,19 @@ public class ClientModelTests
     public void Effect_values_scale_and_round_to_one_decimal(int perk, double ratio, string expected)
     {
         Assert.Equal(expected, PerkAmounts.Format(perk, ratio));
+    }
+
+    [Theory]
+    [InlineData(1, 0.75, "+22.5%p")]
+    [InlineData(8, 1.0, "−30%p")]
+    [InlineData(14, 0.75, "−7.5%p")]
+    [InlineData(27, 0.75, "+18.8%p")]
+    [InlineData(11, 0.5, "−10%")] // 곱하는 특전은 그대로 %
+    [InlineData(24, 1.0, "+30%")]
+    [InlineData(30, 1.0, "+10")] // 고정값은 단위 없음
+    public void Added_perks_take_the_point_unit_and_multiplied_perks_keep_percent(int perk, double ratio, string expected)
+    {
+        Assert.Equal(expected, PerkAmounts.Format(perk, ratio, "%p"));
     }
 
     [Fact]
