@@ -49,11 +49,14 @@ if (-not $ServerOnly) {
     dotnet build (Join-Path $root 'client\PrestigePerks.Client\PrestigePerks.Client.csproj') -c Release
     if ($LASTEXITCODE -ne 0) { throw 'client build failed' }
     $clientDll = Join-Path $root 'client\PrestigePerks.Client\bin\Release\netstandard2.1\PrestigePerks.Client.dll'
-    # 특전 페이지 그림은 DLL 리소스다 (client\PrestigePerks.Client\Assets). 따로 복사할 파일은 없다
+    # 특전 페이지 그림은 DLL 리소스다 (client\PrestigePerks.Client\Assets). 언어 파일은 플러그인 폴더의 Locales 에도 복사한다 (사용자가 다른 언어를 더하는 곳)
     $clientText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($clientDll))
     if (-not $clientText.Contains('PrestigePerks.Sprites.') -or -not $clientText.Contains('PrestigePerks.Icons.')) { throw '클라 DLL 에 특전 페이지 그림 리소스가 없습니다' }
     $clientDest = Join-Path $spt 'BepInEx\plugins\PrestigePerks'
     New-Item -ItemType Directory -Force $clientDest | Out-Null
     Copy-Item $clientDll $clientDest -Force
+    $localeDest = Join-Path $clientDest 'Locales'
+    New-Item -ItemType Directory -Force $localeDest | Out-Null
+    Copy-Item (Join-Path $root 'client\PrestigePerks.Client\Locales\*.json') $localeDest -Force
     Write-Host "client deployed to $clientDest"
 }

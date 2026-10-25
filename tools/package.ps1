@@ -26,6 +26,9 @@ $ServerRequired    = @('bundles\prestige_coin.bundle')            # 출력에 �
 # 클라 플러그인. 클라가 없으면 @()
 $ClientDlls = @('client\PrestigePerks.Client\bin\Release\netstandard2.1\PrestigePerks.Client.dll')
 
+# 클라 플러그인 폴더에 그대로 넣을 폴더 (언어 파일 en·kr. 사용자가 다른 언어 파일을 더한다). 없으면 @{}
+$ClientFolders = @{ 'client\PrestigePerks.Client\Locales' = 'Locales' }
+
 # 클라 DLL 에 리소스로 넣는 그림 (특전 페이지). 폴더의 PNG 마다 DLL 에 '<앞부분><파일 이름>' 리소스가 있어야 한다. 없으면 @{}
 $ClientResources = @{
     'client\PrestigePerks.Client\Assets\Icons'   = 'PrestigePerks.Icons.'
@@ -117,6 +120,11 @@ if ($clientPaths) {
     $clientStage = Join-Path $stage "BepInEx\plugins\$ModName"
     New-Item -ItemType Directory -Force $clientStage | Out-Null
     Copy-Item $clientPaths $clientStage
+    foreach ($folder in $ClientFolders.Keys) {
+        $folderStage = Join-Path $clientStage $ClientFolders[$folder]
+        New-Item -ItemType Directory -Force $folderStage | Out-Null
+        Copy-Item (Join-Path (Join-Path $root $folder) '*') $folderStage
+    }
 }
 
 if ($Dev) {

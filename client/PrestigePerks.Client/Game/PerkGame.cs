@@ -86,7 +86,7 @@ namespace PrestigePerks.Game
             }
         }
 
-        /// <summary>게임 언어(LocalizationManager.Culture)의 문구. 파일이 없으면 en.</summary>
+        /// <summary>게임 언어(LocalizationManager.Culture)의 문구. 파일이 없으면 en. 플러그인 폴더의 언어 파일(<see cref="PerkLocaleFolder"/>)이 있으면 DLL 문구를 덮어쓴다.</summary>
         public static PerkLocale LoadLocale()
         {
             string culture = null;
@@ -99,8 +99,8 @@ namespace PrestigePerks.Game
                 // 언어를 못 읽으면 en
             }
 
-            var fallback = PerkLocale.ParseFile(ReadResource(PerkLocale.Fallback));
-            var primary = string.IsNullOrEmpty(culture) ? null : PerkLocale.ParseFile(ReadResource(culture));
+            var fallback = PerkLocalePack.Merge(PerkLocale.ParseFile(ReadResource(PerkLocale.Fallback)), PerkLocaleFolder.Texts(PerkLocale.Fallback));
+            var primary = string.IsNullOrEmpty(culture) ? null : PerkLocalePack.Merge(PerkLocale.ParseFile(ReadResource(culture)), PerkLocaleFolder.Texts(culture));
             return new PerkLocale(primary, fallback);
         }
 
