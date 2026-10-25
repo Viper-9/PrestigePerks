@@ -37,6 +37,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\server\Commands\PrestigeCommandoCommand.cs" Link="ServerDev\PrestigeCommandoCommand.cs" />
+    <Compile Include="..\..\server\Commands\BossCoinCheck.cs" Link="ServerDev\BossCoinCheck.cs" />
   </ItemGroup>
 
 </Project>
