@@ -11,6 +11,9 @@ public static class PrestigeLocales
     public const string ConfirmationText = "Prestige/Conformation/Text";
     public const string TransferWarning = "TransferItemsMessage/Description";
 
+    // 프레스티지 확인 창의 "유지(STAYS)" 목록. 끝에 특전 도감을 더한다 (산 특전과 단계는 모든 프레스티지에서 남는다). 앞 줄은 바닐라 문구 그대로
+    public const string StaysList = "Prestige/Conformation/Save/EFT{S}{M}";
+
     public static readonly Dictionary<string, Dictionary<string, string>> Texts = new()
     {
         ["en"] = new()
@@ -19,6 +22,7 @@ public static class PrestigeLocales
             [TransferSubTitle] = "Coin conversion",
             [ConfirmationText] = "Upon gaining Prestige, you will start the game from the beginning.\nTransferred items become prestige coins (capped per level), and the coins you own carry over automatically",
             [TransferWarning] = "Items left in the stash will be lost. Prestige coins you own carry over automatically.",
+            [StaysList] = "• {S}% SKILLS \n• {M}% MASTERING\n• EARNED ACHIEVEMENTS\n• PROFILE STATISTICS\n• PRESTIGE PROGRESS\n• PERK COLLECTION",
         },
         ["kr"] = new()
         {
@@ -32,7 +36,7 @@ public static class PrestigeLocales
             ["ObtainPrestigeScreen/Conformation/SubTitle"] = "기본 정보",
             ["Prestige/Conformation/Save"] = "유지",
             ["Prestige/Conformation/Lost"] = "초기화",
-            ["Prestige/Conformation/Save/EFT{S}{M}"] = "• 스킬 {S}%\n• 숙련도 {M}%\n• 획득한 업적\n• 프로필 통계\n• 프레스티지 진행도",
+            [StaysList] = "• 스킬 {S}%\n• 숙련도 {M}%\n• 획득한 업적\n• 프로필 통계\n• 프레스티지 진행도\n• 특전 도감",
             ["Prestige/Conformation/Save/Arena{S}{M}"] = "• 스킬 {S}%\n• 숙련도 {M}%\n• 획득한 업적\n• ARP 등급\n• 무기고 진행도\n• 프로필 통계",
             ["Prestige/ItemsTransfer/FitButtonTooltip"] = "넣을 수 있는 아이템 보기",
             ["Prestige/ItemsTransfer/FitWindow"] = "넣을 수 있는 아이템 전체",
