@@ -17,9 +17,9 @@
     "tierPrices": [40, 100, 200]
   },
   "safeCoins": {
-    "chance": 0.2,
+    "chance": 0.3,
     "minStack": 5,
-    "maxStack": 10
+    "maxStack": 15
   },
   "bossCoins": {
     "enabled": true,
