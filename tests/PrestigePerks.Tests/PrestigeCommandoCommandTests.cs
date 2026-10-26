@@ -123,7 +123,7 @@ public class PrestigeCommandoCommandTests
             ActiveTiers = new Dictionary<int, int> { [1] = 1, [24] = 2, [8] = 1 },
             Owned = new Dictionary<int, int> { [24] = 3 },
             TierCap = 2,
-            Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 24, Fixed = true }, new PerkSlot { Perk = 8 }, new PerkSlot()],
+            Slots = [new PerkSlotState { Perk = 1, Locked = true }, new PerkSlotState { Perk = 24, Fixed = true }, new PerkSlotState { Perk = 8 }, new PerkSlotState()],
             NewPerks = [8],
             FreeRerollsLeft = 0,
             PaidRerolls = 1,

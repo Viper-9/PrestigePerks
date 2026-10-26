@@ -1,5 +1,6 @@
 using PrestigePerks.Perks;
 using PrestigePerks.Saving;
+using static PrestigePerks.Tests.TestPerks;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
@@ -37,7 +38,7 @@ public class PerkBonusTests
     [Fact]
     public void Bonus_values_scale_with_the_tier_ratio()
     {
-        var bonuses = PerkBonusApplier.CreateBonuses(new Dictionary<int, double> { [1] = 0.5, [8] = 0.75, [24] = 1.0, [2] = 0 });
+        var bonuses = PerkBonusApplier.CreateBonuses(new Dictionary<string, double> { [Id(1)] = 0.5, [Id(8)] = 0.75, [Id(24)] = 1.0, [Id(2)] = 0 });
 
         Assert.Equal(15, bonuses.Single(bonus => bonus.Type == BonusType.ExperienceRate).Value);
         Assert.Equal(-22.5, bonuses.Single(bonus => bonus.Type == BonusType.ScavCooldownTimer).Value);
@@ -49,7 +50,7 @@ public class PerkBonusTests
     public void Apply_adds_the_bonuses_of_bonus_perks_only()
     {
         var pmc = Pmc(HideoutBonus());
-        PerkBonusApplier.Apply(pmc, [1, 4, 8, 24]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 4, 8, 24));
 
         Assert.Equal(["64f5b9e5fa34f11b380756f8", "8bcbeb65b78be907af6ee2b0", "26b6ac04721b710794837e2c", "24656f22d00ab74d124b8174", "bfa913d120f3845fffd516e0"], Ids(pmc));
         var scav = pmc.Bonuses!.Single(bonus => bonus.Type == BonusType.ScavCooldownTimer);
@@ -62,10 +63,10 @@ public class PerkBonusTests
     public void Apply_is_idempotent()
     {
         var pmc = Pmc(HideoutBonus());
-        PerkBonusApplier.Apply(pmc, [1, 2, 3]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 2, 3));
         var once = Ids(pmc);
-        PerkBonusApplier.Apply(pmc, [1, 2, 3]);
-        PerkBonusApplier.Apply(pmc, [1, 2, 3]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 2, 3));
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 2, 3));
         Assert.Equal(once, Ids(pmc));
     }
 
@@ -73,11 +74,11 @@ public class PerkBonusTests
     public void Apply_replaces_old_perk_bonuses_and_keeps_vanilla_ones()
     {
         var pmc = Pmc(HideoutBonus());
-        PerkBonusApplier.Apply(pmc, [1, 8]);
-        PerkBonusApplier.Apply(pmc, [3]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 8));
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(3));
         Assert.Equal(["64f5b9e5fa34f11b380756f8", "f1360d70ed3bb18289339797"], Ids(pmc));
 
-        PerkBonusApplier.Apply(pmc, []);
+        PerkBonusApplier.Apply(pmc, Array.Empty<string>());
         Assert.Equal(["64f5b9e5fa34f11b380756f8"], Ids(pmc));
     }
 
@@ -85,10 +86,10 @@ public class PerkBonusTests
     public void Apply_leaves_null_bonuses_alone_when_there_is_nothing_to_add()
     {
         var pmc = new PmcData();
-        PerkBonusApplier.Apply(pmc, [24]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(24));
         Assert.Null(pmc.Bonuses);
 
-        PerkBonusApplier.Apply(pmc, [1]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1));
         Assert.Equal(["8bcbeb65b78be907af6ee2b0"], Ids(pmc));
     }
 
@@ -105,7 +106,7 @@ public class PerkBonusTests
     public void Saved_profile_json_has_no_perk_bonus_ids()
     {
         var pmc = Pmc(HideoutBonus());
-        PerkBonusApplier.Apply(pmc, [1, 2, 3, 4, 8]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 2, 3, 4, 8));
         var profile = Profile(pmc);
 
         var json = CreateJsonUtil().Serialize(profile, true)!;
@@ -125,7 +126,7 @@ public class PerkBonusTests
     public void Saved_profile_reloads_as_vanilla_profile()
     {
         var pmc = Pmc(HideoutBonus());
-        PerkBonusApplier.Apply(pmc, [1, 8]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(1, 8));
         var jsonUtil = CreateJsonUtil();
         var json = jsonUtil.Serialize(Profile(pmc))!;
 
@@ -141,7 +142,7 @@ public class PerkBonusTests
     {
         var pmc = Pmc(HideoutBonus());
         pmc.Bonuses!.Add(new Bonus { Id = new MongoId("bfa913d120f3845fffd516e1"), Type = BonusType.ScavCooldownTimer, Value = -25 });
-        PerkBonusApplier.Apply(pmc, [8]);
+        PerkBonusApplier.Apply(pmc, TestPerks.Ids(8));
 
         var stripped = PerkProfileConverter.StripPerkBonuses(Profile(pmc));
 

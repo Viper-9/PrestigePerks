@@ -1,4 +1,5 @@
 using PrestigePerks.Perks;
+using static PrestigePerks.Tests.TestPerks;
 
 namespace PrestigePerks.Tests;
 
@@ -7,7 +8,7 @@ public class PerkRulesTests
     private static readonly PerkConfig Config = new();
 
     private static PerkData WithSlots(params int[] perks) =>
-        new() { Slots = perks.Select(perk => new PerkSlot { Perk = perk }).ToList() };
+        new() { Slots = perks.Select(perk => new PerkSlot { Perk = SlotPerk(perk) }).ToList() };
 
     /// <summary>단계에 들어선 상태 (무료 횟수가 채워지고 빈 슬롯이 뽑힘).</summary>
     private static PerkData Entered(int level, int seed, params int[] perks)
@@ -63,11 +64,11 @@ public class PerkRulesTests
 
         Assert.True(changed);
         Assert.Equal(3, data.Slots.Count);
-        Assert.Equal(1, data.Slots[0].Perk);
-        Assert.Equal(24, data.Slots[1].Perk);
-        Assert.DoesNotContain(data.Slots[2].Perk, new[] { 1, 24 });
-        Assert.Equal([data.Slots[2].Perk], newPerks);
-        Assert.Equal([data.Slots[2].Perk], data.UnseenNewPerks);
+        Assert.Equal(Id(1), data.Slots[0].Perk);
+        Assert.Equal(Id(24), data.Slots[1].Perk);
+        Assert.DoesNotContain(data.Slots[2].Perk, Ids(1, 24));
+        Assert.Equal([data.Slots[2].Perk!], newPerks);
+        Assert.Equal([data.Slots[2].Perk!], data.UnseenNewPerks);
         Assert.Equal(3, data.Rerolls.Level);
         Assert.Equal(3, data.Rerolls.FreeLeft);
         Assert.Equal(0, data.Rerolls.Paid);
@@ -141,7 +142,7 @@ public class PerkRulesTests
         {
             var data = Entered(1, seed, 1);
             PerkRules.Roll(data, 1, Config, new Random(seed));
-            reappeared = data.Slots[0].Perk == 1;
+            reappeared = data.Slots[0].Perk == Id(1);
         }
 
         Assert.True(reappeared);
@@ -236,7 +237,7 @@ public class PerkRulesTests
     public void Active_perks_are_capped_by_prestige_level()
     {
         var data = WithSlots(1, 8, 24);
-        Assert.Equal([1, 8], PerkRules.ActivePerks(data, 2));
+        Assert.Equal(Ids(1, 8), PerkRules.ActivePerks(data, 2));
         Assert.Empty(PerkRules.ActivePerks(data, 0));
     }
 
@@ -245,8 +246,8 @@ public class PerkRulesTests
     {
         var data = WithSlots(1, 8);
         data.DevAllPerks = true;
-        Assert.Equal(PerkCatalog.Numbers, PerkRules.ActivePerks(data, 1));
-        Assert.Equal(PerkCatalog.Numbers, PerkRules.ActivePerks(data, 0));
+        Assert.Equal(PerkCatalog.Ids, PerkRules.ActivePerks(data, 1));
+        Assert.Equal(PerkCatalog.Ids, PerkRules.ActivePerks(data, 0));
     }
 
     [Fact]
@@ -257,7 +258,7 @@ public class PerkRulesTests
             var data = WithSlots(1, 2, 3);
             data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 3 };
             PerkRules.Roll(data, 1, Config, new Random(seed));
-            Assert.DoesNotContain(data.Slots[0].Perk, new[] { 2, 3 });
+            Assert.DoesNotContain(data.Slots[0].Perk, Ids(2, 3));
         }
     }
 
@@ -285,11 +286,11 @@ public class PerkRulesTests
     {
         var data = WithSlots(1, 4, 8);
         data.Slots[0].Locked = true;
-        Assert.Equal(PerkError.None, PerkRules.SetPerk(data, 3, 1, 24));
-        Assert.Equal([1, 24, 8], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(PerkError.None, PerkRules.SetPerk(data, 3, 1, Id(24)));
+        Assert.Equal(SlotPerks(1, 24, 8), data.Slots.Select(slot => slot.Perk));
 
-        Assert.Equal(PerkError.None, PerkRules.SetPerk(data, 3, 2, 1));
-        Assert.Equal([8, 24, 1], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(PerkError.None, PerkRules.SetPerk(data, 3, 2, Id(1)));
+        Assert.Equal(SlotPerks(8, 24, 1), data.Slots.Select(slot => slot.Perk));
         Assert.True(data.Slots[0].Locked);
     }
 
@@ -297,17 +298,17 @@ public class PerkRulesTests
     public void Set_rejects_inactive_slots_and_unknown_perks()
     {
         var data = WithSlots(1, 4, 8);
-        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 2, 2, 24));
-        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 3, -1, 24));
-        Assert.Equal(PerkError.UnknownPerk, PerkRules.SetPerk(data, 3, 0, 999));
-        Assert.Equal([1, 4, 8], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 2, 2, Id(24)));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 3, -1, Id(24)));
+        Assert.Equal(PerkError.UnknownPerk, PerkRules.SetPerk(data, 3, 0, Id(999)));
+        Assert.Equal(SlotPerks(1, 4, 8), data.Slots.Select(slot => slot.Perk));
     }
 
     private static PerkData Owning(PerkData data, params (int Perk, int Tier)[] owned)
     {
         foreach (var (perk, tier) in owned)
         {
-            data.Owned[perk] = tier;
+            data.Owned[Id(perk)] = tier;
         }
 
         return data;
@@ -321,7 +322,7 @@ public class PerkRulesTests
             var data = Owning(WithSlots(1, 2, 3), (4, 1), (8, 2), (9, 3));
             data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 3 };
             PerkRules.Roll(data, 3, Config, new Random(seed));
-            Assert.DoesNotContain(data.Slots, slot => slot.Perk is 4 or 8 or 9);
+            Assert.DoesNotContain(data.Slots, slot => slot.Perk == Id(4) || slot.Perk == Id(8) || slot.Perk == Id(9));
         }
     }
 
@@ -337,18 +338,18 @@ public class PerkRulesTests
         Assert.Equal(PerkRules.RerollCost(Config, 3, 1, 1), PerkRules.NextRerollCost(Config, 3, data));
 
         PerkRules.Roll(data, 3, Config, new Random(5));
-        Assert.Equal(1, data.Slots[0].Perk);
+        Assert.Equal(Id(1), data.Slots[0].Perk);
         Assert.True(data.Slots[0].Fixed);
-        Assert.Equal(2, data.Slots[1].Perk);
+        Assert.Equal(Id(2), data.Slots[1].Perk);
     }
 
     [Fact]
     public void Roll_fills_empty_slots_and_leaves_the_rest_empty_when_unowned_perks_run_out()
     {
         // 20개 중 18개 보유, 미보유 2개뿐인데 리롤 칸은 3개
-        var unowned = new[] { 24, 32 };
-        var data = new PerkData { Slots = [new PerkSlot(), new PerkSlot { Perk = 24 }, new PerkSlot()] };
-        foreach (var perk in PerkCatalog.Numbers.Except(unowned))
+        var unowned = Ids(24, 32).Order().ToArray();
+        var data = new PerkData { Slots = [new PerkSlot(), new PerkSlot { Perk = Id(24) }, new PerkSlot()] };
+        foreach (var perk in PerkCatalog.Ids.Except(unowned))
         {
             data.Owned[perk] = 1;
         }
@@ -372,7 +373,7 @@ public class PerkRulesTests
         data.Slots[1] = new PerkSlot();
         Assert.Equal(PerkError.None, PerkRules.CheckRoll(data, 2));
 
-        foreach (var perk in PerkCatalog.Numbers)
+        foreach (var perk in PerkCatalog.Ids)
         {
             data.Owned[perk] = 1;
         }
@@ -387,16 +388,16 @@ public class PerkRulesTests
     {
         var data = Owning(WithSlots(1), (2, 1));
         data.Rerolls = new PerkRerolls { Level = 1, FreeLeft = 0 };
-        foreach (var perk in PerkCatalog.Numbers.Where(perk => perk is not (1 or 3)))
+        foreach (var perk in PerkCatalog.Ids.Where(perk => perk != Id(1) && perk != Id(3)))
         {
             data.Owned[perk] = 1;
         }
 
         var (_, newPerks) = PerkRules.EnterLevel(data, 3, Config, new Random(1));
 
-        Assert.Equal([1, 3, 0], data.Slots.Select(slot => slot.Perk));
-        Assert.Equal([3], newPerks);
-        Assert.Equal([3], data.UnseenNewPerks);
+        Assert.Equal(SlotPerks(1, 3, 0), data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(Ids(3), newPerks);
+        Assert.Equal(Ids(3), data.UnseenNewPerks);
     }
 
     [Fact]
@@ -426,9 +427,9 @@ public class PerkRulesTests
         var data = Owning(WithSlots(1, 2, 3), (1, 3), (2, 2));
         data.Slots[0].Fixed = data.Slots[1].Fixed = true;
 
-        Assert.Equal(new Dictionary<int, int> { [1] = 2, [2] = 2, [3] = 1 }, PerkRules.ActiveTiers(data, 3, Config));
-        Assert.Equal(new Dictionary<int, int> { [1] = 3, [2] = 2, [3] = 1 }, PerkRules.ActiveTiers(data, 5, Config));
-        Assert.Equal(new Dictionary<int, double> { [1] = 1.0, [2] = 0.75, [3] = 0.5 }, PerkRules.ActiveScales(data, 5, Config));
+        Assert.Equal(new Dictionary<string, int> { [Id(1)] = 2, [Id(2)] = 2, [Id(3)] = 1 }, PerkRules.ActiveTiers(data, 3, Config));
+        Assert.Equal(new Dictionary<string, int> { [Id(1)] = 3, [Id(2)] = 2, [Id(3)] = 1 }, PerkRules.ActiveTiers(data, 5, Config));
+        Assert.Equal(new Dictionary<string, double> { [Id(1)] = 1.0, [Id(2)] = 0.75, [Id(3)] = 0.5 }, PerkRules.ActiveScales(data, 5, Config));
 
         data.DevAllPerks = true;
         Assert.All(PerkRules.ActiveTiers(data, 1, Config).Values, tier => Assert.Equal(3, tier));
@@ -440,13 +441,13 @@ public class PerkRulesTests
         var data = WithSlots(1, 2);
         data.Slots[1].Locked = true;
 
-        Assert.Equal(PerkError.NotInSlot, PerkRules.CheckBuy(data, 2, Config, 3, 1));
-        Assert.Equal(PerkError.None, PerkRules.Buy(data, 2, Config, 2, 1));
+        Assert.Equal(PerkError.NotInSlot, PerkRules.CheckBuy(data, 2, Config, Id(3), 1));
+        Assert.Equal(PerkError.None, PerkRules.Buy(data, 2, Config, Id(2), 1));
 
-        Assert.Equal(1, data.OwnedTier(2));
+        Assert.Equal(1, data.OwnedTier(Id(2)));
         Assert.True(data.Slots[1].Fixed);
         Assert.False(data.Slots[1].Locked);
-        Assert.Equal(PerkError.AlreadyOwned, PerkRules.CheckBuy(data, 2, Config, 2, 1));
+        Assert.Equal(PerkError.AlreadyOwned, PerkRules.CheckBuy(data, 2, Config, Id(2), 1));
     }
 
     [Fact]
@@ -454,16 +455,16 @@ public class PerkRulesTests
     {
         var data = Owning(WithSlots(1), (14, 1));
 
-        Assert.Equal(PerkError.TierCapped, PerkRules.CheckBuy(data, 2, Config, 14, 2));
-        Assert.Equal(PerkError.TierOrder, PerkRules.CheckBuy(data, 6, Config, 14, 3));
-        Assert.Equal(PerkError.TierOrder, PerkRules.CheckBuy(data, 6, Config, 24, 2));
-        Assert.Equal(PerkError.None, PerkRules.Buy(data, 3, Config, 14, 2));
-        Assert.Equal(PerkError.TierCapped, PerkRules.CheckBuy(data, 4, Config, 14, 3));
-        Assert.Equal(PerkError.None, PerkRules.Buy(data, 5, Config, 14, 3));
-        Assert.Equal(3, data.OwnedTier(14));
-        Assert.Equal(PerkError.AlreadyOwned, PerkRules.CheckBuy(data, 6, Config, 14, 2));
-        Assert.Equal(PerkError.InvalidTier, PerkRules.CheckBuy(data, 6, Config, 14, 4));
-        Assert.Equal(PerkError.UnknownPerk, PerkRules.CheckBuy(data, 6, Config, 999, 1));
+        Assert.Equal(PerkError.TierCapped, PerkRules.CheckBuy(data, 2, Config, Id(14), 2));
+        Assert.Equal(PerkError.TierOrder, PerkRules.CheckBuy(data, 6, Config, Id(14), 3));
+        Assert.Equal(PerkError.TierOrder, PerkRules.CheckBuy(data, 6, Config, Id(24), 2));
+        Assert.Equal(PerkError.None, PerkRules.Buy(data, 3, Config, Id(14), 2));
+        Assert.Equal(PerkError.TierCapped, PerkRules.CheckBuy(data, 4, Config, Id(14), 3));
+        Assert.Equal(PerkError.None, PerkRules.Buy(data, 5, Config, Id(14), 3));
+        Assert.Equal(3, data.OwnedTier(Id(14)));
+        Assert.Equal(PerkError.AlreadyOwned, PerkRules.CheckBuy(data, 6, Config, Id(14), 2));
+        Assert.Equal(PerkError.InvalidTier, PerkRules.CheckBuy(data, 6, Config, Id(14), 4));
+        Assert.Equal(PerkError.UnknownPerk, PerkRules.CheckBuy(data, 6, Config, Id(999), 1));
     }
 
     [Fact]
@@ -472,13 +473,13 @@ public class PerkRulesTests
         var data = Owning(WithSlots(1, 2, 3), (1, 1), (14, 2), (24, 1));
         data.Slots[0].Fixed = true;
 
-        Assert.Equal(PerkError.None, PerkRules.Equip(data, 3, 14, 1));
-        Assert.Equal([1, 14, 3], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(PerkError.None, PerkRules.Equip(data, 3, Id(14), 1));
+        Assert.Equal(SlotPerks(1, 14, 3), data.Slots.Select(slot => slot.Perk));
         Assert.True(data.Slots[1].Fixed);
 
-        Assert.Equal(PerkError.None, PerkRules.Equip(data, 3, 24, 0));
-        Assert.Equal([24, 14, 3], data.Slots.Select(slot => slot.Perk));
-        Assert.Equal(1, data.OwnedTier(1));
+        Assert.Equal(PerkError.None, PerkRules.Equip(data, 3, Id(24), 0));
+        Assert.Equal(SlotPerks(24, 14, 3), data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(1, data.OwnedTier(Id(1)));
     }
 
     [Fact]
@@ -488,11 +489,11 @@ public class PerkRulesTests
         data.Slots[0].Fixed = true;
         data.Slots[2].Locked = true;
 
-        Assert.Equal(PerkError.SlotLocked, PerkRules.Equip(data, 3, 14, 2));
-        Assert.Equal(PerkError.NotOwned, PerkRules.Equip(data, 3, 24, 1));
-        Assert.Equal(PerkError.AlreadyEquipped, PerkRules.Equip(data, 3, 1, 1));
-        Assert.Equal(PerkError.InvalidSlot, PerkRules.Equip(data, 3, 14, 3));
-        Assert.Equal([1, 2, 3], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal(PerkError.SlotLocked, PerkRules.Equip(data, 3, Id(14), 2));
+        Assert.Equal(PerkError.NotOwned, PerkRules.Equip(data, 3, Id(24), 1));
+        Assert.Equal(PerkError.AlreadyEquipped, PerkRules.Equip(data, 3, Id(1), 1));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.Equip(data, 3, Id(14), 3));
+        Assert.Equal(SlotPerks(1, 2, 3), data.Slots.Select(slot => slot.Perk));
     }
 
     [Fact]
@@ -505,14 +506,14 @@ public class PerkRulesTests
         Assert.Equal(PerkError.None, PerkRules.Unequip(data, 2, 0));
         Assert.True(data.Slots[0].IsEmpty);
         Assert.False(data.Slots[0].Fixed);
-        Assert.Equal(2, data.OwnedTier(1));
-        Assert.Equal([2], PerkRules.ActivePerks(data, 2));
+        Assert.Equal(2, data.OwnedTier(Id(1)));
+        Assert.Equal(Ids(2), PerkRules.ActivePerks(data, 2));
     }
 
     [Fact]
     public void Fixed_and_empty_slots_cannot_be_locked()
     {
-        var data = Owning(new PerkData { Slots = [new PerkSlot { Perk = 1, Fixed = true }, new PerkSlot()] }, (1, 1));
+        var data = Owning(new PerkData { Slots = [new PerkSlot { Perk = Id(1), Fixed = true }, new PerkSlot()] }, (1, 1));
         Assert.Equal(PerkError.SlotFixed, PerkRules.SetLock(data, 2, 0, true));
         Assert.Equal(PerkError.SlotEmpty, PerkRules.SetLock(data, 2, 1, true));
         Assert.Equal(PerkError.None, PerkRules.SetLock(data, 2, 1, false));
@@ -524,11 +525,11 @@ public class PerkRulesTests
         var data = Owning(WithSlots(1, 2), (1, 2));
         data.Slots[0].Fixed = true;
 
-        Assert.Equal(PerkError.None, PerkRules.SetOwnedTier(data, 2, 3));
-        Assert.Equal(3, data.OwnedTier(2));
-        Assert.Equal(PerkError.None, PerkRules.SetOwnedTier(data, 1, 0));
+        Assert.Equal(PerkError.None, PerkRules.SetOwnedTier(data, Id(2), 3));
+        Assert.Equal(3, data.OwnedTier(Id(2)));
+        Assert.Equal(PerkError.None, PerkRules.SetOwnedTier(data, Id(1), 0));
         Assert.False(data.Slots[0].Fixed);
-        Assert.Equal(PerkError.InvalidTier, PerkRules.SetOwnedTier(data, 1, 4));
+        Assert.Equal(PerkError.InvalidTier, PerkRules.SetOwnedTier(data, Id(1), 4));
 
         PerkRules.ResetCollection(data);
         Assert.Empty(data.Owned);
@@ -540,7 +541,7 @@ public class PerkRulesTests
     {
         var data = Owning(WithSlots(1, 2), (24, 1));
         data.Slots[1].Locked = true;
-        PerkRules.SetPerk(data, 2, 1, 24);
+        PerkRules.SetPerk(data, 2, 1, Id(24));
         Assert.True(data.Slots[1].Fixed);
         Assert.False(data.Slots[1].Locked);
     }
@@ -583,12 +584,12 @@ public class PerkRulesTests
         var config = Config with { PrestigeLevel3Slots = 1 };
         var data = WithSlots(1, 4, 8);
         data.Rerolls = new PerkRerolls { Level = 3, FreeLeft = 1 };
-        Assert.Equal([1], PerkRules.ActivePerks(data, config.Slots(3)));
+        Assert.Equal(Ids(1), PerkRules.ActivePerks(data, config.Slots(3)));
         Assert.Equal(PerkError.InvalidSlot, PerkRules.SetLock(data, config.Slots(3), 1, true));
 
         Assert.True(PerkRules.Roll(data, 3, config, new Random(5)).Success);
-        Assert.DoesNotContain(data.Slots[0].Perk, new[] { 4, 8 });
-        Assert.Equal([4, 8], data.Slots.Skip(1).Select(slot => slot.Perk));
+        Assert.DoesNotContain(data.Slots[0].Perk, Ids(4, 8));
+        Assert.Equal(SlotPerks(4, 8), data.Slots.Skip(1).Select(slot => slot.Perk));
     }
 
     [Fact]

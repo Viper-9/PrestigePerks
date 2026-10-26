@@ -1,6 +1,7 @@
 using PrestigePerks.Model;
 using PrestigePerks.Perks;
 using PrestigePerks.Saving;
+using static PrestigePerks.Tests.TestPerks;
 using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Utils;
 using SPTarkov.Server.Core.Utils.Json;
@@ -23,14 +24,14 @@ public class ClientModelTests
         var server = new PerkState
         {
             PrestigeLevel = 3,
-            Slots = [new PerkSlot { Perk = 1, Locked = true }, new PerkSlot { Perk = 4 }, new PerkSlot { Perk = 8 }],
+            Slots = [new PerkSlotState { Perk = 1, Locked = true }, new PerkSlotState { Perk = 4 }, new PerkSlotState { Perk = 8 }],
             ActivePerks = [1, 4, 8],
             FreeRerollsLeft = 0,
             PaidRerolls = 2,
             NextRerollCost = 180,
             CostFixed = true,
             NewPerks = [8],
-            Bonuses = PerkBonusApplier.CreateBonuses([1, 4, 8]),
+            Bonuses = PerkBonusApplier.CreateBonuses(Ids(1, 4, 8)),
             BonusIds = PerkCatalog.FilteredBonusIds.Select(id => id.ToString()).ToList(),
         };
         var json = new JsonUtil([new SptJsonConverterRegistrator()]).Serialize(server)!;
@@ -72,7 +73,7 @@ public class ClientModelTests
         var server = new PerkState
         {
             PrestigeLevel = 3,
-            Slots = [new PerkSlot { Perk = 14, Fixed = true }, new PerkSlot(), new PerkSlot { Perk = 29, Locked = true }],
+            Slots = [new PerkSlotState { Perk = 14, Fixed = true }, new PerkSlotState(), new PerkSlotState { Perk = 29, Locked = true }],
             ActiveTiers = new Dictionary<int, int> { [14] = 2, [29] = 1 },
             Owned = new Dictionary<int, int> { [14] = 3, [26] = 1 },
             TierCap = 2,
