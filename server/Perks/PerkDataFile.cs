@@ -88,7 +88,7 @@ public static class PerkDataFile
         }
     }
 
-    /// <summary>schema 1 을 옮기고, 모르는 특전 번호·중복·잘못된 값을 정리한다. schema 2 는 그대로 읽혀 "보유 없음, 확정 없음"이 된다. 정리한 내용은 warnings 에 남긴다.</summary>
+    /// <summary>schema 1~3 을 옮기고, 잘못된 값을 정리한다. 모르는 특전은 도감에 그대로 두고 슬롯에서는 그 자리 빈 칸으로 바꾼다. schema 2 는 그대로 읽혀 "보유 없음, 확정 없음"이 된다. 정리한 내용은 warnings 에 남긴다.</summary>
     internal static PerkData Normalize(PerkData data, List<string> warnings)
     {
         var schema = data.SchemaVersion;
@@ -135,26 +135,33 @@ public static class PerkDataFile
         }
 #endif
 
-        var owned = data.Owned.Where(pair => PerkCatalog.IsKnown(pair.Key) && pair.Value >= 1)
+        // 모르는 특전(add-on 을 뺀 경우 등)도 지우지 않는다. 다시 넣으면 산 단계 그대로 돌아온다. 리롤·효과·state 는 카탈로그에 있는 특전만 본다
+        var owned = data.Owned.Where(pair => !string.IsNullOrEmpty(pair.Key) && pair.Value >= 1)
             .ToDictionary(pair => pair.Key, pair => Math.Min(pair.Value, PerkConfig.MaxTier));
         if (owned.Count != data.Owned.Count || owned.Any(pair => data.Owned[pair.Key] != pair.Value))
         {
-            warnings.Add($"도감의 모르는 특전·잘못된 단계를 정리했습니다: {Describe(data.Owned)} → {Describe(owned)}");
+            warnings.Add($"도감의 잘못된 단계를 정리했습니다: {Describe(data.Owned)} → {Describe(owned)}");
         }
 
         data.Owned = owned;
 
-        // 빈 칸(0)은 남긴다. 모르는 번호·겹친 특전은 지금처럼 지워서 새 단계 진입(EnterLevel)이 무료로 다시 채운다
+        // 모르는 특전(add-on 을 뺀 경우)·겹친 특전이 있던 칸은 그 자리의 빈 칸이 된다 (확정 빼기와 같다: 다음 리롤 때 채운다). 도감 보유는 위에서 그대로 남는다
         var seen = new HashSet<string>();
         var before = DescribeSlots(data.Slots);
         var fixedUp = false;
         var slots = new List<PerkSlot>();
         foreach (var slot in data.Slots)
         {
-            if (slot is null || (!slot.IsEmpty && (!PerkCatalog.IsKnown(slot.Perk) || !seen.Add(slot.Perk!))))
+            if (slot is null)
             {
                 fixedUp = true;
                 continue;
+            }
+
+            if (!slot.IsEmpty && (!PerkCatalog.IsKnown(slot.Perk) || !seen.Add(slot.Perk!)))
+            {
+                slot.Perk = PerkSlot.Empty;
+                fixedUp = true;
             }
 
             // 확정 칸은 보유한 특전만, 잠금과 함께 켜지지 않는다. 빈 칸은 잠그거나 확정할 수 없다
@@ -172,7 +179,7 @@ public static class PerkDataFile
 
         if (fixedUp)
         {
-            warnings.Add($"모르는 특전 번호·중복 슬롯을 지우고 잘못된 칸 상태를 정리했습니다: [{before}] → [{DescribeSlots(slots)}]");
+            warnings.Add($"모르는 특전·중복 슬롯을 빈 칸으로 바꾸고 잘못된 칸 상태를 정리했습니다: [{before}] → [{DescribeSlots(slots)}]");
         }
 
         data.Slots = slots;
