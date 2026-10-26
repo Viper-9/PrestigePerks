@@ -13,12 +13,15 @@ public enum PerkKind
 /// <summary>Bonus 특전이 PMC 프로필에 넣는 Bonus 하나. Id 는 고정이며 저장 때 이 ID 로 걸러 낸다.</summary>
 public sealed record PerkBonus(string Id, BonusType Type, double Value, BonusSkillType? SkillType = null);
 
-/// <summary>특전 하나. Number 는 고정 ID 로 특전 데이터 파일에 저장된다. Key 는 언어 파일·표시용 이름(가칭).</summary>
-public sealed record PerkDefinition(int Number, string Key, PerkKind Kind, IReadOnlyList<PerkBonus> Bonuses);
+/// <summary>
+/// 특전 하나. Id 는 특전 데이터 파일(schema 4)에 저장되는 영구 ID 이자 언어 파일·표시용 이름이다.
+/// Number 는 클라이언트와 주고받는 번호와 schema 3 까지의 파일을 옮길 때만 쓴다.
+/// </summary>
+public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, IReadOnlyList<PerkBonus> Bonuses);
 
 /// <summary>
 /// 특전 20개 정의 (dev-docs 2_특전.md 3절, 6절).
-/// 번호와 Bonus ID 는 한 번 정하면 바꾸거나 재사용하지 않는다. 테스트가 값을 고정한다.
+/// 번호·ID·Bonus ID 는 한 번 정하면 바꾸거나 재사용하지 않는다. 테스트가 값을 고정한다.
 /// </summary>
 public static class PerkCatalog
 {
@@ -64,16 +67,37 @@ public static class PerkCatalog
 
     public static IReadOnlyList<int> Numbers { get; } = All.Select(perk => perk.Number).ToList();
 
+    public static IReadOnlyList<string> Ids { get; } = All.Select(perk => perk.Id).ToList();
+
     private static readonly Dictionary<int, PerkDefinition> ByNumber = All.ToDictionary(perk => perk.Number);
+
+    private static readonly Dictionary<string, PerkDefinition> ById = All.ToDictionary(perk => perk.Id);
 
     public static bool TryGet(int number, out PerkDefinition perk) => ByNumber.TryGetValue(number, out perk!);
 
+    public static bool TryGet(string? id, out PerkDefinition perk)
+    {
+        perk = null!;
+        return id is not null && ById.TryGetValue(id, out perk!);
+    }
+
     public static bool IsKnown(int number) => ByNumber.ContainsKey(number);
 
+    public static bool IsKnown(string? id) => id is not null && ById.ContainsKey(id);
+
+    /// <summary>번호의 ID. 모르는 번호(빈 칸 0, 쓰지 않는 번호)면 null.</summary>
+    public static string? IdOf(int number) => TryGet(number, out var perk) ? perk.Id : null;
+
+    /// <summary>ID 의 번호. 빈 칸이거나 모르는 특전(add-on 을 뺀 경우)이면 null.</summary>
+    public static int? NumberOf(string? id) => TryGet(id, out var perk) ? perk.Number : null;
+
     /// <summary>"mastery(24)" 형식. 개발용 명령 출력에 쓴다. EFT 채팅은 "#숫자" 를 해시태그로 색칠하다 태그가 깨지므로 # 을 쓰지 않는다.</summary>
-    public static string Describe(int number) => TryGet(number, out var perk) ? $"{perk.Key}({number})" : $"?({number})";
+    public static string Describe(int number) => TryGet(number, out var perk) ? $"{perk.Id}({number})" : $"?({number})";
 
-    private static PerkDefinition Bonus(int number, string key, params PerkBonus[] bonuses) => new(number, key, PerkKind.Bonus, bonuses);
+    /// <summary>"mastery(24)" 형식 (로그용). 빈 칸은 "empty", 모르는 특전은 ID 그대로.</summary>
+    public static string Describe(string? id) => TryGet(id, out var perk) ? $"{perk.Id}({perk.Number})" : id ?? "empty";
 
-    private static PerkDefinition Patch(int number, string key) => new(number, key, PerkKind.Patch, []);
+    private static PerkDefinition Bonus(int number, string id, params PerkBonus[] bonuses) => new(number, id, PerkKind.Bonus, bonuses);
+
+    private static PerkDefinition Patch(int number, string id) => new(number, id, PerkKind.Patch, []);
 }
