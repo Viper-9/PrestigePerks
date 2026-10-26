@@ -174,7 +174,7 @@ public sealed class PerkDataFileTests : IDisposable
 
         var result = PerkDataFile.Read(FilePath);
 
-        Assert.Equal(SlotPerks(1, 0, 0, 24), Perks(result.Data));
+        Assert.Equal(SlotPerks(1, 0, 0, 0, 24), Perks(result.Data));
         Assert.True(result.Data.Slots[0].Locked);
         Assert.Equal(0, result.Data.Rerolls.FreeLeft);
         Assert.Equal(0, result.Data.Rerolls.Paid);
@@ -245,6 +245,52 @@ public sealed class PerkDataFileTests : IDisposable
         Assert.DoesNotContain("\"perk\": null", json);
         Assert.DoesNotContain("\"perk\": 0", json);
         Assert.Empty(PerkDataFile.Read(FilePath).Warnings);
+    }
+
+    // add-on 을 잠깐 빼고 접속해도 코인으로 산 보유·단계가 남아야 한다 (dev-docs 98 3절 1번)
+    [Fact]
+    public void Unknown_owned_perks_are_kept_through_read_and_write()
+    {
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(FilePath, """
+            { "schemaVersion": 4, "slots": [ { "perk": "control", "fixed": true } ],
+              "owned": { "control": 2, "someone.sprint": 3 } }
+            """);
+
+        var result = PerkDataFile.Read(FilePath);
+        Assert.Equal(new Dictionary<string, int> { ["control"] = 2, ["someone.sprint"] = 3 }, result.Data.Owned);
+        Assert.Empty(result.Warnings);
+
+        PerkDataFile.Write(FilePath, result.Data);
+        Assert.Equal(3, PerkDataFile.Read(FilePath).Data.OwnedTier("someone.sprint"));
+    }
+
+    [Fact]
+    public void Unknown_and_duplicate_slot_perks_become_empty_in_place()
+    {
+        var warnings = new List<string>();
+        var data = PerkDataFile.Normalize(PerkDataFile.Deserialize("""
+            {
+              "schemaVersion": 4,
+              "slots": [
+                { "perk": "control", "fixed": true },
+                { "perk": "someone.sprint", "fixed": true },
+                { "perk": "control" },
+                { "perk": "reload", "locked": true },
+                { "perk": "someone.other", "locked": true }
+              ],
+              "owned": { "control": 2, "someone.sprint": 3 },
+              "unseenNewPerks": ["someone.other", "reload"]
+            }
+            """), warnings);
+
+        Assert.Equal(["control", null, null, "reload", null], data.Slots.Select(slot => slot.Perk));
+        Assert.Equal([true, false, false, false, false], data.Slots.Select(slot => slot.Fixed));
+        Assert.Equal([false, false, false, true, false], data.Slots.Select(slot => slot.Locked));
+        Assert.Equal(3, data.OwnedTier("someone.sprint"));
+        Assert.Equal(["reload"], data.UnseenNewPerks);
+        Assert.Single(warnings);
+        Assert.Contains("someone.sprint", warnings[0]);
     }
 
     // 개발용 reset(PerkDataStore.Delete)은 빈 데이터를 덮어쓴다. 파일만 지우면 다음 읽기가 .bak 에서 복구해 reset 이 무효였다

@@ -750,6 +750,24 @@ public class PerkRulesTests
         Assert.Equal(1, data.Rerolls.Level);
     }
 
+    // add-on 을 뺀 특전: 도감에는 남지만 효과·Bonus·리롤·도감 수에는 없다
+    [Fact]
+    public void Unknown_owned_perks_do_not_apply_or_count()
+    {
+        var data = Owning(WithSlots(0), (14, 2));
+        data.Owned["someone.sprint"] = 3;
+
+        Assert.Empty(PerkRules.ActiveTiers(data, 1, Config));
+        Assert.Empty(PrestigePerks.Saving.PerkBonusApplier.CreateBonuses(new Dictionary<string, double> { ["someone.sprint"] = 1.0 }));
+        Assert.Equal(new Dictionary<int, int> { [14] = 2 }, PerkWire.ToNumberKeys(data.Owned));
+
+        PerkRules.EnterLevel(data, 1, Config, new Random(1));
+        Assert.True(PerkRules.Roll(data, 1, Config, new Random(1)).Success);
+        Assert.True(PerkCatalog.IsKnown(data.Slots[0].Perk));
+        Assert.Equal(PerkError.UnknownPerk, PerkRules.Equip(data, 1, "someone.sprint", 0));
+        Assert.Equal(PerkError.UnknownPerk, PerkRules.CheckBuy(data, 1, Config, "someone.sprint", 1));
+    }
+
     [Fact]
     public void Prestige_zero_closed_slots_point_to_the_first_level_that_opens_them() =>
         Assert.Equal([null, null, 3, 4, 5, 6], (Config with { PrestigeLevel0Slots = 2 }).SlotOpensAt(0));
