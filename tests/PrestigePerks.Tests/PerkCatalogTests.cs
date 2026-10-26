@@ -51,9 +51,42 @@ public class PerkCatalogTests
         Assert.Equal(ids.Count, PerkCatalog.FilteredBonusIds.Count);
     }
 
+    // 특전 데이터 파일(schema 4)에 영구히 저장되는 ID. 바뀌면 산 특전이 "모르는 특전"이 되므로 값 자체를 고정한다
     [Fact]
-    public void Keys_are_unique()
+    public void Has_the_20_fixed_perk_ids()
     {
-        Assert.Equal(PerkCatalog.All.Count, PerkCatalog.All.Select(perk => perk.Key).Distinct().Count());
+        Assert.Equal(
+            ["experience", "conditioning", "combat", "learning", "scav", "porter", "stamina", "tough", "control", "maintenance",
+             "temperance", "artisan", "mastery", "loading", "search", "surgeon", "reload", "handling", "reliability", "agility"],
+            PerkCatalog.Ids);
+        Assert.Equal(PerkCatalog.All.Count, PerkCatalog.Ids.Distinct().Count());
+    }
+
+    [Fact]
+    public void Numbers_and_ids_map_both_ways()
+    {
+        Assert.All(PerkCatalog.All, perk =>
+        {
+            Assert.Equal(perk.Id, PerkCatalog.IdOf(perk.Number));
+            Assert.Equal(perk.Number, PerkCatalog.NumberOf(perk.Id));
+            Assert.True(PerkCatalog.IsKnown(perk.Id));
+        });
+        Assert.Equal("mastery", PerkCatalog.IdOf(24));
+        Assert.Null(PerkCatalog.IdOf(5));
+        Assert.Null(PerkCatalog.IdOf(0));
+        Assert.Null(PerkCatalog.NumberOf("someone.sprint"));
+        Assert.Null(PerkCatalog.NumberOf(null));
+        Assert.False(PerkCatalog.IsKnown("someone.sprint"));
+        Assert.False(PerkCatalog.IsKnown((string?)null));
+        Assert.False(PerkCatalog.IsKnown("24"));
+    }
+
+    [Fact]
+    public void Describe_shows_id_and_number()
+    {
+        Assert.Equal("mastery(24)", PerkCatalog.Describe("mastery"));
+        Assert.Equal("someone.sprint", PerkCatalog.Describe("someone.sprint"));
+        Assert.Equal("empty", PerkCatalog.Describe((string?)null));
+        Assert.Equal("mastery(24)", PerkCatalog.Describe(24));
     }
 }
