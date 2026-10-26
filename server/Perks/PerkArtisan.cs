@@ -9,7 +9,7 @@ namespace PrestigePerks.Perks;
 /// </summary>
 public static class PerkArtisan
 {
-    public const int Perk = 17;
+    public const string Perk = "artisan";
     /// <summary>단계 III 의 시간 배율.</summary>
     public const double TimeFactor = 0.8;
 

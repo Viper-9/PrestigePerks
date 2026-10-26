@@ -7,7 +7,7 @@ namespace PrestigePerks.Perks;
 /// </summary>
 public sealed class PerkData
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     [JsonPropertyName("schemaVersion")]
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
@@ -16,24 +16,24 @@ public sealed class PerkData
     [JsonPropertyName("slots")]
     public List<PerkSlot> Slots { get; set; } = [];
 
-    /// <summary>도감: 코인으로 산 특전과 산 단계 (1~3). 모든 프레스티지에서 유지한다. schema 2 파일은 비어 있다.</summary>
+    /// <summary>도감: 코인으로 산 특전 ID 와 산 단계 (1~3). 모든 프레스티지에서 유지한다. schema 2 파일은 비어 있다.</summary>
     [JsonPropertyName("owned")]
-    public Dictionary<int, int> Owned { get; set; } = [];
+    public Dictionary<string, int> Owned { get; set; } = [];
 
     [JsonPropertyName("rerolls")]
     public PerkRerolls Rerolls { get; set; } = new();
 
     /// <summary>새 단계 진입 때 자동으로 뽑았지만 아직 클라이언트에 알리지 않은 특전. state 라우트가 알리고 비운다.</summary>
     [JsonPropertyName("unseenNewPerks")]
-    public List<int> UnseenNewPerks { get; set; } = [];
+    public List<string> UnseenNewPerks { get; set; } = [];
 
     /// <summary>프레스티지로 올랐지만 아직 클라이언트에 알리지 않은 단계 상한. state 라우트가 알리고 비운다.</summary>
     [JsonPropertyName("unseenTierCap")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? UnseenTierCap { get; set; }
 
-    /// <summary>보유한 단계. 없으면 0.</summary>
-    public int OwnedTier(int perk) => Owned.TryGetValue(perk, out var tier) ? tier : 0;
+    /// <summary>보유한 단계. 없거나 빈 칸이면 0.</summary>
+    public int OwnedTier(string? perk) => perk is not null && Owned.TryGetValue(perk, out var tier) ? tier : 0;
 
     /// <summary>개발용 (Dev 빌드만): 슬롯과 상관없이 모든 특전을 적용한다. 상용 빌드는 읽을 때 끈다 (<see cref="PerkDataFile.Normalize"/>).</summary>
     [JsonPropertyName("devAllPerks")]
@@ -52,12 +52,13 @@ public sealed class PerkData
 
 public sealed class PerkSlot
 {
-    /// <summary>빈 칸 번호. 확정 특전을 빼서 생기거나, 뽑을 미보유 특전이 없을 때 생긴다. 다음 리롤 때 채운다.</summary>
-    public const int Empty = 0;
+    /// <summary>빈 칸. 확정 특전을 빼서 생기거나, 뽑을 미보유 특전이 없을 때 생긴다. 다음 리롤 때 채운다.</summary>
+    public const string? Empty = null;
 
-    /// <summary>특전 번호. <see cref="Empty"/> 면 빈 칸.</summary>
+    /// <summary>특전 ID. <see cref="Empty"/>(null) 면 빈 칸이고 파일에 쓰지 않는다.</summary>
     [JsonPropertyName("perk")]
-    public int Perk { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Perk { get; set; }
 
     /// <summary>잠긴 칸: 풀 때까지 리롤에서 빠지고 리롤 비용을 올린다.</summary>
     [JsonPropertyName("locked")]
@@ -68,7 +69,7 @@ public sealed class PerkSlot
     public bool Fixed { get; set; }
 
     [JsonIgnore]
-    public bool IsEmpty => Perk == Empty;
+    public bool IsEmpty => string.IsNullOrEmpty(Perk);
 
     /// <summary>다음 리롤 때 다시 뽑는 칸 (리롤 칸·빈 칸).</summary>
     [JsonIgnore]

@@ -12,7 +12,7 @@ public sealed record PerkState
 
     /// <summary>슬롯 (효과가 적용되는 슬롯만, 단계 수만큼). 특전 0 은 빈 칸.</summary>
     [JsonPropertyName("slots")]
-    public IReadOnlyList<PerkSlot> Slots { get; init; } = [];
+    public IReadOnlyList<PerkSlotState> Slots { get; init; } = [];
 
     [JsonPropertyName("activePerks")]
     public IReadOnlyList<int> ActivePerks { get; init; } = [];
@@ -96,9 +96,26 @@ public sealed record PerkState
     public int? BuyCost { get; init; }
 }
 
+/// <summary>state 응답의 슬롯 한 칸. 클라이언트는 아직 특전 번호를 쓴다 (<see cref="PerkWire"/>).</summary>
+public sealed record PerkSlotState
+{
+    /// <summary>특전 번호. 0 이면 빈 칸.</summary>
+    [JsonPropertyName("perk")]
+    public int Perk { get; init; }
+
+    [JsonPropertyName("locked")]
+    public bool Locked { get; init; }
+
+    [JsonPropertyName("fixed")]
+    public bool Fixed { get; init; }
+
+    [JsonIgnore]
+    public bool IsEmpty => Perk == 0;
+}
+
 public sealed record PerkEquipRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
 {
-    /// <summary>넣을 보유 특전.</summary>
+    /// <summary>넣을 보유 특전 번호 (서버가 <see cref="PerkWire.ToId"/> 로 바꾼다).</summary>
     [JsonPropertyName("perk")]
     public int Perk { get; init; }
 
