@@ -1,5 +1,6 @@
 using PrestigePerks.Commands;
 using PrestigePerks.Perks;
+using static PrestigePerks.Tests.TestPerks;
 
 namespace PrestigePerks.Tests;
 
@@ -77,9 +78,10 @@ public class PrestigeCommandoCommandTests
     }
 
     [Theory]
-    [InlineData("prestige perk set 1 2", 1, 2)]
-    [InlineData("  PRESTIGE PERK SET 6 29 ", 6, 29)]
-    public void Parses_set_command(string text, int slot, int perk)
+    [InlineData("prestige perk set 1 2", 1, "conditioning")]
+    [InlineData("  PRESTIGE PERK SET 6 29 ", 6, "reload")]
+    [InlineData("prestige perk set 2 mastery", 2, "mastery")]
+    public void Parses_set_command(string text, int slot, string perk)
     {
         Assert.Equal((slot, perk), PrestigeCommandoCommand.ParseSetCommand(text));
     }
@@ -88,6 +90,7 @@ public class PrestigeCommandoCommandTests
     [InlineData("prestige perk set 0 2")]
     [InlineData("prestige perk set 7 2")]
     [InlineData("prestige perk set 1 999")]
+    [InlineData("prestige perk set 1 someone.sprint")]
     [InlineData("prestige perk set 1")]
     [InlineData("prestige perk set")]
     [InlineData(null)]
@@ -119,12 +122,12 @@ public class PrestigeCommandoCommandTests
         var text = PrestigeCommandoCommand.FormatState(new PerkState
         {
             PrestigeLevel = 3,
-            ActivePerks = [1, 24, 8],
-            ActiveTiers = new Dictionary<int, int> { [1] = 1, [24] = 2, [8] = 1 },
-            Owned = new Dictionary<int, int> { [24] = 3 },
+            ActivePerks = Ids(1, 24, 8),
+            ActiveTiers = new Dictionary<string, int> { [Id(1)] = 1, [Id(24)] = 2, [Id(8)] = 1 },
+            Owned = new Dictionary<string, int> { [Id(24)] = 3 },
             TierCap = 2,
-            Slots = [new PerkSlotState { Perk = 1, Locked = true }, new PerkSlotState { Perk = 24, Fixed = true }, new PerkSlotState { Perk = 8 }, new PerkSlotState()],
-            NewPerks = [8],
+            Slots = [new PerkSlotState { Perk = Id(1), Locked = true }, new PerkSlotState { Perk = Id(24), Fixed = true }, new PerkSlotState { Perk = Id(8) }, new PerkSlotState()],
+            NewPerks = Ids(8),
             FreeRerollsLeft = 0,
             PaidRerolls = 1,
             NextRerollCost = 90,
@@ -140,9 +143,10 @@ public class PrestigeCommandoCommandTests
     }
 
     [Theory]
-    [InlineData("prestige perk tier 14 2", 14, 2)]
-    [InlineData("prestige perk tier 1 0", 1, 0)]
-    public void Parses_tier_commands(string text, int perk, int tier)
+    [InlineData("prestige perk tier 14 2", "control", 2)]
+    [InlineData("prestige perk tier 1 0", "experience", 0)]
+    [InlineData("prestige perk tier search 3", "search", 3)]
+    public void Parses_tier_commands(string text, string perk, int tier)
     {
         Assert.Equal((perk, tier), PrestigeCommandoCommand.ParseTierCommand(text));
     }
@@ -151,6 +155,7 @@ public class PrestigeCommandoCommandTests
     [InlineData("prestige perk tier 14 4")]
     [InlineData("prestige perk tier 999 1")]
     [InlineData("prestige perk tier 14")]
+    [InlineData("prestige perk tier sprint 1")]
     public void Rejects_invalid_tier_commands(string text)
     {
         Assert.Null(PrestigeCommandoCommand.ParseTierCommand(text));

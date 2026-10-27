@@ -89,4 +89,61 @@ public class PerkCatalogTests
         Assert.Equal("empty", PerkCatalog.Describe((string?)null));
         Assert.Equal("mastery(24)", PerkCatalog.Describe(24));
     }
+
+    // 화면 수치의 출처. 클라이언트 문구가 이 값을 그대로 보이므로 값 자체를 고정한다 (dev-docs 2_특전.md 3절 표)
+    [Fact]
+    public void Has_the_fixed_tier_three_amounts_and_units()
+    {
+        Assert.Equal(
+            [30, 30, 30, 30, -30, 20, 15, -20, -10, -20, -15, -20, 30, -20, 30, 25, 15, 10, -20, 5],
+            PerkCatalog.All.Select(perk => perk.Amount));
+        Assert.Equal([1, 2, 3, 4, 8, 9, 10, 14, 27], PerkCatalog.All.Where(perk => perk.Unit == PerkUnit.Points).Select(perk => perk.Number));
+        Assert.Equal([30], PerkCatalog.All.Where(perk => perk.Unit == PerkUnit.Flat).Select(perk => perk.Number));
+    }
+
+    [Fact]
+    public void Bonus_perk_amount_is_its_bonus_value()
+    {
+        Assert.All(PerkCatalog.All.Where(perk => perk.Kind == PerkKind.Bonus),
+            perk => Assert.All(perk.Bonuses, bonus => Assert.Equal(bonus.Value, perk.Amount)));
+    }
+
+    [Fact]
+    public void State_entries_follow_the_catalog_order()
+    {
+        Assert.Equal(PerkCatalog.Ids, PerkCatalog.Entries.Select(entry => entry.Id));
+        Assert.Equal(PerkCatalog.All.Select(perk => perk.Amount), PerkCatalog.Entries.Select(entry => entry.Amount));
+        Assert.Equal("points", PerkCatalog.Entries[0].Unit);
+        Assert.Equal("percent", PerkCatalog.Entries.Single(entry => entry.Id == "mastery").Unit);
+        Assert.Equal("flat", PerkCatalog.Entries.Single(entry => entry.Id == "handling").Unit);
+    }
+
+    [Fact]
+    public void Known_only_drops_empty_and_unknown_perks()
+    {
+        Assert.Equal(["experience", "mastery"], PerkCatalog.KnownOnly(["experience", null, "someone.sprint", "mastery"]));
+        Assert.Equal(new Dictionary<string, int> { ["control"] = 2 },
+            PerkCatalog.KnownOnly(new Dictionary<string, int> { ["control"] = 2, ["someone.sprint"] = 3 }));
+    }
+
+    [Fact]
+    public void Slot_state_hides_unknown_perks_as_empty()
+    {
+        var state = PerkSlotState.From(new PerkSlot { Perk = "reload", Locked = true });
+        Assert.Equal(("reload", true, false), (state.Perk, state.Locked, state.Fixed));
+        Assert.True(PerkSlotState.From(new PerkSlot()).IsEmpty);
+        Assert.True(PerkSlotState.From(new PerkSlot { Perk = "someone.sprint" }).IsEmpty);
+    }
+
+    [Theory]
+    [InlineData("24", "mastery")]
+    [InlineData("mastery", "mastery")]
+    [InlineData("MASTERY", "mastery")]
+    [InlineData("5", null)]
+    [InlineData("someone.sprint", null)]
+    [InlineData(null, null)]
+    public void Resolve_takes_a_number_or_an_id(string? token, string? id)
+    {
+        Assert.Equal(id, PerkCatalog.Resolve(token));
+    }
 }

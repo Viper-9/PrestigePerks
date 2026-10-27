@@ -759,7 +759,7 @@ public class PerkRulesTests
 
         Assert.Empty(PerkRules.ActiveTiers(data, 1, Config));
         Assert.Empty(PrestigePerks.Saving.PerkBonusApplier.CreateBonuses(new Dictionary<string, double> { ["someone.sprint"] = 1.0 }));
-        Assert.Equal(new Dictionary<int, int> { [14] = 2 }, PerkWire.ToNumberKeys(data.Owned));
+        Assert.Equal(new Dictionary<string, int> { [Id(14)] = 2 }, PerkCatalog.KnownOnly(data.Owned));
 
         PerkRules.EnterLevel(data, 1, Config, new Random(1));
         Assert.True(PerkRules.Roll(data, 1, Config, new Random(1)).Success);
