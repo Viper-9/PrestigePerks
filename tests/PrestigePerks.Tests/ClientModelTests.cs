@@ -14,9 +14,14 @@ public class ClientModelTests
     private static PerkStateDto State(int cost, params (int Perk, bool Locked)[] slots) => new()
     {
         PrestigeLevel = slots.Length,
-        Slots = slots.Select(slot => new PerkSlotDto { Perk = slot.Perk, Locked = slot.Locked }).ToList(),
+        Slots = slots.Select(slot => new PerkSlotDto { Perk = SlotPerk(slot.Perk), Locked = slot.Locked }).ToList(),
         NextRerollCost = cost,
+        Catalog = ClientCatalog(),
     };
+
+    /// <summary>서버 state 의 catalog 를 System.Text.Json 으로 직렬화해 클라이언트가 읽은 것.</summary>
+    private static List<PerkCatalogEntryDto> ClientCatalog() =>
+        PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(new PerkState { Catalog = PerkCatalog.Entries }))!.Catalog;
 
     [Fact]
     public void Reads_the_json_the_server_sends()
@@ -24,28 +29,29 @@ public class ClientModelTests
         var server = new PerkState
         {
             PrestigeLevel = 3,
-            Slots = [new PerkSlotState { Perk = 1, Locked = true }, new PerkSlotState { Perk = 4 }, new PerkSlotState { Perk = 8 }],
-            ActivePerks = [1, 4, 8],
+            Slots = [new PerkSlotState { Perk = Id(1), Locked = true }, new PerkSlotState { Perk = Id(4) }, new PerkSlotState { Perk = Id(8) }],
+            ActivePerks = Ids(1, 4, 8),
             FreeRerollsLeft = 0,
             PaidRerolls = 2,
             NextRerollCost = 180,
             CostFixed = true,
-            NewPerks = [8],
+            NewPerks = Ids(8),
             Bonuses = PerkBonusApplier.CreateBonuses(Ids(1, 4, 8)),
             BonusIds = PerkCatalog.FilteredBonusIds.Select(id => id.ToString()).ToList(),
+            Catalog = PerkCatalog.Entries,
         };
         var json = new JsonUtil([new SptJsonConverterRegistrator()]).Serialize(server)!;
 
         var state = PerkStateDto.Parse(json)!;
 
         Assert.Equal(3, state.PrestigeLevel);
-        Assert.Equal([1, 4, 8], state.Slots.Select(slot => slot.Perk));
+        Assert.Equal(Ids(1, 4, 8), state.Slots.Select(slot => slot.Perk));
         Assert.Equal([true, false, false], state.Slots.Select(slot => slot.Locked));
         Assert.Equal(0, state.FreeRerollsLeft);
         Assert.Equal(2, state.PaidRerolls);
         Assert.Equal(180, state.NextRerollCost);
         Assert.True(state.CostFixed);
-        Assert.Equal([8], state.NewPerks);
+        Assert.Equal(Ids(8), state.NewPerks);
         Assert.Null(state.Error);
         Assert.Equal(6, state.BonusIds.Count);
 
@@ -73,22 +79,23 @@ public class ClientModelTests
         var server = new PerkState
         {
             PrestigeLevel = 3,
-            Slots = [new PerkSlotState { Perk = 14, Fixed = true }, new PerkSlotState(), new PerkSlotState { Perk = 29, Locked = true }],
-            ActiveTiers = new Dictionary<int, int> { [14] = 2, [29] = 1 },
-            Owned = new Dictionary<int, int> { [14] = 3, [26] = 1 },
+            Slots = [new PerkSlotState { Perk = Id(14), Fixed = true }, new PerkSlotState(), new PerkSlotState { Perk = Id(29), Locked = true }],
+            ActiveTiers = new Dictionary<string, int> { [Id(14)] = 2, [Id(29)] = 1 },
+            Owned = new Dictionary<string, int> { [Id(14)] = 3, [Id(26)] = 1 },
             TierCap = 2,
             TierOpensAt = [config.TierOpensAt(3, 2), config.TierOpensAt(3, 3)],
             TierPrices = config.TierPrices,
             TierEffectRatio = config.TierEffectRatio,
             NewTierCap = 2,
             BuyCost = 100,
+            Catalog = PerkCatalog.Entries,
         };
         var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(server))!;
 
         Assert.Equal([true, false, false], state.Slots.Select(slot => slot.Fixed));
         Assert.True(state.Slots[1].IsEmpty);
-        Assert.Equal(2, state.ActiveTiers[14]);
-        Assert.Equal(3, state.Owned[14]);
+        Assert.Equal(2, state.ActiveTiers[Id(14)]);
+        Assert.Equal(3, state.Owned[Id(14)]);
         Assert.Equal(2, state.TierCap);
         Assert.Equal([null, 5], state.TierOpensAt);
         Assert.Equal([40, 100, 200], state.TierPrices);
@@ -155,8 +162,8 @@ public class ClientModelTests
         var state = State(0, (1, true), (4, false), (8, true), (9, false));
         Assert.Equal([1, 3], PerkPageModel.SpinTargets(state));
         Assert.Equal(2, PerkPageModel.LockedCount(state));
-        Assert.Equal(2, PerkPageModel.SlotOf(state, 8));
-        Assert.Equal(-1, PerkPageModel.SlotOf(state, 24));
+        Assert.Equal(2, PerkPageModel.SlotOf(state, Id(8)));
+        Assert.Equal(-1, PerkPageModel.SlotOf(state, Id(24)));
         Assert.True(PerkPageModel.IsSlotOpen(state, 3));
         Assert.False(PerkPageModel.IsSlotOpen(state, 4));
     }
@@ -167,8 +174,8 @@ public class ClientModelTests
         var state = State(0, (14, false), (0, false), (11, true));
         state.Slots[0].Fixed = true;
         state.TierCap = 2;
-        state.Owned = new Dictionary<int, int> { [14] = 3, [26] = 1 };
-        state.ActiveTiers = new Dictionary<int, int> { [14] = 2, [11] = 1 };
+        state.Owned = new Dictionary<string, int> { [Id(14)] = 3, [Id(26)] = 1 };
+        state.ActiveTiers = new Dictionary<string, int> { [Id(14)] = 2, [Id(11)] = 1 };
         state.TierPrices = [40, 100, 200];
         state.TierEffectRatio = [0.5, 0.75, 1.0];
         state.TierOpensAt = [null, 5];
@@ -184,12 +191,12 @@ public class ClientModelTests
         Assert.Equal(1, PerkPageModel.FixedCount(state));
         Assert.Equal(1, PerkPageModel.LockedCount(state));
         Assert.Equal(2, PerkPageModel.OwnedCount(state));
-        Assert.Equal(-1, PerkPageModel.SlotOf(state, 0));
+        Assert.Equal(-1, PerkPageModel.SlotOf(state, null!));
 
         var pool = PerkPageModel.RollPool(state);
-        Assert.DoesNotContain(14, pool);
-        Assert.DoesNotContain(26, pool);
-        Assert.DoesNotContain(11, pool);
+        Assert.DoesNotContain(Id(14), pool);
+        Assert.DoesNotContain(Id(26), pool);
+        Assert.DoesNotContain(Id(11), pool);
         Assert.Equal(17, pool.Count);
     }
 
@@ -198,22 +205,22 @@ public class ClientModelTests
     {
         // [빈 칸] [강인 잠김] [제어]: 빈 칸을 건너뛰고 강인
         var state = State(0, (0, false), (11, true), (14, false));
-        Assert.Equal(11, PerkPageModel.FirstSlotPerk(state));
-        Assert.Equal(0, PerkPageModel.PerkInSlot(state, 0));
-        Assert.Equal(14, PerkPageModel.PerkInSlot(state, 2));
-        Assert.Equal(0, PerkPageModel.PerkInSlot(state, 3)); // 닫힌 칸
-        Assert.Equal(0, PerkPageModel.PerkInSlot(state, -1));
+        Assert.Equal(Id(11), PerkPageModel.FirstSlotPerk(state));
+        Assert.Null(PerkPageModel.PerkInSlot(state, 0));
+        Assert.Equal(Id(14), PerkPageModel.PerkInSlot(state, 2));
+        Assert.Null(PerkPageModel.PerkInSlot(state, 3)); // 닫힌 칸
+        Assert.Null(PerkPageModel.PerkInSlot(state, -1));
 
-        Assert.Equal(0, PerkPageModel.FirstSlotPerk(State(0, (0, false), (0, false))));
-        Assert.Equal(0, PerkPageModel.FirstSlotPerk(State(0)));
-        Assert.Equal(0, PerkPageModel.FirstSlotPerk(null!));
+        Assert.Null(PerkPageModel.FirstSlotPerk(State(0, (0, false), (0, false))));
+        Assert.Null(PerkPageModel.FirstSlotPerk(State(0)));
+        Assert.Null(PerkPageModel.FirstSlotPerk(null!));
     }
 
     [Fact]
     public void Roll_is_blocked_when_the_collection_is_complete()
     {
         var state = State(0, (0, false));
-        state.Owned = PerkPageModel.AllPerks.ToDictionary(perk => perk, _ => 1);
+        state.Owned = PerkCatalog.Ids.ToDictionary(perk => perk, _ => 1);
         Assert.Equal(RollBlock.CollectionComplete, PerkPageModel.CheckRoll(state, 999, false));
     }
 
@@ -221,22 +228,22 @@ public class ClientModelTests
     public void Shown_tier_is_applied_tier_in_a_slot_owned_tier_up_to_the_cap_otherwise_one()
     {
         var state = Collection();
-        Assert.Equal(2, PerkPageModel.ShownTier(state, 14)); // III 보유, 상한 II
-        Assert.Equal(1, PerkPageModel.ShownTier(state, 11)); // 미보유, 잠긴 칸
-        Assert.Equal(1, PerkPageModel.ShownTier(state, 26)); // I 보유, 장착 안 됨
-        Assert.Equal(1, PerkPageModel.ShownTier(state, 24)); // 미보유
-        Assert.Equal(0, PerkPageModel.AppliedTier(state, 26));
-        Assert.Equal("−10%", PerkPageModel.EffectValue(state, 11, 1));
-        Assert.Equal("−7.5%", PerkPageModel.EffectValue(state, 14, 2));
+        Assert.Equal(2, PerkPageModel.ShownTier(state, Id(14))); // III 보유, 상한 II
+        Assert.Equal(1, PerkPageModel.ShownTier(state, Id(11))); // 미보유, 잠긴 칸
+        Assert.Equal(1, PerkPageModel.ShownTier(state, Id(26))); // I 보유, 장착 안 됨
+        Assert.Equal(1, PerkPageModel.ShownTier(state, Id(24))); // 미보유
+        Assert.Equal(0, PerkPageModel.AppliedTier(state, Id(26)));
+        Assert.Equal("−10%", PerkPageModel.EffectValue(state, Id(11), 1));
+        Assert.Equal("−7.5%", PerkPageModel.EffectValue(state, Id(14), 2));
     }
 
     [Fact]
     public void Drag_rules_allow_only_unequipped_owned_rows_and_fixed_slots_onto_unlocked_slots()
     {
         var state = Collection();
-        Assert.True(PerkPageModel.CanDragRow(state, 26));
-        Assert.False(PerkPageModel.CanDragRow(state, 14)); // 이미 칸에 있음
-        Assert.False(PerkPageModel.CanDragRow(state, 24)); // 미보유
+        Assert.True(PerkPageModel.CanDragRow(state, Id(26)));
+        Assert.False(PerkPageModel.CanDragRow(state, Id(14))); // 이미 칸에 있음
+        Assert.False(PerkPageModel.CanDragRow(state, Id(24))); // 미보유
         Assert.True(PerkPageModel.CanDragSlot(state, 0));
         Assert.False(PerkPageModel.CanDragSlot(state, 2));
         Assert.Equal([true, true, false, false], Enumerable.Range(0, 4).Select(i => PerkPageModel.CanDrop(state, i)));
@@ -246,29 +253,85 @@ public class ClientModelTests
     public void Selection_states_and_buy_buttons()
     {
         var state = Collection();
-        state.Slots.Add(new PerkSlotDto { Perk = 29 });
+        state.Slots.Add(new PerkSlotDto { Perk = Id(29) });
 
-        var roll = PerkPageModel.Select(state, 29, 500);
+        var roll = PerkPageModel.Select(state, Id(29), 500);
         Assert.Equal((SelectionKind.RollSlot, 1, 40, BuyBlock.None), (roll.Kind, roll.NextTier, roll.Price, roll.Block));
 
-        var locked = PerkPageModel.Select(state, 11, 20);
+        var locked = PerkPageModel.Select(state, Id(11), 20);
         Assert.Equal((SelectionKind.LockedSlot, 1, BuyBlock.NotEnoughCoins), (locked.Kind, locked.NextTier, locked.Block));
 
         // 제어: III 보유라 살 단계 없음
-        var fixedPerk = PerkPageModel.Select(state, 14, 500);
+        var fixedPerk = PerkPageModel.Select(state, Id(14), 500);
         Assert.Equal((SelectionKind.Fixed, 0, 2), (fixedPerk.Kind, fixedPerk.NextTier, fixedPerk.Tier));
 
-        var owned = PerkPageModel.Select(state, 26, 500);
+        var owned = PerkPageModel.Select(state, Id(26), 500);
         Assert.Equal((SelectionKind.Owned, 2, 100, BuyBlock.None), (owned.Kind, owned.NextTier, owned.Price, owned.Block));
 
-        state.Owned[26] = 2;
-        var capped = PerkPageModel.Select(state, 26, 500);
+        state.Owned[Id(26)] = 2;
+        var capped = PerkPageModel.Select(state, Id(26), 500);
         Assert.Equal((3, BuyBlock.Capped, (int?)5), (capped.NextTier, capped.Block, capped.OpensAt));
 
-        var notShown = PerkPageModel.Select(state, 24, 500);
+        var notShown = PerkPageModel.Select(state, Id(24), 500);
         Assert.Equal((SelectionKind.NotShown, 0), (notShown.Kind, notShown.NextTier));
-        Assert.Equal(SelectionKind.None, PerkPageModel.Select(state, 0, 500).Kind);
-        Assert.Equal(SelectionKind.None, PerkPageModel.Select(null!, 14, 500).Kind);
+        Assert.Equal(SelectionKind.None, PerkPageModel.Select(state, null!, 500).Kind);
+        Assert.Equal(SelectionKind.None, PerkPageModel.Select(null!, Id(14), 500).Kind);
+    }
+
+    [Fact]
+    public void Unknown_perks_in_the_state_are_dropped_and_their_slots_become_empty()
+    {
+        var json = """
+            {
+              "prestigeLevel": 2,
+              "catalog": [ { "id": "control", "amount": -10, "unit": "points" } ],
+              "slots": [ { "perk": "someone.sprint", "locked": true, "fixed": false }, { "perk": "control", "locked": false, "fixed": true }, { "perk": "", "locked": false, "fixed": false } ],
+              "activePerks": [ "someone.sprint", "control" ],
+              "activeTiers": { "someone.sprint": 1, "control": 2 },
+              "owned": { "someone.sprint": 3, "control": 2 },
+              "newPerks": [ "someone.sprint" ]
+            }
+            """;
+        var state = PerkStateDto.Parse(json)!;
+
+        Assert.True(state.Slots[0].IsEmpty);
+        Assert.False(state.Slots[0].Locked);
+        Assert.Equal("control", state.Slots[1].Perk);
+        Assert.True(state.Slots[2].IsEmpty);
+        Assert.Null(state.Slots[2].Perk);
+        Assert.Equal(["control"], state.ActivePerks);
+        Assert.Equal(["control"], state.ActiveTiers.Keys);
+        Assert.Equal(["control"], state.Owned.Keys);
+        Assert.Empty(state.NewPerks);
+        Assert.Equal(["control"], PerkPageModel.Perks(state));
+    }
+
+    [Fact]
+    public void Error_only_states_still_carry_the_full_catalog()
+    {
+        var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(new PerkState { Error = "NoProfile" }))!;
+
+        Assert.Equal("NoProfile", state.Error);
+        Assert.Equal(PerkCatalog.Ids, state.Catalog.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public void Perks_without_texts_show_the_id_and_the_value_only()
+    {
+        var locale = new PerkLocale(new Dictionary<string, string>(), LocaleFile("en"));
+        Assert.Equal("someone.sprint", locale.PerkName("someone.sprint"));
+        Assert.Equal("+15%", locale.PerkEffect("someone.sprint", "+15%"));
+        Assert.Equal("", locale.PerkSubject("someone.sprint"));
+        Assert.Equal("", locale.PerkDetail("someone.sprint"));
+        Assert.Equal(LocaleFile("en")["perk.mastery.name"], locale.PerkName("mastery"));
+    }
+
+    [Fact]
+    public void List_is_empty_until_the_catalog_arrives()
+    {
+        Assert.Empty(PerkPageModel.Perks(null!));
+        Assert.Empty(PerkPageModel.RollPool(null!));
+        Assert.Empty(PerkPageModel.Perks(PerkStateDto.Parse("""{ "prestigeLevel": 1 }""")!));
     }
 
     [Theory]
@@ -281,7 +344,7 @@ public class ClientModelTests
     [InlineData(1, 1.0, "+30%")]
     public void Effect_values_scale_and_round_to_one_decimal(int perk, double ratio, string expected)
     {
-        Assert.Equal(expected, PerkAmounts.Format(perk, ratio));
+        Assert.Equal(expected, PerkAmounts.Format(ClientCatalog().Single(entry => entry.Id == Id(perk)), ratio));
     }
 
     [Theory]
@@ -294,7 +357,7 @@ public class ClientModelTests
     [InlineData(30, 1.0, "+10")] // 고정값은 단위 없음
     public void Added_perks_take_the_point_unit_and_multiplied_perks_keep_percent(int perk, double ratio, string expected)
     {
-        Assert.Equal(expected, PerkAmounts.Format(perk, ratio, "%p"));
+        Assert.Equal(expected, PerkAmounts.Format(ClientCatalog().Single(entry => entry.Id == Id(perk)), ratio, "%p"));
     }
 
     [Fact]
@@ -306,14 +369,17 @@ public class ClientModelTests
     }
 
     [Fact]
-    public void Bonus_perk_amounts_match_the_server_catalog()
+    public void Reads_the_catalog_the_server_sends()
     {
-        foreach (var perk in PerkCatalog.All.Where(perk => perk.Kind == PerkKind.Bonus))
-        {
-            Assert.All(perk.Bonuses, bonus => Assert.Equal(bonus.Value, PerkAmounts.Amount(perk.Number)));
-        }
+        var state = PerkStateDto.Parse(System.Text.Json.JsonSerializer.Serialize(new PerkState { Catalog = PerkCatalog.Entries }))!;
 
-        Assert.All(PerkCatalog.Numbers, perk => Assert.True(PerkAmounts.IsKnown(perk), $"perk {perk}"));
+        Assert.Equal(PerkCatalog.Ids, state.CatalogIds);
+        Assert.Equal(-10, state.Info("control")!.Amount);
+        Assert.Equal(PerkCatalogEntryDto.Points, state.Info("control")!.Unit);
+        Assert.Null(state.Info("someone.sprint"));
+        Assert.Null(state.Info(null!));
+        Assert.Empty(PerkStateDto.Parse("""{ "prestigeLevel": 1, "catalog": null }""")!.CatalogIds);
+        Assert.Equal("", PerkAmounts.Format((PerkCatalogEntryDto)null!, 1.0));
     }
 
     [Theory]
@@ -322,7 +388,7 @@ public class ClientModelTests
     public void Effect_texts_take_the_value_and_have_no_numbers(string culture)
     {
         var locale = new PerkLocale(LocaleFile(culture), null!);
-        foreach (var perk in PerkCatalog.Numbers)
+        foreach (var perk in PerkCatalog.Ids)
         {
             var text = LocaleFile(culture)[$"perk.{perk}.effect"];
             Assert.Contains("{0}", text);
@@ -330,12 +396,6 @@ public class ClientModelTests
             Assert.EndsWith("+15%", locale.PerkEffect(perk, "+15%"));
             Assert.DoesNotContain("{0}", locale.PerkSubject(perk));
         }
-    }
-
-    [Fact]
-    public void Client_perk_list_matches_the_server_catalog()
-    {
-        Assert.Equal(PerkCatalog.Numbers, PerkPageModel.AllPerks);
     }
 
     private static Dictionary<string, string> LocaleFile(string culture) =>
@@ -347,7 +407,7 @@ public class ClientModelTests
     public void Locale_files_name_every_perk(string culture)
     {
         var file = LocaleFile(culture);
-        foreach (var perk in PerkCatalog.Numbers)
+        foreach (var perk in PerkCatalog.Ids)
         {
             foreach (var field in new[] { "name", "effect", "detail" })
             {
@@ -359,7 +419,7 @@ public class ClientModelTests
     [Fact]
     public void Every_perk_has_an_icon()
     {
-        foreach (var perk in PerkCatalog.Numbers)
+        foreach (var perk in PerkCatalog.Ids)
         {
             Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "ClientIcons", $"perk_{perk}.png")), $"perk_{perk}.png");
         }
@@ -413,7 +473,7 @@ public class ClientModelTests
 
 public class ReelScheduleTests
 {
-    private static readonly int[] Pool = PrestigePerks.Model.PerkPageModel.AllPerks;
+    private static readonly string[] Pool = PerkCatalog.Ids.ToArray();
 
     [Theory]
     [InlineData(false)]
@@ -424,16 +484,16 @@ public class ReelScheduleTests
         for (var seed = 0; seed < 200; seed++)
         {
             var random = new Random(seed);
-            var strip = new List<int>();
-            PrestigePerks.Model.ReelSchedule.Fill(strip, 7, random, Pool, -1);
+            var strip = new List<string>();
+            PrestigePerks.Model.ReelSchedule.Fill(strip, 7, random, Pool, null!);
 
-            var (result, stop) = PrestigePerks.Model.ReelSchedule.Extend(strip, 5, 24, effect, random, Pool);
+            var (result, stop) = PrestigePerks.Model.ReelSchedule.Extend(strip, 5, Id(24), effect, random, Pool);
 
             Assert.Equal(5 + PrestigePerks.Model.ReelSchedule.LandingItems, result);
-            Assert.Equal(24, strip[result]);
+            Assert.Equal(Id(24), strip[result]);
             // 가짜 멈춤이면 결과 바로 다음 칸(미끼)에서 멈춘다. 결과 칸은 그 아래에 걸려 보인다
             Assert.Equal(fakeOut ? result + 1 : result, stop);
-            Assert.NotEqual(24, strip[stop + (fakeOut ? 0 : 1)]);
+            Assert.NotEqual(Id(24), strip[stop + (fakeOut ? 0 : 1)]);
             // 멈춘 칸 위로도 보일 칸이 있다
             Assert.True(strip.Count >= stop + 3);
             // 같은 칸이 연달아 나오지 않고, 새로 붙인 칸에는 결과가 한 번만 있다
@@ -442,7 +502,7 @@ public class ReelScheduleTests
                 Assert.NotEqual(strip[i - 1], strip[i]);
             }
 
-            Assert.Single(strip.Skip(7), perk => perk == 24);
+            Assert.Single(strip.Skip(7), perk => perk == Id(24));
         }
     }
 
@@ -497,7 +557,7 @@ public class ReelFakeOutTests
 
 public class ReelReverseTests
 {
-    private static readonly int[] Pool = PrestigePerks.Model.PerkPageModel.AllPerks;
+    private static readonly string[] Pool = PerkCatalog.Ids.ToArray();
 
     [Fact]
     public void Reverse_stops_on_a_decoy_and_plants_the_result_behind()
@@ -505,19 +565,19 @@ public class ReelReverseTests
         for (var seed = 0; seed < 200; seed++)
         {
             var random = new Random(seed);
-            var strip = new List<int>();
-            PrestigePerks.Model.ReelSchedule.Fill(strip, 7, random, Pool, -1);
+            var strip = new List<string>();
+            PrestigePerks.Model.ReelSchedule.Fill(strip, 7, random, Pool, null!);
 
-            var (result, stop) = PrestigePerks.Model.ReelSchedule.Extend(strip, 5, 24, PrestigePerks.Model.ReelEffect.Reverse, random, Pool);
+            var (result, stop) = PrestigePerks.Model.ReelSchedule.Extend(strip, 5, Id(24), PrestigePerks.Model.ReelEffect.Reverse, random, Pool);
 
             Assert.Equal(5 + PrestigePerks.Model.ReelSchedule.LandingItems, stop);
-            Assert.NotEqual(24, strip[stop]);
+            Assert.NotEqual(Id(24), strip[stop]);
             // 결과는 이미 지나간 칸, 멈춘 자리에서 보이지 않을 만큼 뒤에 있다
             Assert.Equal(stop - PrestigePerks.Model.ReelSchedule.ReverseItems, result);
             Assert.True(stop - result > 2);
-            Assert.Equal(24, strip[result]);
-            Assert.NotEqual(24, strip[result - 1]);
-            Assert.NotEqual(24, strip[result + 1]);
+            Assert.Equal(Id(24), strip[result]);
+            Assert.NotEqual(Id(24), strip[result - 1]);
+            Assert.NotEqual(Id(24), strip[result + 1]);
         }
     }
 
@@ -532,14 +592,14 @@ public class ReelReverseTests
     [Fact]
     public void Next_cell_after_the_stop_is_a_perk_no_slot_has()
     {
-        var held = new HashSet<int> { 1, 4, 8 };
+        var held = new HashSet<string>(Ids(1, 4, 8));
         for (var seed = 0; seed < 300; seed++)
         {
             var random = new Random(seed);
-            var strip = new List<int>();
-            PrestigePerks.Model.ReelSchedule.Fill(strip, 7, random, Pool, -1);
-            var (_, stop) = PrestigePerks.Model.ReelSchedule.Extend(strip, 5, 8, PrestigePerks.Model.ReelEffect.Normal, random, Pool, held);
-            Assert.Equal(8, strip[stop]);
+            var strip = new List<string>();
+            PrestigePerks.Model.ReelSchedule.Fill(strip, 7, random, Pool, null!);
+            var (_, stop) = PrestigePerks.Model.ReelSchedule.Extend(strip, 5, Id(8), PrestigePerks.Model.ReelEffect.Normal, random, Pool, held);
+            Assert.Equal(Id(8), strip[stop]);
             Assert.DoesNotContain(strip[stop + 1], held);
         }
     }

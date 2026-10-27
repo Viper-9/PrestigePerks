@@ -1,4 +1,5 @@
 using PrestigePerks.Model;
+using PrestigePerks.Perks;
 
 namespace PrestigePerks.Tests;
 
@@ -8,20 +9,33 @@ public class PerkPatchMathTests
     private const float Tolerance = 1e-4f;
 
     [Fact]
-    public void Scales_come_from_applied_tiers_and_ignore_unknown_numbers_and_disabled_perks()
+    public void Scales_come_from_applied_tiers_and_ignore_unknown_ids_and_disabled_perks()
     {
-        var disabled = new bool[PerkPatchMath.Size];
-        disabled[10] = true;
-        var tiers = new Dictionary<int, int> { [9] = 1, [10] = 3, [24] = 2, [32] = 3, [0] = 1, [-1] = 1, [33] = 1, [99] = 1, [26] = 0, [14] = 4 };
+        var disabled = new bool[PerkPatchSlots.Count];
+        disabled[PerkPatchSlots.Index("stamina")] = true;
+        var tiers = new Dictionary<string, int>
+        {
+            ["porter"] = 1, ["stamina"] = 3, ["mastery"] = 2, ["agility"] = 3, ["experience"] = 1, ["someone.sprint"] = 1, ["search"] = 0, ["control"] = 4,
+        };
 
         var scales = PerkPatchMath.BuildScales(tiers, [0.5, 0.75, 1.0], disabled);
 
-        Assert.Equal([9, 24, 32], Enumerable.Range(0, scales.Length).Where(perk => scales[perk] > 0));
-        Assert.Equal([0.5f, 0.75f, 1f], new[] { scales[9], scales[24], scales[32] });
+        Assert.Equal(["porter", "mastery", "agility"], Enumerable.Range(0, scales.Length).Where(slot => scales[slot] > 0).Select(slot => PerkPatchSlots.Ids[slot]));
+        Assert.Equal([0.5f, 0.75f, 1f], new[] { scales[PerkPatchSlots.Index("porter")], scales[PerkPatchSlots.Index("mastery")], scales[PerkPatchSlots.Index("agility")] });
         Assert.All(PerkPatchMath.BuildScales(null!, null!, disabled), scale => Assert.Equal(0f, scale));
-        Assert.Equal(PerkPatchMath.Size, PerkPatchMath.BuildScales(new Dictionary<int, int>(), null!, null!).Length);
+        Assert.Equal(PerkPatchSlots.Count, PerkPatchMath.BuildScales(new Dictionary<string, int>(), null!, null!).Length);
         // 비율을 받지 못하면 기본값 (0.5, 0.75, 1)
-        Assert.Equal(0.75f, PerkPatchMath.BuildScales(new Dictionary<int, int> { [9] = 2 }, null!, null!)[9]);
+        Assert.Equal(0.75f, PerkPatchMath.BuildScales(new Dictionary<string, int> { ["porter"] = 2 }, null!, null!)[PerkPatchSlots.Index("porter")]);
+    }
+
+    // 클라이언트 패치가 있는 특전 = 서버 카탈로그의 Patch 특전. add-on 이 없는 지금은 정확히 같아야 한다
+    [Fact]
+    public void Patch_slots_cover_every_server_patch_perk()
+    {
+        var patchIds = PerkCatalog.All.Where(perk => perk.Kind == PerkKind.Patch).Select(perk => perk.Id).Order();
+        Assert.Equal(patchIds, PerkPatchSlots.Ids.Where(id => id != null).Order());
+        Assert.Equal(-1, PerkPatchSlots.Index("experience"));
+        Assert.Equal(-1, PerkPatchSlots.Index(null!));
     }
 
     // 기획 README 4절 표: III 은 지금 수치, II 75%, I 50% (효과량에 곱한다)
@@ -43,23 +57,23 @@ public class PerkPatchMathTests
     [Fact]
     public void Tier_three_constants_match_the_shown_amounts()
     {
-        Assert.Equal(PerkAmounts.Fraction(9), PerkPatchMath.PorterWeight, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(10), PerkPatchMath.StaminaBuff, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(11), 1 - PerkPatchMath.ChanceFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(14), PerkPatchMath.RecoilBuff, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(15), 1 - PerkPatchMath.WeaponWearFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(15), 1 - PerkPatchMath.ArmorWearFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(16), 1 - PerkPatchMath.ConsumptionFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(17), 1 - PerkPatchMath.CraftTimeFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(24), PerkPatchMath.MasteringFactor - 1, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(25), 1 - PerkPatchMath.LoadTimeFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(26), PerkPatchMath.SearchFactor - 1, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(27), PerkPatchMath.SurgeryBuff, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(29), PerkPatchMath.ReloadFactor - 1, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(30), PerkPatchMath.ErgonomicsPoints, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(31), 1 - PerkPatchMath.MalfunctionFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(31), 1 - PerkPatchMath.OverheatFactor, Tolerance);
-        Assert.Equal(PerkAmounts.Fraction(32), PerkPatchMath.MoveSpeedFactor - 1, Tolerance);
+        Assert.Equal(Fraction(9), PerkPatchMath.PorterWeight, Tolerance);
+        Assert.Equal(Fraction(10), PerkPatchMath.StaminaBuff, Tolerance);
+        Assert.Equal(Fraction(11), 1 - PerkPatchMath.ChanceFactor, Tolerance);
+        Assert.Equal(Fraction(14), PerkPatchMath.RecoilBuff, Tolerance);
+        Assert.Equal(Fraction(15), 1 - PerkPatchMath.WeaponWearFactor, Tolerance);
+        Assert.Equal(Fraction(15), 1 - PerkPatchMath.ArmorWearFactor, Tolerance);
+        Assert.Equal(Fraction(16), 1 - PerkPatchMath.ConsumptionFactor, Tolerance);
+        Assert.Equal(Fraction(17), 1 - PerkPatchMath.CraftTimeFactor, Tolerance);
+        Assert.Equal(Fraction(24), PerkPatchMath.MasteringFactor - 1, Tolerance);
+        Assert.Equal(Fraction(25), 1 - PerkPatchMath.LoadTimeFactor, Tolerance);
+        Assert.Equal(Fraction(26), PerkPatchMath.SearchFactor - 1, Tolerance);
+        Assert.Equal(Fraction(27), PerkPatchMath.SurgeryBuff, Tolerance);
+        Assert.Equal(Fraction(29), PerkPatchMath.ReloadFactor - 1, Tolerance);
+        Assert.Equal(Fraction(30), PerkPatchMath.ErgonomicsPoints, Tolerance);
+        Assert.Equal(Fraction(31), 1 - PerkPatchMath.MalfunctionFactor, Tolerance);
+        Assert.Equal(Fraction(31), 1 - PerkPatchMath.OverheatFactor, Tolerance);
+        Assert.Equal(Fraction(32), PerkPatchMath.MoveSpeedFactor - 1, Tolerance);
     }
 
     [Theory]
@@ -217,5 +231,26 @@ public class PerkPatchMathTests
         Assert.Equal(float.NaN, PerkPatchMath.Mastering(float.NaN, 1f));
         Assert.Equal(-2f, PerkPatchMath.AttentionLootSpeed(-2f, 1f));
         Assert.Equal(float.NaN, PerkPatchMath.SearchBuffSpeed(float.NaN, 1f));
+    }
+
+    // 서버 카탈로그의 III 효과량을 0~1 비율로 (30% → 0.3, 고정값 10 → 10)
+    private static float Fraction(int number)
+    {
+        Assert.True(PerkCatalog.TryGet(number, out var perk));
+        return (float)Math.Abs(perk.Unit == PerkUnit.Flat ? perk.Amount : perk.Amount / 100);
+    }
+
+    // 패치 본문은 이 상수로 배열을 읽는다. 표와 상수가 어긋나면 다른 특전의 비율을 읽게 된다
+    [Fact]
+    public void Patch_slot_constants_match_the_table_without_gaps()
+    {
+        Assert.Equal(15, PerkPatchSlots.Count);
+        Assert.All(PerkPatchSlots.Ids, id => Assert.NotNull(id));
+        Assert.Equal(
+            [("porter", PerkPatchSlots.Porter), ("stamina", PerkPatchSlots.Stamina), ("tough", PerkPatchSlots.Tough), ("control", PerkPatchSlots.Control),
+             ("maintenance", PerkPatchSlots.Maintenance), ("temperance", PerkPatchSlots.Temperance), ("artisan", PerkPatchSlots.Artisan),
+             ("mastery", PerkPatchSlots.Mastery), ("loading", PerkPatchSlots.Loading), ("search", PerkPatchSlots.Search), ("surgeon", PerkPatchSlots.Surgeon),
+             ("reload", PerkPatchSlots.Reload), ("handling", PerkPatchSlots.Handling), ("reliability", PerkPatchSlots.Reliability), ("agility", PerkPatchSlots.Agility)],
+            PerkPatchSlots.Ids.Select(id => (id, PerkPatchSlots.Index(id))));
     }
 }
