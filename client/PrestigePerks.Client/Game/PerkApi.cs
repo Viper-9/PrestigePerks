@@ -21,7 +21,7 @@ namespace PrestigePerks.Game
             PerkStateDto.Parse(await RequestHandler.PostJsonAsync(StateRoute, "{}"));
 
         /// <summary>확정 넣기: 장착 안 된 보유 특전을 슬롯에 놓는다 (확정 칸이면 서로 바뀐다).</summary>
-        public static async Task<PerkStateDto> Equip(int perk, int slot) =>
+        public static async Task<PerkStateDto> Equip(string perk, int slot) =>
             PerkStateDto.Parse(await RequestHandler.PostJsonAsync(EquipRoute, JsonConvert.SerializeObject(new EquipBody { Perk = perk, Slot = slot })));
 
         /// <summary>확정 빼기: 그 칸은 빈 칸이 된다.</summary>
@@ -38,7 +38,7 @@ namespace PrestigePerks.Game
         public static Task<IResult> Roll(int expectedCost) => Send(new RollOperation { ExpectedCost = expectedCost });
 
         /// <summary>보유하기(단계 1)·단계 구매. 리롤과 같은 대기열로 보내고 코인 차감은 바닐라가 반영한다. 결과는 이어서 state 로 받는다.</summary>
-        public static Task<IResult> Buy(int perk, int tier, int expectedCost) => Send(new BuyOperation { Perk = perk, Tier = tier, ExpectedCost = expectedCost });
+        public static Task<IResult> Buy(string perk, int tier, int expectedCost) => Send(new BuyOperation { Perk = perk, Tier = tier, ExpectedCost = expectedCost });
 
         private static Task<IResult> Send(object operation)
         {
@@ -56,7 +56,7 @@ namespace PrestigePerks.Game
 
         private sealed class EquipBody
         {
-            [JsonProperty("perk")] public int Perk;
+            [JsonProperty("perk")] public string Perk;
             [JsonProperty("slot")] public int Slot;
         }
 
@@ -84,7 +84,7 @@ namespace PrestigePerks.Game
         private sealed class BuyOperation
         {
             [JsonProperty("Action")] public string Action => "PrestigePerksBuy";
-            [JsonProperty("perk")] public int Perk { get; set; }
+            [JsonProperty("perk")] public string Perk { get; set; }
             [JsonProperty("tier")] public int Tier { get; set; }
             [JsonProperty("expectedCost")] public int ExpectedCost { get; set; }
             [JsonProperty("items")] public string[] Items { get; set; } = new string[0];

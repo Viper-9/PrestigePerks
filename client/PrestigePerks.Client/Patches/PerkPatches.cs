@@ -21,7 +21,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class CarryingWeightPatch
     {
-        private const int Perk = 9;
+        private const int Perk = PerkPatchSlots.Porter;
 
         private static MethodBase TargetMethod() => AccessTools.PropertyGetter(typeof(SkillManager), nameof(SkillManager.CarryingWeightRelativeModifier));
 
@@ -56,7 +56,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class OverweightLimitsPatch
     {
-        private const int Perk = 9;
+        private const int Perk = PerkPatchSlots.Porter;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(PhysicalBase), nameof(PhysicalBase.UpdateWeightLimits));
 
@@ -102,7 +102,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class StaminaCapacityPatch
     {
-        private const int Perk = 10;
+        private const int Perk = PerkPatchSlots.Stamina;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(Physical), nameof(Physical.BaseStaminaFunction));
 
@@ -133,7 +133,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ExistenceDamagePatch
     {
-        private const int Perk = 16;
+        private const int Perk = PerkPatchSlots.Temperance;
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
@@ -171,7 +171,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ShotSkillScopePatch
     {
-        private const int Perk = 24;
+        private const int Perk = PerkPatchSlots.Mastery;
 
         /// <summary>PMC 본인의 사격 숙련도 처리 중.</summary>
         internal static bool PmcShot;
@@ -203,7 +203,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class MasteringTriggerPatch
     {
-        private const int Perk = 24;
+        private const int Perk = PerkPatchSlots.Mastery;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(BaseSkill), nameof(BaseSkill.OnTrigger));
 
@@ -237,7 +237,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class AttentionLootSpeedPatch
     {
-        private const int Perk = 26;
+        private const int Perk = PerkPatchSlots.Search;
 
         private static MethodBase TargetMethod() => AccessTools.PropertyGetter(typeof(SkillManager), nameof(SkillManager.AttentionLootSpeedValue));
 
@@ -268,7 +268,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class SearchBuffSpeedPatch
     {
-        private const int Perk = 26;
+        private const int Perk = PerkPatchSlots.Search;
 
         private static MethodBase TargetMethod() => AccessTools.PropertyGetter(typeof(SkillManager), nameof(SkillManager.SearchBuffSpeedValue));
 
@@ -300,7 +300,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ApplyDamageScopePatch
     {
-        private const int Perk = 11;
+        private const int Perk = PerkPatchSlots.Tough;
 
         internal static EffectsSettings.ProbabilitySetting FractureFall, FractureBullet, HeavyBleeding, LightBleeding;
 
@@ -375,8 +375,8 @@ namespace PrestigePerks.Patches
                 || ReferenceEquals(__instance, ApplyDamageScopePatch.HeavyBleeding) || ReferenceEquals(__instance, ApplyDamageScopePatch.LightBleeding))
             {
                 var before = cap;
-                cap = PerkPatchMath.ChanceCap(cap, PerkEffects.Scale(11));
-                PerkEffects.Record(11, before, cap);
+                cap = PerkPatchMath.ChanceCap(cap, PerkEffects.Scale(PerkPatchSlots.Tough));
+                PerkEffects.Record(PerkPatchSlots.Tough, before, cap);
             }
         }
     }
@@ -385,7 +385,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class RecoilSuppressionPatch
     {
-        private const int Perk = 14;
+        private const int Perk = PerkPatchSlots.Control;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(SkillManager), nameof(SkillManager.GetWeaponInfo));
 
@@ -419,7 +419,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ReloadSpeedPatch
     {
-        private const int Perk = 29;
+        private const int Perk = PerkPatchSlots.Reload;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(SkillManager), nameof(SkillManager.GetWeaponInfo));
 
@@ -453,7 +453,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ErgonomicsPatch
     {
-        private const int Perk = 30;
+        private const int Perk = PerkPatchSlots.Handling;
 
         private const EPhysicalCondition ArmDamaged = EPhysicalCondition.LeftArmDamaged | EPhysicalCondition.RightArmDamaged;
 
@@ -490,7 +490,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class MalfunctionChancePatch
     {
-        private const int Perk = 31;
+        private const int Perk = PerkPatchSlots.Reliability;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(Player.FirearmController), nameof(Player.FirearmController.GetTotalMalfunctionChance));
 
@@ -525,7 +525,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ShotOverheatPatch
     {
-        private const int Perk = 31;
+        private const int Perk = PerkPatchSlots.Reliability;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(Weapon), nameof(Weapon.GetShotOverheat));
 
@@ -556,7 +556,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class WeaponShotWearPatch
     {
-        private const int Perk = 15;
+        private const int Perk = PerkPatchSlots.Maintenance;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(Weapon), nameof(Weapon.OnShot));
 
@@ -590,7 +590,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ArmorWearPatch
     {
-        private const int Perk = 15;
+        private const int Perk = PerkPatchSlots.Maintenance;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(ArmorComponent), nameof(ArmorComponent.ApplyDurabilityDamage));
 
@@ -626,7 +626,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class MoveSpeedPatch
     {
-        private const int Perk = 32;
+        private const int Perk = PerkPatchSlots.Agility;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(MovementContext), nameof(MovementContext.ApplyMotion), new[] { typeof(Vector3), typeof(float) });
 
@@ -662,7 +662,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class MedEffectScopePatch
     {
-        private const int Perk = 27;
+        private const int Perk = PerkPatchSlots.Surgeon;
 
         internal static ActiveHealthController PmcHealth;
 
@@ -700,7 +700,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class SurgeryTimePatch
     {
-        private const int Perk = 27;
+        private const int Perk = PerkPatchSlots.Surgeon;
 
         // params 배열을 매번 만들지 않게
         private static readonly EDamageEffectType[] DestroyedPart = { EDamageEffectType.DestroyedPart };
@@ -738,7 +738,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class MagazineLoadTimePatch
     {
-        private const int Perk = 25;
+        private const int Perk = PerkPatchSlots.Loading;
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
@@ -783,7 +783,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ProducerReductionPatch
     {
-        private const int Perk = 17;
+        private const int Perk = PerkPatchSlots.Artisan;
 
         private static MethodBase TargetMethod() => AccessTools.PropertyGetter(typeof(ItemsProducerBase), nameof(ItemsProducerBase.ReductionCoefficient));
 
@@ -814,7 +814,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class ScavCaseReductionPatch
     {
-        private const int Perk = 17;
+        private const int Perk = PerkPatchSlots.Artisan;
 
         private static MethodBase TargetMethod() => AccessTools.PropertyGetter(typeof(ScavCaseProducer), nameof(ScavCaseProducer.ReductionCoefficient));
 
@@ -842,7 +842,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class BitcoinSpeedPatch
     {
-        private const int Perk = 17;
+        private const int Perk = PerkPatchSlots.Artisan;
 
         private static MethodBase TargetMethod() => AccessTools.PropertyGetter(typeof(PermanentProducer), nameof(PermanentProducer.ResourceRelatedSpeedCoefficient));
 
@@ -870,7 +870,7 @@ namespace PrestigePerks.Patches
     [HarmonyPatch]
     internal static class CraftTimeFloorPatch
     {
-        private const int Perk = 17;
+        private const int Perk = PerkPatchSlots.Artisan;
 
         private static MethodBase TargetMethod() => AccessTools.Method(typeof(BaseHideoutScheme), nameof(BaseHideoutScheme.GetProducingItem));
 

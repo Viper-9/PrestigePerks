@@ -352,7 +352,7 @@ namespace PrestigePerks
             var first = Mathf.Max(0, FirstStopDelay - (Time.unscaledTime - started));
             var effect = ReelSchedule.PickEffect(random);
             // 멈출 칸 바로 위에 다른 슬롯 특전이 나오지 않게
-            var held = new System.Collections.Generic.HashSet<int>(state.Slots.Select(slot => slot.Perk));
+            var held = new System.Collections.Generic.HashSet<string>(state.Slots.Where(slot => !slot.IsEmpty).Select(slot => slot.Perk));
             for (var i = 0; i < targets.Count; i++)
             {
                 var slot = targets[i];
@@ -391,7 +391,7 @@ namespace PrestigePerks
         /// 보유하기·단계 구매 (코인). 리롤처럼 아이템 이벤트로 보내고 결과는 state 로 받는다.
         /// 이미 그 단계를 가졌으면 서버가 결제 없이 성공으로 돌려준다 (두 번 눌림).
         /// </summary>
-        private async Task Buy(int perk, int tier, int price)
+        private async Task Buy(string perk, int tier, int price)
         {
             if (busy || state == null || page == null || page.IsSpinning)
             {
@@ -437,7 +437,7 @@ namespace PrestigePerks
         /// 확정 넣기·빼기 (무료). 효과가 바뀌므로 응답을 Accept 해 Bonus 와 패치 특전을 다시 넣는다.
         /// flashPerk 가 있으면 (넣기) 성공 뒤 그 특전의 슬롯 틀과 줄이 반짝인다.
         /// </summary>
-        private async Task Change(Func<Task<PerkStateDto>> request, string what, int flashPerk = 0)
+        private async Task Change(Func<Task<PerkStateDto>> request, string what, string flashPerk = null)
         {
             if (busy || state == null)
             {
@@ -467,7 +467,7 @@ namespace PrestigePerks
                 Accept(fresh, what);
                 PerkGame.Sound(EUISoundType.MenuInstallMag);
                 RenderPage(null);
-                if (flashPerk > 0)
+                if (flashPerk != null)
                 {
                     page?.Flash(flashPerk, 0);
                 }

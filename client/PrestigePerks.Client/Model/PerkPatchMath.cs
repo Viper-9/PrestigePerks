@@ -10,9 +10,6 @@ namespace PrestigePerks.Model
     /// </summary>
     public static class PerkPatchMath
     {
-        /// <summary>특전 번호로 찾는 배열 크기. 가장 큰 번호 32.</summary>
-        public const int Size = 33;
-
         public const float PorterWeight = 0.2f;       // 9: 근력 버프에 +0.2 (상수는 모두 단계 III 값)
         public const float StaminaBuff = 0.15f;       // 10: 지구력 버프에 +0.15
         public const float ConsumptionFactor = 0.85f; // 16: 에너지·수분 소모 ×0.85
@@ -33,12 +30,12 @@ namespace PrestigePerks.Model
         public const float MaxRecoilBuff = 0.8f;
 
         /// <summary>
-        /// 특전별 효과 비율 배열 (0 = 꺼짐). 적용 단계(서버 activeTiers)를 단계 비율(서버 tierEffectRatio)로 바꾼다.
-        /// 범위 밖 번호·단계는 무시하고, 이번 실행 동안 끈 특전(disabled)은 켜지 않는다.
+        /// 패치 칸별 효과 비율 배열 (0 = 꺼짐, 칸 번호는 <see cref="PerkPatchSlots"/>). 적용 단계(서버 activeTiers, 특전 ID → 단계)를 단계 비율(서버 tierEffectRatio)로 바꾼다.
+        /// 패치가 없는 특전(Bonus 특전, 모르는 ID)과 범위 밖 단계는 무시하고, 이번 실행 동안 끈 칸(disabled)은 켜지 않는다.
         /// </summary>
-        public static float[] BuildScales(IDictionary<int, int> tiers, IList<double> ratios, bool[] disabled)
+        public static float[] BuildScales(IDictionary<string, int> tiers, IList<double> ratios, bool[] disabled)
         {
-            var scales = new float[Size];
+            var scales = new float[PerkPatchSlots.Count];
             if (tiers == null)
             {
                 return scales;
@@ -46,11 +43,11 @@ namespace PrestigePerks.Model
 
             foreach (var pair in tiers)
             {
-                var perk = pair.Key;
+                var slot = PerkPatchSlots.Index(pair.Key);
                 var scale = (float)PerkAmounts.Ratio(ratios, pair.Value);
-                if (perk > 0 && perk < Size && scale > 0f && Finite(scale) && !(disabled != null && perk < disabled.Length && disabled[perk]))
+                if (slot >= 0 && scale > 0f && Finite(scale) && !(disabled != null && slot < disabled.Length && disabled[slot]))
                 {
-                    scales[perk] = Math.Min(scale, 1f);
+                    scales[slot] = Math.Min(scale, 1f);
                 }
             }
 

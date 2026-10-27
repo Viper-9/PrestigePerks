@@ -12,8 +12,14 @@ namespace PrestigePerks.UI
     {
         private static readonly Dictionary<string, Sprite> cache = new Dictionary<string, Sprite>();
 
-        /// <summary>특전 아이콘 (128px). 목록에서 50px 안팎으로 줄어 보이므로 mipmap 과 트릴리니어로 거칠지 않게 한다.</summary>
-        public static Sprite Icon(int perk) => Load($"Icons.perk_{perk}", true);
+        private static readonly HashSet<string> resources = new HashSet<string>(typeof(PerkSprites).Assembly.GetManifestResourceNames());
+
+        /// <summary>
+        /// 특전 아이콘 (128px). 목록에서 50px 안팎으로 줄어 보이므로 mipmap 과 트릴리니어로 거칠지 않게 한다.
+        /// 그림이 없는 특전(add-on)은 작업 표시줄 버튼 아이콘을 쓴다 (없는 리소스를 매번 찾으며 경고하지 않게 미리 거른다).
+        /// </summary>
+        public static Sprite Icon(string perk) =>
+            perk != null && resources.Contains($"PrestigePerks.Icons.perk_{perk}.png") ? Load($"Icons.perk_{perk}", true) : TaskbarIcon;
 
         public static Sprite RowGradient => Load("Sprites.Sesons_PerkTemplate_Background-Gradient", false);
         public static Sprite RowGlow => Load("Sprites.Sesons_PerkTemplate_Background-GradientWhite", false);

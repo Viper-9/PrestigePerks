@@ -12,25 +12,26 @@ namespace PrestigePerks.Game
     /// </summary>
     internal static class PerkEffects
     {
-        private static float[] scales = new float[PerkPatchMath.Size];
-        private static readonly bool[] Disabled = new bool[PerkPatchMath.Size];
+        private static float[] scales = new float[PerkPatchSlots.Count];
+        private static readonly bool[] Disabled = new bool[PerkPatchSlots.Count];
 
-        // 개발용: 특전별 적용 횟수와 마지막 바닐라 값 → 적용 값. 서버가 Dev 빌드일 때만 남긴다
+        // 개발용: 패치 칸별 적용 횟수와 마지막 바닐라 값 → 적용 값. 서버가 Dev 빌드일 때만 남긴다
         private static bool dev;
-        private static readonly long[] Counts = new long[PerkPatchMath.Size];
-        private static readonly float[] Before = new float[PerkPatchMath.Size];
-        private static readonly float[] After = new float[PerkPatchMath.Size];
+        private static readonly long[] Counts = new long[PerkPatchSlots.Count];
+        private static readonly float[] Before = new float[PerkPatchSlots.Count];
+        private static readonly float[] After = new float[PerkPatchSlots.Count];
 
-        public static bool Has(int perk) => scales[perk] > 0f;
+        /// <summary>패치 칸(<see cref="PerkPatchSlots"/>)의 효과가 켜져 있는지.</summary>
+        public static bool Has(int slot) => scales[slot] > 0f;
 
         /// <summary>효과 비율 (단계 I 0.5, II 0.75, III 1). 꺼져 있으면 0.</summary>
-        public static float Scale(int perk) => scales[perk];
+        public static float Scale(int slot) => scales[slot];
 
         /// <summary>서버가 Dev 빌드인지 (마지막으로 받은 state 기준). 개발용 로그를 남길지 정한다.</summary>
         public static bool DevMode => dev;
 
-        /// <summary>적용 단계(특전 → 1~3)와 단계 비율로 덮어쓴다.</summary>
-        public static void Set(IDictionary<int, int> tiers, IList<double> ratios, bool devMode)
+        /// <summary>적용 단계(특전 ID → 1~3)와 단계 비율로 덮어쓴다.</summary>
+        public static void Set(IDictionary<string, int> tiers, IList<double> ratios, bool devMode)
         {
             scales = PerkPatchMath.BuildScales(tiers, ratios, Disabled);
             dev = devMode;
@@ -46,11 +47,11 @@ namespace PrestigePerks.Game
         private static void LogScales()
         {
             var line = new StringBuilder();
-            for (var perk = 0; perk < scales.Length; perk++)
+            for (var slot = 0; slot < scales.Length; slot++)
             {
-                if (scales[perk] > 0f)
+                if (scales[slot] > 0f)
                 {
-                    line.Append(line.Length > 0 ? ", " : "").Append(perk).Append(" x").Append(scales[perk].ToString("0.##"));
+                    line.Append(line.Length > 0 ? ", " : "").Append(PerkPatchSlots.Ids[slot]).Append(" x").Append(scales[slot].ToString("0.##"));
                 }
             }
 
@@ -63,26 +64,26 @@ namespace PrestigePerks.Game
         }
 
         /// <summary>패치에서 예외가 나면 그 특전만 이번 실행 동안 끈다. 경고는 한 번만.</summary>
-        public static void Disable(int perk, Exception e)
+        public static void Disable(int slot, Exception e)
         {
-            if (Disabled[perk])
+            if (Disabled[slot])
             {
                 return;
             }
 
-            Disabled[perk] = true;
-            scales[perk] = 0f;
-            Log.Warn($"perk {perk} disabled for this session after an error: {e}");
+            Disabled[slot] = true;
+            scales[slot] = 0f;
+            Log.Warn($"perk {PerkPatchSlots.Ids[slot]} disabled for this session after an error: {e}");
         }
 
         /// <summary>개발용: 적용 횟수와 마지막 값(바닐라 → 특전). 레이드 중에는 로그를 남기지 않고 배열에 적기만 한다.</summary>
-        public static void Record(int perk, float before, float after)
+        public static void Record(int slot, float before, float after)
         {
             if (dev)
             {
-                Counts[perk]++;
-                Before[perk] = before;
-                After[perk] = after;
+                Counts[slot]++;
+                Before[slot] = before;
+                After[slot] = after;
             }
         }
 
@@ -95,18 +96,18 @@ namespace PrestigePerks.Game
             }
 
             var line = new StringBuilder();
-            for (var perk = 0; perk < Counts.Length; perk++)
+            for (var slot = 0; slot < Counts.Length; slot++)
             {
-                if (Counts[perk] > 0)
+                if (Counts[slot] > 0)
                 {
-                    line.Append("\n  ").Append(perk).Append(": ").Append(Counts[perk]).Append("x, last ")
-                        .Append(Before[perk].ToString("0.####")).Append(" -> ").Append(After[perk].ToString("0.####"));
-                    if (Before[perk] != 0f)
+                    line.Append("\n  ").Append(PerkPatchSlots.Ids[slot]).Append(": ").Append(Counts[slot]).Append("x, last ")
+                        .Append(Before[slot].ToString("0.####")).Append(" -> ").Append(After[slot].ToString("0.####"));
+                    if (Before[slot] != 0f)
                     {
-                        line.Append(" (x").Append((After[perk] / Before[perk]).ToString("0.###")).Append(')');
+                        line.Append(" (x").Append((After[slot] / Before[slot]).ToString("0.###")).Append(')');
                     }
 
-                    Counts[perk] = 0;
+                    Counts[slot] = 0;
                 }
             }
 

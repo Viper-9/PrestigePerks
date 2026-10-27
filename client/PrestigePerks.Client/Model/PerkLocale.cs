@@ -59,14 +59,18 @@ namespace PrestigePerks.Model
             }
         }
 
-        public string PerkName(int perk) => Get($"perk.{perk}.name");
+        /// <summary>문구가 있는지 (게임 언어 → en).</summary>
+        public bool Has(string key) => primary.ContainsKey(key) || fallback.ContainsKey(key);
 
-        /// <summary>효과 한 줄. 문구의 {0} 에 수치(<see cref="PerkAmounts.Format"/>)를 넣는다. 문구에 숫자를 직접 적지 않는다.</summary>
-        public string PerkEffect(int perk, string value) => Format($"perk.{perk}.effect", value);
+        /// <summary>특전 이름. 문구가 없는 특전(add-on)은 ID 를 그대로 보인다.</summary>
+        public string PerkName(string perk) => Has($"perk.{perk}.name") ? Get($"perk.{perk}.name") : perk ?? "";
 
-        /// <summary>수치를 뺀 효과 이름 ("반동"). 선택한 특전 칸의 부제.</summary>
-        public string PerkSubject(int perk) => Format($"perk.{perk}.effect", "").Trim();
+        /// <summary>효과 한 줄. 문구의 {0} 에 수치(<see cref="PerkAmounts.Format"/>)를 넣는다. 문구에 숫자를 직접 적지 않는다. 문구가 없으면 수치만.</summary>
+        public string PerkEffect(string perk, string value) => Has($"perk.{perk}.effect") ? Format($"perk.{perk}.effect", value) : value;
 
-        public string PerkDetail(int perk) => Get($"perk.{perk}.detail");
+        /// <summary>수치를 뺀 효과 이름 ("반동"). 선택한 특전 칸의 부제. 문구가 없으면 빈 줄.</summary>
+        public string PerkSubject(string perk) => Has($"perk.{perk}.effect") ? Format($"perk.{perk}.effect", "").Trim() : "";
+
+        public string PerkDetail(string perk) => Has($"perk.{perk}.detail") ? Get($"perk.{perk}.detail") : "";
     }
 }

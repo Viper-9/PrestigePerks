@@ -107,8 +107,8 @@ namespace PrestigePerks.Model
         /// 보통: 그 칸이 결과. 가짜 멈춤: 결과 다음 칸(미끼)에서 멈춘다. 역회전: 미끼에서 멈추고 결과는 <see cref="ReverseItems"/> 칸 앞(이미 지나간 칸)에 둔다.
         /// 멈춘 칸 위로 보일 칸도 몇 개 더 붙인다.
         /// </summary>
-        public static (int Result, int Stop) Extend(List<int> strip, int from, int target, ReelEffect effect, Random random, IReadOnlyList<int> pool,
-            ICollection<int> held = null)
+        public static (int Result, int Stop) Extend(List<string> strip, int from, string target, ReelEffect effect, Random random, IReadOnlyList<string> pool,
+            ICollection<string> held = null)
         {
             var first = Math.Max(from + LandingItems, strip.Count);
             Fill(strip, first, random, pool, target);
@@ -149,7 +149,7 @@ namespace PrestigePerks.Model
         }
 
         /// <summary>띠를 count 칸까지 채운다. 바로 앞 칸, avoid 와 겹치지 않게.</summary>
-        public static void Fill(List<int> strip, int count, Random random, IReadOnlyList<int> pool, int avoid)
+        public static void Fill(List<string> strip, int count, Random random, IReadOnlyList<string> pool, string avoid)
         {
             while (strip.Count < count)
             {
@@ -157,9 +157,9 @@ namespace PrestigePerks.Model
             }
         }
 
-        private static int PickFree(Random random, IReadOnlyList<int> pool, int notThis, ICollection<int> held)
+        private static string PickFree(Random random, IReadOnlyList<string> pool, string notThis, ICollection<string> held)
         {
-            var free = new List<int>();
+            var free = new List<string>();
             foreach (var perk in pool)
             {
                 if (perk != notThis && (held == null || !held.Contains(perk)))
@@ -171,7 +171,7 @@ namespace PrestigePerks.Model
             return free.Count > 0 ? free[random.Next(free.Count)] : Pick(random, pool, notThis, notThis);
         }
 
-        private static int Pick(Random random, IReadOnlyList<int> pool, int notA, int notB)
+        private static string Pick(Random random, IReadOnlyList<string> pool, string notA, string notB)
         {
             for (var tries = 0; tries < 32; tries++)
             {
