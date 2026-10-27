@@ -85,9 +85,9 @@ public class PerkService(
         });
 
     /// <summary>확정 넣기: 보유 특전을 리롤 칸·빈 칸·확정 칸에 놓는다 (무료).</summary>
-    public PerkState Equip(MongoId sessionId, int perk, int slotIndex)
+    public PerkState Equip(MongoId sessionId, string? perk, int slotIndex)
     {
-        var id = PerkWire.ToId(perk);
+        var id = perk ?? "";
         return Change(sessionId, (data, level) => PerkRules.Equip(data, Config.Slots(level), id, slotIndex), $"넣기 {PerkCatalog.Describe(id)} → 슬롯 {slotIndex + 1}");
     }
 
@@ -140,7 +140,7 @@ public class PerkService(
         var state = Run(sessionId, (profile, data, level) =>
         {
             EnterLevel(sessionId, profile);
-            var perk = PerkWire.ToId(request.Perk);
+            var perk = request.Perk ?? "";
             var error = PerkRules.CheckBuy(data, level, Config, perk, request.Tier);
             if (error == PerkError.AlreadyOwned)
             {
@@ -174,12 +174,12 @@ public class PerkService(
     }
 
     /// <summary>개발용: 슬롯에 특전을 직접 넣는다 (특전 효과를 비교해 보려고). 다른 슬롯에 있던 특전이면 서로 바꾼다.</summary>
-    public PerkState SetPerk(MongoId sessionId, int slotIndex, int perk) =>
-        Change(sessionId, (data, level) => PerkRules.SetPerk(data, Config.Slots(level), slotIndex, PerkWire.ToId(perk)), $"개발용 set 슬롯 {slotIndex + 1} → {PerkCatalog.Describe(PerkWire.ToId(perk))}");
+    public PerkState SetPerk(MongoId sessionId, int slotIndex, string perk) =>
+        Change(sessionId, (data, level) => PerkRules.SetPerk(data, Config.Slots(level), slotIndex, perk), $"개발용 set 슬롯 {slotIndex + 1} → {PerkCatalog.Describe(perk)}");
 
     /// <summary>개발용: 보유 단계를 정한다 (0 이면 도감에서 뺀다). 결제 없이.</summary>
-    public PerkState SetOwnedTier(MongoId sessionId, int perk, int tier) =>
-        Change(sessionId, (data, _) => PerkRules.SetOwnedTier(data, PerkWire.ToId(perk), tier), $"개발용 tier {PerkCatalog.Describe(PerkWire.ToId(perk))} → {tier}");
+    public PerkState SetOwnedTier(MongoId sessionId, string perk, int tier) =>
+        Change(sessionId, (data, _) => PerkRules.SetOwnedTier(data, perk, tier), $"개발용 tier {PerkCatalog.Describe(perk)} → {tier}");
 
     /// <summary>개발용: 도감을 비운다 (확정 칸은 리롤 칸이 된다).</summary>
     public PerkState ResetCollection(MongoId sessionId) =>
@@ -332,10 +332,10 @@ public class PerkService(
         new()
         {
             PrestigeLevel = level,
-            Slots = PerkRules.ActiveSlots(data, Config.Slots(level)).Select(PerkWire.ToState).ToList(),
-            ActivePerks = PerkWire.ToNumbers(PerkRules.ActivePerks(data, Config.Slots(level))),
-            ActiveTiers = PerkWire.ToNumberKeys(PerkRules.ActiveTiers(data, level, Config)),
-            Owned = PerkWire.ToNumberKeys(data.Owned),
+            Slots = PerkRules.ActiveSlots(data, Config.Slots(level)).Select(PerkSlotState.From).ToList(),
+            ActivePerks = PerkCatalog.KnownOnly(PerkRules.ActivePerks(data, Config.Slots(level))),
+            ActiveTiers = PerkCatalog.KnownOnly(PerkRules.ActiveTiers(data, level, Config)),
+            Owned = PerkCatalog.KnownOnly(data.Owned),
             TierCap = Config.TierCap(level),
             TierOpensAt = [Config.TierOpensAt(level, 2), Config.TierOpensAt(level, 3)],
             TierPrices = Config.TierPrices,
@@ -345,7 +345,7 @@ public class PerkService(
             PaidRerolls = data.Rerolls.Paid,
             NextRerollCost = PerkRules.NextRerollCost(Config, level, data),
             CostFixed = data.Rerolls.FreeLeft <= 0 && data.Rerolls.Paid + 1 >= Config.PaidCostCapRound,
-            NewPerks = PerkWire.ToNumbers(data.UnseenNewPerks),
+            NewPerks = PerkCatalog.KnownOnly(data.UnseenNewPerks),
             NewTierCap = data.UnseenTierCap,
             Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActiveScales(data, level, Config)),
             BonusIds = BonusIds,

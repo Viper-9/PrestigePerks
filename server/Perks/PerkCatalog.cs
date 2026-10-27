@@ -1,3 +1,4 @@
+using System.Globalization;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Enums;
 
@@ -13,11 +14,20 @@ public enum PerkKind
 /// <summary>Bonus 특전이 PMC 프로필에 넣는 Bonus 하나. Id 는 고정이며 저장 때 이 ID 로 걸러 낸다.</summary>
 public sealed record PerkBonus(string Id, BonusType Type, double Value, BonusSkillType? SkillType = null);
 
+/// <summary>화면 단위. Points 는 게임 보너스 합에 더해지는 % (한국어 %p), Percent 는 게임 결과에 곱하는 %, Flat 은 단위 없는 고정값.</summary>
+public enum PerkUnit
+{
+    Percent,
+    Points,
+    Flat,
+}
+
 /// <summary>
-/// 특전 하나. Id 는 특전 데이터 파일(schema 4)에 저장되는 영구 ID 이자 언어 파일·표시용 이름이다.
-/// Number 는 클라이언트와 주고받는 번호와 schema 3 까지의 파일을 옮길 때만 쓴다.
+/// 특전 하나. Id 는 특전 데이터 파일(schema 4)에 저장되고 클라이언트와 주고받는 영구 ID 이자 언어 파일·아이콘 이름이다.
+/// Number 는 schema 3 까지의 파일을 옮길 때와 개발용 명령 입력에만 쓴다.
+/// Amount 는 단계 III 효과량(문구 방향의 부호 포함, % 는 숫자만)이다. 화면 수치이고, Bonus 특전은 Bonus 값과 같다.
 /// </summary>
-public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, IReadOnlyList<PerkBonus> Bonuses);
+public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, double Amount, PerkUnit Unit, IReadOnlyList<PerkBonus> Bonuses);
 
 /// <summary>
 /// 특전 20개 정의 (dev-docs 2_특전.md 3절, 6절).
@@ -27,29 +37,29 @@ public static class PerkCatalog
 {
     public static IReadOnlyList<PerkDefinition> All { get; } =
     [
-        Bonus(1, "experience", new PerkBonus("8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 30)),
-        Bonus(2, "conditioning", new PerkBonus("5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Physical)),
-        Bonus(3, "combat", new PerkBonus("f1360d70ed3bb18289339797", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Combat)),
-        Bonus(4, "learning",
+        Bonus(1, "experience", PerkUnit.Points, new PerkBonus("8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 30)),
+        Bonus(2, "conditioning", PerkUnit.Points, new PerkBonus("5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Physical)),
+        Bonus(3, "combat", PerkUnit.Points, new PerkBonus("f1360d70ed3bb18289339797", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Combat)),
+        Bonus(4, "learning", PerkUnit.Points,
             new PerkBonus("26b6ac04721b710794837e2c", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Practical),
             new PerkBonus("24656f22d00ab74d124b8174", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Mental)),
         // 음수 값 타입은 음수일 때 은신처 관리 증폭이 걸린다. 반드시 음수로 넣는다
-        Bonus(8, "scav", new PerkBonus("bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -30)),
-        Patch(9, "porter"),
-        Patch(10, "stamina"),
-        Patch(11, "tough"), // 골절·출혈. 12번(출혈)을 합쳤다 (2026-10-19)
-        Patch(14, "control"),
-        Patch(15, "maintenance"), // 무기·방어구 내구도. 28번(방어구)을 합쳤다 (2026-10-19)
-        Patch(16, "temperance"),
-        Patch(17, "artisan"),
-        Patch(24, "mastery"),
-        Patch(25, "loading"),
-        Patch(26, "search"),
-        Patch(27, "surgeon"),
-        Patch(29, "reload"),
-        Patch(30, "handling"),
-        Patch(31, "reliability"),
-        Patch(32, "agility"),
+        Bonus(8, "scav", PerkUnit.Points, new PerkBonus("bfa913d120f3845fffd516e0", BonusType.ScavCooldownTimer, -30)),
+        Patch(9, "porter", 20, PerkUnit.Points),       // 소지 무게 한도
+        Patch(10, "stamina", 15, PerkUnit.Points),     // 스태미나
+        Patch(11, "tough", -20, PerkUnit.Percent),     // 골절·출혈. 12번(출혈)을 합쳤다 (2026-10-19)
+        Patch(14, "control", -10, PerkUnit.Points),    // 반동
+        Patch(15, "maintenance", -20, PerkUnit.Percent), // 무기·방어구 내구도. 28번(방어구)을 합쳤다 (2026-10-19)
+        Patch(16, "temperance", -15, PerkUnit.Percent),  // 에너지·수분 소모
+        Patch(17, "artisan", -20, PerkUnit.Percent),   // 은신처 생산 시간
+        Patch(24, "mastery", 30, PerkUnit.Percent),    // 무기 숙련도 성장
+        Patch(25, "loading", -20, PerkUnit.Percent),   // 삽탄·탄 빼기 시간
+        Patch(26, "search", 30, PerkUnit.Percent),     // 수색 속도
+        Patch(27, "surgeon", 25, PerkUnit.Points),     // 수술 속도
+        Patch(29, "reload", 15, PerkUnit.Percent),     // 탄창 교체 속도
+        Patch(30, "handling", 10, PerkUnit.Flat),      // 무기 인체공학 (고정값)
+        Patch(31, "reliability", -20, PerkUnit.Percent), // 고장·과열
+        Patch(32, "agility", 5, PerkUnit.Percent),     // 이동 속도
     ];
 
     /// <summary>제외·통합한 번호. 다시 쓰지 않는다.</summary>
@@ -68,6 +78,19 @@ public static class PerkCatalog
     public static IReadOnlyList<int> Numbers { get; } = All.Select(perk => perk.Number).ToList();
 
     public static IReadOnlyList<string> Ids { get; } = All.Select(perk => perk.Id).ToList();
+
+    /// <summary>state 의 catalog. 클라이언트는 이 순서로 목록을 그리고 이 값으로 수치를 보인다.</summary>
+    public static IReadOnlyList<PerkCatalogEntry> Entries { get; } = All.Select(perk => new PerkCatalogEntry
+    {
+        Id = perk.Id,
+        Amount = perk.Amount,
+        Unit = perk.Unit switch
+        {
+            PerkUnit.Points => PerkCatalogEntry.Points,
+            PerkUnit.Flat => PerkCatalogEntry.Flat,
+            _ => PerkCatalogEntry.Percent,
+        },
+    }).ToList();
 
     private static readonly Dictionary<int, PerkDefinition> ByNumber = All.ToDictionary(perk => perk.Number);
 
@@ -91,13 +114,39 @@ public static class PerkCatalog
     /// <summary>ID 의 번호. 빈 칸이거나 모르는 특전(add-on 을 뺀 경우)이면 null.</summary>
     public static int? NumberOf(string? id) => TryGet(id, out var perk) ? perk.Number : null;
 
+    /// <summary>카탈로그에 있는 특전만 (빈 칸, add-on 을 뺀 특전은 빠진다). state 에는 클라이언트가 그릴 수 있는 특전만 보낸다.</summary>
+    public static IReadOnlyList<string> KnownOnly(IEnumerable<string?> ids) => ids.Where(IsKnown).Select(id => id!).ToList();
+
+    /// <summary>특전 → 단계. 모르는 특전은 빠진다 (도감 수에 넣지 않는다).</summary>
+    public static IReadOnlyDictionary<string, int> KnownOnly(IReadOnlyDictionary<string, int> tiers) =>
+        tiers.Where(pair => IsKnown(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
+
+    /// <summary>개발용 명령 입력: 번호("24") 또는 ID("mastery", 대소문자 무시). 카탈로그에 없으면 null.</summary>
+    public static string? Resolve(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        if (int.TryParse(token, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+        {
+            return IdOf(number);
+        }
+
+        var id = token.Trim().ToLowerInvariant();
+        return IsKnown(id) ? id : null;
+    }
+
     /// <summary>"mastery(24)" 형식. 개발용 명령 출력에 쓴다. EFT 채팅은 "#숫자" 를 해시태그로 색칠하다 태그가 깨지므로 # 을 쓰지 않는다.</summary>
     public static string Describe(int number) => TryGet(number, out var perk) ? $"{perk.Id}({number})" : $"?({number})";
 
     /// <summary>"mastery(24)" 형식 (로그용). 빈 칸은 "empty", 모르는 특전은 ID 그대로.</summary>
     public static string Describe(string? id) => TryGet(id, out var perk) ? $"{perk.Id}({perk.Number})" : id ?? "empty";
 
-    private static PerkDefinition Bonus(int number, string id, params PerkBonus[] bonuses) => new(number, id, PerkKind.Bonus, bonuses);
+    // Bonus 특전의 화면 수치는 첫 Bonus 값이다 (4번처럼 여러 개면 모두 같은 값, 테스트가 확인)
+    private static PerkDefinition Bonus(int number, string id, PerkUnit unit, params PerkBonus[] bonuses) =>
+        new(number, id, PerkKind.Bonus, bonuses[0].Value, unit, bonuses);
 
-    private static PerkDefinition Patch(int number, string id) => new(number, id, PerkKind.Patch, []);
+    private static PerkDefinition Patch(int number, string id, double amount, PerkUnit unit) => new(number, id, PerkKind.Patch, amount, unit, []);
 }

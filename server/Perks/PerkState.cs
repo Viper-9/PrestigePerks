@@ -10,12 +10,13 @@ public sealed record PerkState
     [JsonPropertyName("prestigeLevel")]
     public int PrestigeLevel { get; init; }
 
-    /// <summary>슬롯 (효과가 적용되는 슬롯만, 단계 수만큼). 특전 0 은 빈 칸.</summary>
+    /// <summary>슬롯 (효과가 적용되는 슬롯만, 단계 수만큼). 특전 null 은 빈 칸.</summary>
     [JsonPropertyName("slots")]
     public IReadOnlyList<PerkSlotState> Slots { get; init; } = [];
 
+    /// <summary>효과가 적용되는 특전 ID.</summary>
     [JsonPropertyName("activePerks")]
-    public IReadOnlyList<int> ActivePerks { get; init; } = [];
+    public IReadOnlyList<string> ActivePerks { get; init; } = [];
 
     [JsonPropertyName("freeRerollsLeft")]
     public int FreeRerollsLeft { get; init; }
@@ -35,9 +36,9 @@ public sealed record PerkState
     [JsonPropertyName("costFixed")]
     public bool CostFixed { get; init; }
 
-    /// <summary>새 단계 진입 때 자동으로 뽑아 아직 알리지 않은 특전. 클라이언트가 알림을 띄운다.</summary>
+    /// <summary>새 단계 진입 때 자동으로 뽑아 아직 알리지 않은 특전 ID. 클라이언트가 알림을 띄운다.</summary>
     [JsonPropertyName("newPerks")]
-    public IReadOnlyList<int> NewPerks { get; init; } = [];
+    public IReadOnlyList<string> NewPerks { get; init; } = [];
 
     /// <summary>지금 PMC 에 들어가 있어야 하는 특전 Bonus (바닐라 BonusDescriptor 형식). 클라이언트가 BonusController 에 넣는다.</summary>
     [JsonPropertyName("bonuses")]
@@ -63,13 +64,13 @@ public sealed record PerkState
     [JsonPropertyName("slotOpensAt")]
     public IReadOnlyList<int?> SlotOpensAt { get; init; } = [];
 
-    /// <summary>효과를 적용하는 특전과 단계 (1~3). 클라이언트 패치가 tierEffectRatio 로 효과량을 정한다.</summary>
+    /// <summary>효과를 적용하는 특전 ID 와 단계 (1~3). 클라이언트 패치가 tierEffectRatio 로 효과량을 정한다.</summary>
     [JsonPropertyName("activeTiers")]
-    public IReadOnlyDictionary<int, int> ActiveTiers { get; init; } = new Dictionary<int, int>();
+    public IReadOnlyDictionary<string, int> ActiveTiers { get; init; } = new Dictionary<string, int>();
 
-    /// <summary>도감: 보유한 특전과 산 단계.</summary>
+    /// <summary>도감: 보유한 특전 ID 와 산 단계.</summary>
     [JsonPropertyName("owned")]
-    public IReadOnlyDictionary<int, int> Owned { get; init; } = new Dictionary<int, int>();
+    public IReadOnlyDictionary<string, int> Owned { get; init; } = new Dictionary<string, int>();
 
     /// <summary>지금 프레스티지의 단계 상한 (1~3).</summary>
     [JsonPropertyName("tierCap")]
@@ -94,14 +95,34 @@ public sealed record PerkState
     /// <summary>구매에 쓴 코인 (구매 응답). 이미 가진 단계면 0.</summary>
     [JsonPropertyName("buyCost")]
     public int? BuyCost { get; init; }
+
+    /// <summary>특전 목록 (표시 순서, III 효과량, 단위). 클라이언트는 이것으로 목록과 수치를 그린다. 오류 응답에도 실린다 (클라이언트가 오류 응답을 새 state 로 받는다).</summary>
+    [JsonPropertyName("catalog")]
+    public IReadOnlyList<PerkCatalogEntry> Catalog { get; init; } = PerkCatalog.Entries;
 }
 
-/// <summary>state 응답의 슬롯 한 칸. 클라이언트는 아직 특전 번호를 쓴다 (<see cref="PerkWire"/>).</summary>
+/// <summary>state 의 catalog 한 줄. 단위는 문자열로 보낸다 (enum 직렬화 방식에 기대지 않는다).</summary>
+public sealed record PerkCatalogEntry
+{
+    public const string Percent = "percent", Points = "points", Flat = "flat";
+
+    [JsonPropertyName("id")]
+    public string Id { get; init; } = "";
+
+    /// <summary>단계 III 효과량 (부호 포함, % 는 숫자만).</summary>
+    [JsonPropertyName("amount")]
+    public double Amount { get; init; }
+
+    [JsonPropertyName("unit")]
+    public string Unit { get; init; } = Percent;
+}
+
+/// <summary>state 응답의 슬롯 한 칸.</summary>
 public sealed record PerkSlotState
 {
-    /// <summary>특전 번호. 0 이면 빈 칸.</summary>
+    /// <summary>특전 ID. null 이면 빈 칸.</summary>
     [JsonPropertyName("perk")]
-    public int Perk { get; init; }
+    public string? Perk { get; init; }
 
     [JsonPropertyName("locked")]
     public bool Locked { get; init; }
@@ -110,14 +131,18 @@ public sealed record PerkSlotState
     public bool Fixed { get; init; }
 
     [JsonIgnore]
-    public bool IsEmpty => Perk == 0;
+    public bool IsEmpty => Perk is null;
+
+    /// <summary>모르는 특전(add-on 을 뺀 경우)은 빈 칸으로 보낸다. 데이터 파일 정리(PerkDataFile.Normalize)가 이미 빈 칸으로 바꾸므로 방어용이다.</summary>
+    public static PerkSlotState From(PerkSlot slot) =>
+        PerkCatalog.IsKnown(slot.Perk) ? new() { Perk = slot.Perk, Locked = slot.Locked, Fixed = slot.Fixed } : new();
 }
 
 public sealed record PerkEquipRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
 {
-    /// <summary>넣을 보유 특전 번호 (서버가 <see cref="PerkWire.ToId"/> 로 바꾼다).</summary>
+    /// <summary>넣을 보유 특전 ID.</summary>
     [JsonPropertyName("perk")]
-    public int Perk { get; init; }
+    public string? Perk { get; init; }
 
     /// <summary>놓을 슬롯 번호 (0 부터).</summary>
     [JsonPropertyName("slot")]
@@ -166,8 +191,9 @@ public sealed record PerkBuyRequest : BaseInteractionRequestData
 {
     public const string ActionName = "PrestigePerksBuy";
 
+    /// <summary>살 특전 ID.</summary>
     [JsonPropertyName("perk")]
-    public int Perk { get; init; }
+    public string? Perk { get; init; }
 
     /// <summary>사려는 단계 (1 = 보유하기).</summary>
     [JsonPropertyName("tier")]

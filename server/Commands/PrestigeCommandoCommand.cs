@@ -50,9 +50,9 @@ public class PrestigeCommandoCommand(
     private static readonly Regex CoinPreviewRegex = new($"^{Prefix} {CoinCommand} preview$", RegexOptions.IgnoreCase);
     private static readonly Regex BossCheckRegex = new($"^{Prefix} {CoinCommand} boss(?: (\\S+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
-    private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
+    private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([a-z0-9_.]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex HideoutRegex = new($"^{Prefix} {PerkCommand} hideout$", RegexOptions.IgnoreCase);
-    private static readonly Regex TierRegex = new($"^{Prefix} {PerkCommand} tier ([0-9]+) ([0-9]+)$", RegexOptions.IgnoreCase);
+    private static readonly Regex TierRegex = new($"^{Prefix} {PerkCommand} tier ([a-z0-9_.]+) ([0-9]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex CollectionResetRegex = new($"^{Prefix} {PerkCommand} collection reset$", RegexOptions.IgnoreCase);
     private static readonly Regex AllRegex = new($"^{Prefix} {PerkCommand} all (on|off)$", RegexOptions.IgnoreCase);
 
@@ -71,8 +71,8 @@ public class PrestigeCommandoCommand(
                             $"\t{Prefix} {PerkCommand} lock <slot>\t\tslot starts at 1\n" +
                             $"\t{Prefix} {PerkCommand} unlock <slot>\n" +
                             $"\t{Prefix} {PerkCommand} free <count>\t\tset free rerolls left (0-{MaxFreeRerolls})\n" +
-                            $"\t{Prefix} {PerkCommand} set <slot> <perk>\t\tput perk number <perk> in a slot (swaps if another slot has it). Reopen the perk page or main menu to apply it in game\n" +
-                            $"\t{Prefix} {PerkCommand} tier <perk> <0-3>\t\tset the owned tier of perk number <perk> without coins (0 removes it from the collection)\n" +
+                            $"\t{Prefix} {PerkCommand} set <slot> <perk>\t\tput a perk (number or id, e.g. 24 or mastery) in a slot (swaps if another slot has it). Reopen the perk page or main menu to apply it in game\n" +
+                            $"\t{Prefix} {PerkCommand} tier <perk> <0-3>\t\tset the owned tier of a perk (number or id) without coins (0 removes it from the collection)\n" +
                             $"\t{Prefix} {PerkCommand} collection reset\t\tclear the collection (fixed slots become reroll slots)\n" +
                             $"\t{Prefix} {PerkCommand} all on|off\t\tapply every perk at tier III regardless of slots (dev testing). Reopen the perk page or main menu to apply it in game\n" +
                             $"\t{Prefix} {PerkCommand} hideout\t\tshow server hideout times with artisan(17) applied (compare all on/off)\n" +
@@ -257,28 +257,28 @@ public class PrestigeCommandoCommand(
         };
     }
 
-    /// <summary>"prestige perk set &lt;슬롯&gt; &lt;특전 번호&gt;". 슬롯 1~6, 특전은 목록에 있는 번호. 틀리면 null.</summary>
-    internal static (int Slot, int Perk)? ParseSetCommand(string? text)
+    /// <summary>"prestige perk set &lt;슬롯&gt; &lt;특전 번호 또는 ID&gt;". 슬롯 1~6, 특전은 목록에 있는 것. 틀리면 null.</summary>
+    internal static (int Slot, string Perk)? ParseSetCommand(string? text)
     {
         var match = SetRegex.Match(text?.Trim() ?? "");
-        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var slot) || !int.TryParse(match.Groups[2].Value, out var perk))
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var slot) || PerkCatalog.Resolve(match.Groups[2].Value) is not { } perk)
         {
             return null;
         }
 
-        return slot is >= 1 and <= 6 && PerkCatalog.IsKnown(perk) ? (slot, perk) : null;
+        return slot is >= 1 and <= 6 ? (slot, perk) : null;
     }
 
-    /// <summary>"prestige perk tier &lt;특전 번호&gt; &lt;0~3&gt;". 특전은 목록에 있는 번호. 틀리면 null.</summary>
-    internal static (int Perk, int Tier)? ParseTierCommand(string? text)
+    /// <summary>"prestige perk tier &lt;특전 번호 또는 ID&gt; &lt;0~3&gt;". 특전은 목록에 있는 것. 틀리면 null.</summary>
+    internal static (string Perk, int Tier)? ParseTierCommand(string? text)
     {
         var match = TierRegex.Match(text?.Trim() ?? "");
-        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var perk) || !int.TryParse(match.Groups[2].Value, out var tier))
+        if (!match.Success || PerkCatalog.Resolve(match.Groups[1].Value) is not { } perk || !int.TryParse(match.Groups[2].Value, out var tier))
         {
             return null;
         }
 
-        return PerkCatalog.IsKnown(perk) && tier is >= 0 and <= PerkConfig.MaxTier ? (perk, tier) : null;
+        return tier is >= 0 and <= PerkConfig.MaxTier ? (perk, tier) : null;
     }
 
     /// <summary>
@@ -338,7 +338,7 @@ public class PrestigeCommandoCommand(
             text.Append($"Error: {state.Error}\n");
         }
 
-        string Tier(int perk) => PerkService.TierName(state.ActiveTiers.TryGetValue(perk, out var tier) ? tier : 0);
+        string Tier(string? perk) => PerkService.TierName(perk is not null && state.ActiveTiers.TryGetValue(perk, out var tier) ? tier : 0);
         text.Append($"P{state.PrestigeLevel} | tier cap {PerkService.TierName(state.TierCap)} | active: ");
         text.Append(state.ActivePerks.Count == 0 ? "none" : string.Join(", ", state.ActivePerks.Select(perk => $"{PerkCatalog.Describe(perk)} {Tier(perk)}")));
         if (state.RollCost is > 0)
@@ -360,10 +360,10 @@ public class PrestigeCommandoCommand(
                 : $"  [{i + 1}] {PerkCatalog.Describe(slot.Perk)} {Tier(slot.Perk)}{(slot.Fixed ? " (fixed)" : slot.Locked ? " (locked)" : "")}");
         }
 
-        text.Append($"\ncollection {state.Owned.Count} / {PerkCatalog.Numbers.Count}");
+        text.Append($"\ncollection {state.Owned.Count} / {PerkCatalog.Ids.Count}");
         if (state.Owned.Count > 0)
         {
-            text.Append(": ").Append(string.Join(", ", state.Owned.OrderBy(pair => pair.Key).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
+            text.Append(": ").Append(string.Join(", ", state.Owned.OrderBy(pair => PerkCatalog.NumberOf(pair.Key) ?? int.MaxValue).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
         }
 
         text.Append($"\nfree rerolls {state.FreeRerollsLeft} | paid rerolls {state.PaidRerolls} | next reroll: ");
