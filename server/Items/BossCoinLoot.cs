@@ -1,3 +1,4 @@
+using PrestigePerks.Logging;
 using PrestigePerks.Perks;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
@@ -13,7 +14,7 @@ namespace PrestigePerks.Items;
 /// </summary>
 [Injectable(TypePriority = OnLoadOrder.PostLoad + 2)]
 public class BossCoinLoot(
-    ISptLogger<BossCoinLoot> logger,
+    ISptLogger<PerksFileLogger> logger,
     BotTable botTable,
     BotConfig botConfig,
     PerkConfigLoader configLoader) : IOnLoad
