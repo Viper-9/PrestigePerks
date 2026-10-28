@@ -1,6 +1,5 @@
 ﻿# 배포 zip 만들기. SPT 설치 폴더에 그대로 풀면 되는 구조로 묶는다.
-#   .\tools\package.ps1        상용: 서버 Release (개발용 명령 없음). 명령 코드가 섞여 있으면 멈춘다
-#   .\tools\package.ps1 -Dev   테스터용: 서버 Dev (개발용 명령 포함). zip 이름 끝에 -dev
+#   .\tools\package.ps1   빌드는 하나다. 개발용 명령은 게임 F12 개발자 모드로 켠다 (dev-docs 5_개발자_모드.md)
 #   dist\<ModName>-<버전>.zip
 #     SPT_Runtime/user/mods/<ModName>/...   서버 모드 (DLL + Data, bundles 등)
 #     BepInEx/plugins/<ModName>/...         클라 플러그인 DLL
@@ -8,7 +7,6 @@
 # 클라 빌드에 게임 DLL 이 필요하면 SptRoot 가 잡혀 있어야 한다 (이 저장소는 PrestigePerks.local.props).
 #
 # 다른 모드에 쓸 때는 아래 설정 블록만 고친다. 경로는 모두 저장소 루트 기준.
-param([switch]$Dev)
 $ErrorActionPreference = 'Stop'
 
 # ---------------------------------------------------------------- 설정
@@ -19,7 +17,7 @@ $VersionProps = 'Directory.Build.props'               # <Version> 을 읽을 파
 
 # 서버 모드. 서버 모드가 없으면 $ServerOut = $null
 $ServerProject     = 'server\PrestigePerks.Server.csproj'
-$ServerOut         = if ($Dev) { 'server\bin\Dev\PrestigePerks' } else { 'server\bin\Release\PrestigePerks' }   # 빌드 출력 폴더
+$ServerOut         = 'server\bin\Release\PrestigePerks'                 # 빌드 출력 폴더
 $ServerAllowedDlls = @('PrestigePerks.dll')                       # 출력에 있어도 되는 DLL (SPT 가 이미 들고 있는 DLL 이 섞이면 충돌한다)
 $ServerRequired    = @('bundles\prestige_coin.bundle')            # 출력에 반드시 있어야 하는 파일 (없으면 @())
 
@@ -34,9 +32,6 @@ $ClientResources = @{
     'client\PrestigePerks.Client\Assets\Icons'   = 'PrestigePerks.Icons.'
     'client\PrestigePerks.Client\Assets\Sprites' = 'PrestigePerks.Sprites.'
 }
-
-# 상용 빌드 서버 DLL 에 있으면 안 되는 형식 이름 (개발용 명령)
-$DevOnlyTypes = @('PrestigeCommandoCommand')
 
 # 서버 모드 폴더와 클라 플러그인 폴더에 둘 다 넣을 라이선스 파일 (MIT 는 배포본에 문구를 넣어야 한다). 없으면 @()
 $LicenseFiles = @('LICENSE.md', 'THIRD_PARTY_NOTICES.md')
@@ -67,10 +62,6 @@ if ($RunTests) {
 }
 dotnet build $slnPath -c Release
 if ($LASTEXITCODE -ne 0) { throw 'build failed' }
-if ($Dev) {
-    dotnet build (Join-Path $root $ServerProject) -c Dev
-    if ($LASTEXITCODE -ne 0) { throw 'dev server build failed' }
-}
 
 # 2) 빌드 결과 검사
 if ($ServerOut) {
@@ -81,15 +72,6 @@ if ($ServerOut) {
     }
     $leaked = Get-ChildItem $serverOutPath -Filter *.dll | Where-Object { $ServerAllowedDlls -notcontains $_.Name }
     if ($leaked) { throw "빌드 출력에 허용되지 않은 DLL 이 섞였습니다: $(($leaked | ForEach-Object Name) -join ', ')" }
-    if (-not $Dev) {
-        # 상용 빌드에 개발용 명령이 들어가지 않았는지 DLL 메타데이터 이름으로 확인한다
-        foreach ($dll in Get-ChildItem $serverOutPath -Filter *.dll) {
-            $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($dll.FullName))
-            foreach ($type in $DevOnlyTypes) {
-                if ($text.Contains($type)) { throw "상용 빌드 $($dll.Name) 에 개발용 형식 $type 이 들어 있습니다" }
-            }
-        }
-    }
 }
 $clientPaths = @($ClientDlls | ForEach-Object { Join-Path $root $_ })
 foreach ($dll in $clientPaths) {
@@ -144,7 +126,7 @@ foreach ($item in Get-ChildItem $stage -Recurse) {
 }
 
 # 4) zip (항목 경로는 '/' — PowerShell 5.1 Compress-Archive 는 '\' 를 써서 리눅스 도구가 한 파일 이름으로 읽는다)
-$zip = Join-Path $dist "$ModName-$version$(if ($Dev) { '-dev' }).zip"
+$zip = Join-Path $dist "$ModName-$version.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::Open($zip, 'Create')

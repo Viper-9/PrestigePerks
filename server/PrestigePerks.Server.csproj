@@ -11,13 +11,6 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
-  <!-- Dev: 테스트용 빌드. Release 와 같게 최적화하고 개발용 Commando 명령(prestige ...)만 더 넣는다.
-       Release(상용 배포)에는 명령 코드가 아예 들어가지 않는다. tools\deploy-dev.ps1 과 package.ps1 -Dev 가 쓴다 -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Dev'">
-    <Optimize>true</Optimize>
-    <DefineConstants>$(DefineConstants);DEV_COMMANDS</DefineConstants>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="SPTushonka.Common" Version="4.1.5" />
     <PackageReference Include="SPTushonka.DI" Version="4.1.5" />
