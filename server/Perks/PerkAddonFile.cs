@@ -59,7 +59,7 @@ public static class PerkAddonFile
         }
         catch (JsonException error)
         {
-            warn($"{file}: JSON 오류 ({error.Message}). 이 add-on 은 건너뜁니다");
+            warn($"{file}: invalid JSON ({error.Message}). Skipping this add-on");
             return [];
         }
 
@@ -69,7 +69,7 @@ public static class PerkAddonFile
                 || !document.RootElement.TryGetProperty("perks", out var list)
                 || list.ValueKind != JsonValueKind.Array)
             {
-                warn($"{file}: \"perks\" 목록이 없습니다. 이 add-on 은 건너뜁니다");
+                warn($"{file}: no \"perks\" list. Skipping this add-on");
                 return [];
             }
 
@@ -79,15 +79,15 @@ public static class PerkAddonFile
             foreach (var item in list.EnumerateArray())
             {
                 index++;
-                var label = item.ValueKind == JsonValueKind.Object && String(item, "id") is { } named ? named : $"{index}번째 특전";
+                var label = item.ValueKind == JsonValueKind.Object && String(item, "id") is { } named ? named : $"perk #{index}";
                 var perk = ParsePerk(item, source, message => warn($"{file}: {label}: {message}"), out var reason);
                 if (perk is null)
                 {
-                    warn($"{file}: {label}: {reason}. 이 특전은 건너뜁니다");
+                    warn($"{file}: {label}: {reason}. Skipping this perk");
                 }
                 else if (!seen.Add(perk.Id))
                 {
-                    warn($"{file}: {label}: 같은 파일에 같은 ID 가 이미 있습니다. 이 특전은 건너뜁니다");
+                    warn($"{file}: {label}: the id is used twice in this file. Skipping this perk");
                 }
                 else
                 {
@@ -105,14 +105,14 @@ public static class PerkAddonFile
         reason = "";
         if (item.ValueKind != JsonValueKind.Object)
         {
-            reason = "특전이 객체가 아닙니다";
+            reason = "the perk is not an object";
             return null;
         }
 
         var id = String(item, "id");
         if (!IsValidId(id))
         {
-            reason = "id 는 점이 든 소문자 \"author.perk\" (64자 이하) 여야 합니다";
+            reason = "id must be a lower-case dotted \"author.perk\" of at most 64 characters";
             return null;
         }
 
@@ -124,7 +124,7 @@ public static class PerkAddonFile
         };
         if (kind is null)
         {
-            reason = "모르는 kind (\"bonus\" 또는 \"code\")";
+            reason = "unknown kind (\"bonus\" or \"code\")";
             return null;
         }
 
@@ -137,7 +137,7 @@ public static class PerkAddonFile
         };
         if (unit is null)
         {
-            reason = "모르는 unit (\"percent\", \"points\", \"flat\")";
+            reason = "unknown unit (\"percent\", \"points\" or \"flat\")";
             return null;
         }
 
@@ -155,7 +155,7 @@ public static class PerkAddonFile
 
             if (hasAmount)
             {
-                note("bonus 특전의 amount 는 쓰지 않습니다 (화면 수치는 첫 Bonus 값). 무시합니다");
+                note("bonus perks do not use amount (the list shows the first bonus value). Ignoring it");
             }
 
             bonuses = parsed;
@@ -165,13 +165,13 @@ public static class PerkAddonFile
         {
             if (hasBonuses)
             {
-                reason = "code 특전에는 bonuses 를 쓸 수 없습니다";
+                reason = "code perks cannot have bonuses";
                 return null;
             }
 
             if (!hasAmount || !TryValue(amountValue, out amount))
             {
-                reason = $"code 특전의 amount 는 0 이 아니고 절댓값 {MaxValue} 이하인 숫자여야 합니다";
+                reason = $"code perk amount must be a non-zero number of at most {MaxValue} either way";
                 return null;
             }
 
@@ -188,7 +188,7 @@ public static class PerkAddonFile
         reason = "";
         if (list.ValueKind != JsonValueKind.Array || list.GetArrayLength() is 0 or > MaxBonuses)
         {
-            reason = $"bonus 특전의 bonuses 는 1~{MaxBonuses}개여야 합니다";
+            reason = $"bonus perks need 1 to {MaxBonuses} bonuses";
             return null;
         }
 
@@ -197,7 +197,7 @@ public static class PerkAddonFile
         {
             if (entry.ValueKind != JsonValueKind.Object || !TryEnum<BonusType>(String(entry, "type"), out var type) || !AllowedBonusTypes.Contains(type))
             {
-                reason = $"허용하지 않는 Bonus type ({String(entry, "type") ?? "없음"})";
+                reason = $"bonus type not allowed ({String(entry, "type") ?? "none"})";
                 return null;
             }
 
@@ -207,7 +207,7 @@ public static class PerkAddonFile
             {
                 if (!TryEnum<BonusSkillType>(skillName, out var parsed))
                 {
-                    reason = $"SkillGroupLevelingBoost 에는 skillType 이 필요합니다 ({skillName ?? "없음"})";
+                    reason = $"SkillGroupLevelingBoost needs a skillType ({skillName ?? "none"})";
                     return null;
                 }
 
@@ -215,20 +215,20 @@ public static class PerkAddonFile
             }
             else if (entry.TryGetProperty("skillType", out _))
             {
-                reason = $"{type} 에는 skillType 을 쓸 수 없습니다";
+                reason = $"{type} cannot have a skillType";
                 return null;
             }
 
             if (!entry.TryGetProperty("value", out var valueElement) || !TryValue(valueElement, out var value))
             {
-                reason = $"Bonus value 는 0 이 아니고 절댓값 {MaxValue} 이하인 숫자여야 합니다";
+                reason = $"bonus value must be a non-zero number of at most {MaxValue} either way";
                 return null;
             }
 
             // 화면 수치는 첫 값 하나라 값이 다르면 보이는 것과 실제가 달라진다
             if (result.Count > 0 && value != result[0].Value)
             {
-                reason = "Bonus value 가 서로 다릅니다 (모두 같아야 합니다)";
+                reason = "bonus values differ (they must all be the same)";
                 return null;
             }
 
@@ -257,7 +257,7 @@ public static class PerkAddonFile
             var effect = Text(language.Value, "effect");
             if (effect is not null && !effect.Contains("{0}", StringComparison.Ordinal))
             {
-                note($"texts.{language.Name}.effect 에 수치 자리 {{0}} 이 없습니다. 그 문구는 뺍니다");
+                note($"texts.{language.Name}.effect has no {{0}} for the value. Dropping that text");
                 effect = null;
             }
 

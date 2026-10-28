@@ -47,7 +47,7 @@ public static class PerkAddonLoader
             var file = Path.Combine(folder, "perks.json");
             if (!File.Exists(file))
             {
-                Warn($"perks/{source}: perks.json 이 없습니다. 이 add-on 은 건너뜁니다");
+                Warn($"perks/{source}: no perks.json. Skipping this add-on");
                 continue;
             }
 
@@ -58,7 +58,7 @@ public static class PerkAddonLoader
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                Warn($"perks/{source}/perks.json: 읽지 못했습니다 ({error.Message}). 이 add-on 은 건너뜁니다");
+                Warn($"perks/{source}/perks.json: cannot be read ({error.Message}). Skipping this add-on");
                 continue;
             }
 
@@ -67,7 +67,7 @@ public static class PerkAddonLoader
             {
                 if (!ids.Add(perk.Id))
                 {
-                    Warn($"perks/{source}/perks.json: {perk.Id}: 앞선 add-on 과 ID 가 겹칩니다. 이 특전은 건너뜁니다");
+                    Warn($"perks/{source}/perks.json: {perk.Id}: the id is already used by an earlier add-on. Skipping this perk");
                     continue;
                 }
 
@@ -83,7 +83,7 @@ public static class PerkAddonLoader
                 }
                 else
                 {
-                    Warn($"perks/{source}/perks.json: {perk.Id}: 아이콘 {iconPath} {reason}. 아이콘만 빼고 기본 아이콘을 씁니다");
+                    Warn($"perks/{source}/perks.json: {perk.Id}: icon {iconPath} {reason}. Using the default icon");
                 }
             }
         }
@@ -103,13 +103,13 @@ public static class PerkAddonLoader
         }
         catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            reason = "경로가 잘못됐습니다";
+            reason = "is not a valid path";
             return null;
         }
 
         if (Path.IsPathRooted(path) || !full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
         {
-            reason = "는 add-on 폴더 안의 상대 경로여야 합니다";
+            reason = "must be a relative path inside the add-on folder";
             return null;
         }
 
@@ -118,20 +118,20 @@ public static class PerkAddonLoader
             var info = new FileInfo(full);
             if (!info.Exists)
             {
-                reason = "파일이 없습니다";
+                reason = "was not found";
                 return null;
             }
 
             if (info.Length > MaxIconBytes)
             {
-                reason = $"이 {MaxIconBytes / 1024}KB 를 넘습니다";
+                reason = $"is over {MaxIconBytes / 1024} KB";
                 return null;
             }
 
             var bytes = File.ReadAllBytes(full);
             if (bytes.Length < PngSignature.Length || !bytes.AsSpan(0, PngSignature.Length).SequenceEqual(PngSignature))
             {
-                reason = "가 PNG 가 아닙니다";
+                reason = "is not a PNG";
                 return null;
             }
 
@@ -139,7 +139,7 @@ public static class PerkAddonLoader
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            reason = $"을 읽지 못했습니다 ({error.Message})";
+            reason = $"cannot be read ({error.Message})";
             return null;
         }
     }

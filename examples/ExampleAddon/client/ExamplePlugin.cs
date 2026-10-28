@@ -8,18 +8,18 @@ using PrestigePerks.Api;
 namespace PrestigePerks.ExampleAddon
 {
     /// <summary>
-    /// 예제 클라이언트 add-on (B형, dev-docs 95 Task 7). 서버 perks/example/perks.json 의 "example.porter"(code, points, 10) 효과를 낸다:
-    /// 소지 무게 한도 배율에 +0.1 × 단계 비율. 내장 9번 짐꾼과 같은 지점이라 둘 다 장착하면 합쳐진다.
-    /// Awake 에서 칸을 받고, 패치 본문은 Has → IsPmc → Scale 순서로 읽는다 (배열 읽기만, 할당 없음).
+    /// Example client add-on. Gives "example.porter" (code, points, 10 in the server's perks/example/perks.json) its effect:
+    /// +0.1 × tier scale on the carry weight multiplier. The built-in Porter perk patches the same getter, so the two add up.
+    /// Registers its slot in Awake; the patch body reads Has, then IsPmc, then Scale (array reads only, no allocation).
     /// </summary>
     [BepInPlugin("com.example.prestigeperks.addon", "PrestigePerks Example Add-on", "1.0.0")]
     [BepInDependency("com.viper.prestigeperks")]
     public class ExamplePlugin : BaseUnityPlugin
     {
-        /// <summary>서버 perks.json 의 id 와 같아야 한다.</summary>
+        /// <summary>Must match the id in the server's perks.json.</summary>
         public const string PorterId = "example.porter";
 
-        /// <summary>III 효과량 (perks.json amount 10 = +0.1).</summary>
+        /// <summary>Tier III effect (perks.json amount 10 = +0.1).</summary>
         public const float PorterWeight = 0.1f;
 
         internal static int PorterSlot = -1;
@@ -45,7 +45,7 @@ namespace PrestigePerks.ExampleAddon
         }
     }
 
-    /// <summary>SkillManager.CarryingWeightRelativeModifier getter (내장 CarryingWeightPatch 와 같은 지점).</summary>
+    /// <summary>SkillManager.CarryingWeightRelativeModifier getter (the same spot as the built-in Porter patch).</summary>
     [HarmonyPatch]
     internal static class ExamplePorterPatch
     {

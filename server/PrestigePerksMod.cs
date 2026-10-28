@@ -57,7 +57,7 @@ public class PrestigePerksMod(
         PerkAddonLoader.Last = report with { Perks = PerkCatalog.Addons, Warnings = [.. report.Warnings, .. installWarnings] };
         if (PerkCatalog.Addons.Count > 0)
         {
-            logger.Info($"[PrestigePerks] add-on 특전 {PerkCatalog.Addons.Count}개: {string.Join(", ", PerkCatalog.Addons.Select(perk => perk.Id))}");
+            logger.Info($"[PrestigePerks] add-on perks ({PerkCatalog.Addons.Count}): {string.Join(", ", PerkCatalog.Addons.Select(perk => perk.Id))}");
         }
     }
 

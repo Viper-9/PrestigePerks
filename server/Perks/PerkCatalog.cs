@@ -125,14 +125,14 @@ public static class PerkCatalog
             var source = perk.Addon?.Source ?? "?";
             if (ids.Contains(perk.Id))
             {
-                warnings.Add($"perks/{source}: {perk.Id}: 내장 특전이나 앞선 add-on 과 ID 가 겹칩니다. 이 특전은 건너뜁니다");
+                warnings.Add($"perks/{source}: {perk.Id}: the id is already used by a built-in perk or an earlier add-on. Skipping this perk");
                 continue;
             }
 
             var clash = perk.Bonuses.FirstOrDefault(bonus => bonusIds.Contains(bonus.Id));
             if (clash is not null)
             {
-                warnings.Add($"perks/{source}: {perk.Id}: Bonus ID {clash.Id} 가 다른 특전과 겹칩니다. 이 특전은 건너뜁니다");
+                warnings.Add($"perks/{source}: {perk.Id}: bonus id {clash.Id} clashes with another perk. Skipping this perk");
                 continue;
             }
 

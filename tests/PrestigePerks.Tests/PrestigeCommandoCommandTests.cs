@@ -173,9 +173,9 @@ public class PrestigeCommandoCommandTests
     [Fact]
     public void Formats_the_addon_report()
     {
-        var text = PrestigeCommandoCommand.FormatAddons(new PerkAddonReport([], new Dictionary<string, byte[]>(), ["perks/x/perks.json: viper.x: 모르는 kind. 이 특전은 건너뜁니다"], ["x"]));
+        var text = PrestigeCommandoCommand.FormatAddons(new PerkAddonReport([], new Dictionary<string, byte[]>(), ["perks/x/perks.json: viper.x: unknown kind. Skipping this perk"], ["x"]));
         Assert.Contains("add-ons: x", text);
         Assert.Contains("perks: none", text);
-        Assert.Contains("모르는 kind", text);
+        Assert.Contains("unknown kind", text);
     }
 }
