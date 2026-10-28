@@ -63,7 +63,7 @@ The page follows the game language: Korean, English for everything else.
 | P6 | 47 | New Beginning · Collector | Strength 20 · Endurance 20 · Charisma 20 | Intelligence Center 2 · Security 3 · Rest Space 3 | 20,000,000 | 50% |
 
 - **Kept progress** is how much of your skill and weapon mastering progress stays after the prestige.
-- Levels, skills, hideout and kept progress match SPT 5.0. Only the P3 rouble requirement is lower (5.0 asks for
+- Levels, skills, hideout and kept progress match EFT 1.0. Only the P3 rouble requirement is lower (1.0 asks for
   15,000,000).
 - New Beginning is the prestige quest from Content Backport - Prestiges (Ragman). PrestigePerks only lowers the
   start level of the P1 and P2 quests to 15 and 25 so they open at the prestige level. The quests themselves are
