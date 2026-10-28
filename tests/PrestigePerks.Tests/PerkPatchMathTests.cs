@@ -32,8 +32,8 @@ public class PerkPatchMathTests
     [Fact]
     public void Patch_slots_cover_every_server_patch_perk()
     {
-        var patchIds = PerkCatalog.All.Where(perk => perk.Kind == PerkKind.Patch).Select(perk => perk.Id).Order();
-        Assert.Equal(patchIds, PerkPatchSlots.Ids.Where(id => id != null).Order());
+        var patchIds = PerkCatalog.Builtin.Where(perk => perk.Kind == PerkKind.Patch).Select(perk => perk.Id).Order();
+        Assert.Equal(patchIds, PerkPatchSlots.Ids.Take(PerkPatchSlots.BuiltinCount).Order());
         Assert.Equal(-1, PerkPatchSlots.Index("experience"));
         Assert.Equal(-1, PerkPatchSlots.Index(null!));
     }
@@ -252,5 +252,81 @@ public class PerkPatchMathTests
              ("mastery", PerkPatchSlots.Mastery), ("loading", PerkPatchSlots.Loading), ("search", PerkPatchSlots.Search), ("surgeon", PerkPatchSlots.Surgeon),
              ("reload", PerkPatchSlots.Reload), ("handling", PerkPatchSlots.Handling), ("reliability", PerkPatchSlots.Reliability), ("agility", PerkPatchSlots.Agility)],
             PerkPatchSlots.Ids.Select(id => (id, PerkPatchSlots.Index(id))));
+    }
+}
+
+/// <summary>add-on 패치 칸 등록. PerkPatchSlots 는 정적이라 PerkCatalog 설치 테스트와 같은 병렬 실행 안 하는 컬렉션에 넣고 끝에 되돌린다.</summary>
+[Collection(PerkCatalogInstallCollection.Name)]
+public sealed class PerkPatchSlotRegistrationTests : IDisposable
+{
+    public void Dispose() => PerkPatchSlots.ResetForTests();
+
+    // 서버 add-on 파일 검사(PerkAddonFile.IsValidId)와 같은 규칙이다
+    [Theory]
+    [InlineData("viper.medic")]
+    [InlineData("a.b")]
+    [InlineData("viper_2.medic-kit.v2")]
+    [InlineData("medic")]
+    [InlineData("Viper.Medic")]
+    [InlineData(".medic")]
+    [InlineData("viper.")]
+    [InlineData("a.b..")]
+    [InlineData("viper medic.x")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Client_addon_ids_follow_the_server_rule(string? id)
+    {
+        Assert.Equal(PerkAddonFile.IsValidId(id), PerkPatchSlots.IsAddonId(id!));
+        Assert.Equal(PerkAddonFile.IsValidId("a." + new string('b', 62)), PerkPatchSlots.IsAddonId("a." + new string('b', 62)));
+        Assert.Equal(PerkAddonFile.IsValidId("a." + new string('b', 63)), PerkPatchSlots.IsAddonId("a." + new string('b', 63)));
+    }
+
+    [Fact]
+    public void Addon_patch_perks_get_slots_after_the_builtin_ones()
+    {
+        Assert.Equal(PerkPatchSlots.BuiltinCount, PerkPatchSlots.Count);
+
+        var sprint = PerkPatchSlots.Register("viper.sprint");
+        var dive = PerkPatchSlots.Register("viper.dive");
+
+        Assert.Equal((15, 16), (sprint, dive));
+        Assert.Equal(17, PerkPatchSlots.Count);
+        Assert.Equal("viper.sprint", PerkPatchSlots.Ids[15]);
+        Assert.Equal(16, PerkPatchSlots.Index("viper.dive"));
+        Assert.True(PerkPatchSlots.IsRegistered("viper.sprint"));
+    }
+
+    [Theory]
+    [InlineData("viper.sprint")] // 두 번째 등록
+    [InlineData("porter")]       // 내장
+    [InlineData("sprint")]       // 점 없음
+    [InlineData("Viper.Sprint")]
+    [InlineData(null)]
+    public void Bad_or_repeated_registrations_get_no_slot(string? id)
+    {
+        PerkPatchSlots.Register("viper.sprint");
+        Assert.Equal(-1, PerkPatchSlots.Register(id!));
+        Assert.Equal(16, PerkPatchSlots.Count);
+    }
+
+    [Fact]
+    public void Registered_slots_take_their_scale_from_the_applied_tier()
+    {
+        var sprint = PerkPatchSlots.Register("viper.sprint");
+        var scales = PerkPatchMath.BuildScales(new Dictionary<string, int> { ["viper.sprint"] = 2, ["porter"] = 1 }, [0.5, 0.75, 1.0], new bool[PerkPatchSlots.Count]);
+
+        Assert.Equal(PerkPatchSlots.Count, scales.Length);
+        Assert.Equal(0.75f, scales[sprint]);
+        Assert.Equal(0.5f, scales[PerkPatchSlots.Porter]);
+    }
+
+    // 꺼짐 배열이 등록 전 크기여도 (등록이 state 보다 늦은 경우) 새 칸은 꺼지지 않은 것으로 본다
+    [Fact]
+    public void Short_disabled_arrays_do_not_disable_new_slots()
+    {
+        var sprint = PerkPatchSlots.Register("viper.sprint");
+        var scales = PerkPatchMath.BuildScales(new Dictionary<string, int> { ["viper.sprint"] = 3 }, null!, new bool[PerkPatchSlots.BuiltinCount]);
+
+        Assert.Equal(1f, scales[sprint]);
     }
 }
