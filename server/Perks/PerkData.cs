@@ -35,7 +35,7 @@ public sealed class PerkData
     /// <summary>보유한 단계. 없거나 빈 칸이면 0.</summary>
     public int OwnedTier(string? perk) => perk is not null && Owned.TryGetValue(perk, out var tier) ? tier : 0;
 
-    /// <summary>개발용 (Dev 빌드만): 슬롯과 상관없이 모든 특전을 적용한다. 상용 빌드는 읽을 때 끈다 (<see cref="PerkDataFile.Normalize"/>).</summary>
+    /// <summary>개발용: 슬롯과 상관없이 모든 특전을 적용한다. 개발자 모드를 끄면 끈다 (<see cref="PerkService.SetDevMode"/>).</summary>
     [JsonPropertyName("devAllPerks")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool DevAllPerks { get; set; }

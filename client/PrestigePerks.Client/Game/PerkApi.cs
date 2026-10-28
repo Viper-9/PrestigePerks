@@ -16,6 +16,7 @@ namespace PrestigePerks.Game
         private const string EquipRoute = "/prestigeperks/equip";
         private const string UnequipRoute = "/prestigeperks/unequip";
         private const string IconsRoute = "/prestigeperks/icons";
+        private const string DevRoute = "/prestigeperks/dev";
 
         /// <summary>현재 상태. 새 특전 알림은 이 응답으로 받고 서버에서 지워진다. 실패하면 null.</summary>
         public static async Task<PerkStateDto> GetState() =>
@@ -34,6 +35,10 @@ namespace PrestigePerks.Game
                 return new Dictionary<string, string>();
             }
         }
+
+        /// <summary>F12 개발자 모드를 서버에 알린다 (개발용 Commando 명령을 실행할지).</summary>
+        public static Task SetDevMode(bool on) =>
+            RequestHandler.PostJsonAsync(DevRoute, JsonConvert.SerializeObject(new DevBody { Dev = on }));
 
         /// <summary>확정 넣기: 장착 안 된 보유 특전을 슬롯에 놓는다 (확정 칸이면 서로 바뀐다).</summary>
         public static async Task<PerkStateDto> Equip(string perk, int slot) =>
@@ -73,6 +78,11 @@ namespace PrestigePerks.Game
         private sealed class IconsResponse
         {
             [JsonProperty("icons")] public Dictionary<string, string> Icons { get; set; }
+        }
+
+        private sealed class DevBody
+        {
+            [JsonProperty("dev")] public bool Dev;
         }
 
         private sealed class EquipBody

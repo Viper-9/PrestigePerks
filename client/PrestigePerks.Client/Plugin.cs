@@ -1,4 +1,5 @@
 using BepInEx;
+using BepInEx.Configuration;
 using HarmonyLib;
 
 namespace PrestigePerks;
@@ -12,10 +13,21 @@ public class Plugin : BaseUnityPlugin
 {
     internal static Plugin Instance;
 
+    /// <summary>F12 설정의 개발자 모드: 개발용 Commando 명령(prestige ...)과 [dev] 진단 로그 (dev-docs 5_개발자_모드.md).</summary>
+    internal static ConfigEntry<bool> DevMode;
+
     private void Awake()
     {
         Instance = this;
         Log.Source = Logger;
+        DevMode = Config.Bind("Developer", "Developer mode", false,
+            "Testing only. Enables the prestige chat commands (coins, perks, tiers) and [dev] diagnostic logs. Takes effect on the server right away.");
+        Game.PerkEffects.DevMode = DevMode.Value;
+        DevMode.SettingChanged += (_, _) =>
+        {
+            Game.PerkEffects.DevMode = DevMode.Value;
+            PerkController.Instance.SendDevMode();
+        };
         var harmony = new Harmony("com.viper.prestigeperks");
         PerkController.Create();
         PatchOne(harmony, typeof(Patches.LocaleFilePatch));

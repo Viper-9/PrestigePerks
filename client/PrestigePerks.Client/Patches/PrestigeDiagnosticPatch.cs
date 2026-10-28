@@ -11,7 +11,7 @@ namespace PrestigePerks.Patches
     /// <summary>
     /// 개발용: 프레스티지 화면이 "얻기" 버튼을 정할 때 (화면을 열거나 상태가 바뀔 때) 클라이언트 판정을 남긴다.
     /// 버튼은 PrestigeLevel.QuestStatus == AvailableForFinish 일 때만 열린다. 조건마다 현재값과 충족 여부를 찍는다.
-    /// 서버가 Dev 빌드일 때만 남긴다.
+    /// F12 개발자 모드일 때만 남긴다.
     /// </summary>
     [HarmonyPatch]
     internal static class PrestigeClaimDiagnosticPatch

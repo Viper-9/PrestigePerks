@@ -14,6 +14,7 @@ namespace PrestigePerks.Routes;
 ///   /prestigeperks/equip    { "perk": 14, "slot": 0 }  보유 특전을 칸에 넣는다 (확정 칸이면 서로 바꾼다)
 ///   /prestigeperks/unequip  { "slot": 0 }  확정 칸을 비운다
 ///   /prestigeperks/icons    add-on 특전 아이콘 { "icons": { id: base64 PNG } } (PerkIconsResponse, 클라이언트가 실행마다 한 번)
+///   /prestigeperks/dev      { "dev": true }  클라이언트 F12 설정의 개발자 모드 (메인 메뉴마다, 설정을 바꿀 때). 응답 {}
 /// 리롤과 구매는 코인을 인벤토리에서 빼야 해서 아이템 이벤트(<see cref="PerkItemEventRouter"/>)로 받는다.
 /// /client/game/start 는 같은 URL 의 라우터가 모두 차례로 실행되고 앞 응답이 output 으로 넘어오므로, output 을 그대로 돌려줘 바닐라 응답을 바꾸지 않는다.
 /// </summary>
@@ -25,6 +26,7 @@ public class PerkStaticRouter : StaticRouter
     public const string EquipRoute = "/prestigeperks/equip";
     public const string UnequipRoute = "/prestigeperks/unequip";
     public const string IconsRoute = "/prestigeperks/icons";
+    public const string DevRoute = "/prestigeperks/dev";
 
     public PerkStaticRouter(JsonUtil jsonUtil, HttpResponseUtil httpResponseUtil, PerkService perkService)
         : base(jsonUtil,
@@ -37,6 +39,13 @@ public class PerkStaticRouter : StaticRouter
                 }),
             new RouteAction<EmptyRequestData>(IconsRoute,
                 (_, _, _, _, _) => new ValueTask<string>(jsonUtil.Serialize(perkService.Icons()) ?? "{}")),
+            new RouteAction(DevRoute,
+                (_, info, sessionId, _, _) =>
+                {
+                    perkService.SetDevMode(sessionId, info is PerkDevModeRequest { Dev: true });
+                    return new ValueTask<object>("{}");
+                },
+                typeof(PerkDevModeRequest)),
             new RouteAction<EmptyRequestData>(StateRoute,
                 (_, _, sessionId, _, _) => Respond(httpResponseUtil, perkService.GetState(sessionId, markNewPerksSeen: true))),
             // 본문이 비면 StaticRouter 가 EmptyRequestData 를 넘기므로 제네릭 RouteAction 의 강제 형변환을 쓰지 않는다

@@ -54,9 +54,6 @@ namespace PrestigePerks.Model
         /// <summary>슬롯 칸마다 더 높은 어느 단계에서 열리는지. 열렸거나 열리지 않는 칸은 null.</summary>
         [JsonProperty("slotOpensAt")] public List<int?> SlotOpensAt = new List<int?>();
 
-        /// <summary>서버가 개발용 빌드다. 개발용 진단 로그를 남긴다.</summary>
-        [JsonProperty("dev")] public bool Dev;
-
         /// <summary>특전 목록 (서버 PerkCatalog 순서). 화면 목록·수치의 유일한 출처다.</summary>
         [JsonProperty("catalog")] public List<PerkCatalogEntryDto> Catalog = new List<PerkCatalogEntryDto>();
 

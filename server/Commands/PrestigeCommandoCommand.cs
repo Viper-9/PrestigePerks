@@ -18,12 +18,10 @@ using SPTarkov.Server.Core.Servers;
 
 namespace PrestigePerks.Commands;
 
-// 개발용 명령은 Dev 빌드에만 넣는다 (상용 Release 빌드에는 이 클래스가 없다). 서버 csproj 의 Dev 구성 참고
-#if DEV_COMMANDS
-
 /// <summary>
 /// Commando 채팅 명령 "prestige ...". SPT 의 "spt give" 와 같은 개발·테스트용이라
-/// Dev 빌드에만 들어가고, core.json 의 giveCommandEnabled 가 꺼져 있으면 명령을 등록하지 않는다.
+/// core.json 의 giveCommandEnabled 가 꺼져 있으면 명령을 등록하지 않고,
+/// 클라이언트 F12 설정의 개발자 모드가 꺼져 있으면 (<see cref="PerkService.IsDevMode"/>) 실행하지 않고 안내만 보낸다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public class PrestigeCommandoCommand(
@@ -61,6 +59,8 @@ public class PrestigeCommandoCommand(
     private static readonly Regex BonusRegex = new($"^{Prefix} {PerkCommand} bonus$", RegexOptions.IgnoreCase);
     private static readonly Regex ScaleRegex = new($"^{Prefix} {PerkCommand} scale ([a-z0-9_.-]+)$", RegexOptions.IgnoreCase);
 
+    public const string DevModeOff = "Developer mode is off. Turn on PrestigePerks > Developer mode in the BepInEx settings (F12), then go back to the main menu once.";
+
     public string CommandPrefix => Prefix;
 
     public List<string> Commands =>
@@ -90,7 +90,8 @@ public class PrestigeCommandoCommand(
 
     public ValueTask<string> Handle(string command, UserDialogInfo commandHandler, MongoId sessionId, SendMessageRequest request)
     {
-        var reply = command == PerkCommand ? HandlePerk(sessionId, request.Text) : HandleCoin(sessionId, request.Text);
+        var reply = !perkService.IsDevMode(sessionId) ? DevModeOff
+            : command == PerkCommand ? HandlePerk(sessionId, request.Text) : HandleCoin(sessionId, request.Text);
         if (reply is not null)
         {
             mailSendService.SendUserMessageToPlayer(sessionId, commandHandler, reply);
@@ -452,4 +453,3 @@ public class PrestigeCommandoCommand(
         return text.ToString();
     }
 }
-#endif

@@ -36,13 +36,4 @@
     <None Include="..\..\examples\ExampleAddon\perks\**\*" LinkBase="ExampleAddon\example" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- 개발용 명령은 서버 Dev 빌드에만 들어가므로 (상용 Release 에는 없음) 소스를 직접 가져와 이 테스트 어셈블리에서 컴파일한다 -->
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);DEV_COMMANDS</DefineConstants>
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\..\server\Commands\PrestigeCommandoCommand.cs" Link="ServerDev\PrestigeCommandoCommand.cs" />
-    <Compile Include="..\..\server\Commands\BossCoinCheck.cs" Link="ServerDev\BossCoinCheck.cs" />
-  </ItemGroup>
-
 </Project>

@@ -16,7 +16,7 @@ namespace PrestigePerks.Game
         private static float[] scales = new float[PerkPatchSlots.Count];
         private static bool[] disabled = new bool[PerkPatchSlots.Count];
 
-        // 개발용: 패치 칸별 적용 횟수와 마지막 바닐라 값 → 적용 값. 서버가 Dev 빌드일 때만 남긴다
+        // 개발용: 패치 칸별 적용 횟수와 마지막 바닐라 값 → 적용 값. F12 개발자 모드일 때만 남긴다
         private static bool dev;
         private static long[] counts = new long[PerkPatchSlots.Count];
         private static float[] before = new float[PerkPatchSlots.Count];
@@ -36,11 +36,15 @@ namespace PrestigePerks.Game
             return (uint)slot < (uint)current.Length ? current[slot] : 0f;
         }
 
-        /// <summary>서버가 Dev 빌드인지 (마지막으로 받은 state 기준). 개발용 로그를 남길지 정한다.</summary>
-        public static bool DevMode => dev;
+        /// <summary>F12 개발자 모드 (<see cref="Plugin.DevMode"/>). 개발용 로그를 남길지 정한다.</summary>
+        public static bool DevMode
+        {
+            get => dev;
+            set => dev = value;
+        }
 
         /// <summary>적용 단계(특전 ID → 1~3)와 단계 비율로 덮어쓴다.</summary>
-        public static void Set(IDictionary<string, int> tiers, IList<double> ratios, bool devMode)
+        public static void Set(IDictionary<string, int> tiers, IList<double> ratios)
         {
             // add-on 이 칸을 등록했으면 배열을 늘린다 (레이드 밖)
             var count = PerkPatchSlots.Count;
@@ -53,7 +57,6 @@ namespace PrestigePerks.Game
             }
 
             scales = PerkPatchMath.BuildScales(tiers, ratios, disabled);
-            dev = devMode;
             if (dev)
             {
                 LogScales();

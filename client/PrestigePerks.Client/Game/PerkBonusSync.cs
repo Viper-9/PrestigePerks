@@ -52,7 +52,7 @@ namespace PrestigePerks.Game
                 }
             }
 
-            if (state.Dev)
+            if (PerkEffects.DevMode)
             {
                 LogCalculated(controller);
             }

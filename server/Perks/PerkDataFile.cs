@@ -126,14 +126,6 @@ public static class PerkDataFile
 
         data.LegacyPerks = null;
         data.SchemaVersion = PerkData.CurrentSchemaVersion;
-#if !DEV_COMMANDS
-        if (data.DevAllPerks)
-        {
-            // 개발용 플래그는 상용 빌드에서 효과가 없다 (테스터 파일을 그대로 가져온 경우)
-            warnings.Add("개발용 devAllPerks 를 껐습니다");
-            data.DevAllPerks = false;
-        }
-#endif
 
         // 모르는 특전(add-on 을 뺀 경우 등)도 지우지 않는다. 다시 넣으면 산 단계 그대로 돌아온다. 리롤·효과·state 는 카탈로그에 있는 특전만 본다
         var owned = data.Owned.Where(pair => !string.IsNullOrEmpty(pair.Key) && pair.Value >= 1)

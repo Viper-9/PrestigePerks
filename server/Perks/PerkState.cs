@@ -56,9 +56,6 @@ public sealed record PerkState
     [JsonPropertyName("rollCost")]
     public int? RollCost { get; init; }
 
-    /// <summary>서버가 개발용(Dev) 빌드다. 클라이언트가 개발용 진단 로그(특전 효과 계산값)를 남긴다.</summary>
-    [JsonPropertyName("dev")]
-    public bool Dev { get; init; }
 
     /// <summary>슬롯 칸(6칸)마다 더 높은 어느 단계에서 열리는지. 열렸거나 열리지 않는 칸은 null (<see cref="PerkConfig.SlotOpensAt"/>).</summary>
     [JsonPropertyName("slotOpensAt")]
@@ -197,6 +194,13 @@ public sealed record PerkUnequipRequest : SPTarkov.Server.Core.Models.Utils.IReq
     /// <summary>뺄 확정 칸 (0 부터).</summary>
     [JsonPropertyName("slot")]
     public int Slot { get; init; }
+}
+
+public sealed record PerkDevModeRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    /// <summary>클라이언트 F12 설정의 개발자 모드.</summary>
+    [JsonPropertyName("dev")]
+    public bool Dev { get; init; }
 }
 
 public sealed record PerkLockRequest : SPTarkov.Server.Core.Models.Utils.IRequestData

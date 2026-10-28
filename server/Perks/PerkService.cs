@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using PrestigePerks.Items;
 using PrestigePerks.Logging;
 using PrestigePerks.Saving;
@@ -32,11 +33,8 @@ public class PerkService(
 
     private readonly Random random = Random.Shared;
 
-#if DEV_COMMANDS
-    private const bool DevBuild = true;
-#else
-    private const bool DevBuild = false;
-#endif
+    // 클라이언트 F12 설정에서 개발자 모드를 켠 세션 (/prestigeperks/dev). 서버를 다시 켜면 비고, 클라이언트가 메인 메뉴마다 다시 알린다
+    private readonly ConcurrentDictionary<MongoId, bool> devModes = new();
 
     private PerkConfig Config => configLoader.Config;
 
@@ -172,6 +170,37 @@ public class PerkService(
         });
 
         return Finish(state, output);
+    }
+
+    /// <summary>개발자 모드인지 (개발용 Commando 명령을 실행할지).</summary>
+    public bool IsDevMode(MongoId sessionId) => devModes.TryGetValue(sessionId, out var on) && on;
+
+    /// <summary>클라이언트가 알린 개발자 모드. 끄면 개발용 all 도 끄고 Bonus 를 다시 넣는다 (게임 반영은 다음 state).</summary>
+    public void SetDevMode(MongoId sessionId, bool on)
+    {
+        if (IsDevMode(sessionId) != on)
+        {
+            logger.Info($"[PrestigePerks] {sessionId}: 개발자 모드 {(on ? "켬" : "끔")}");
+        }
+
+        devModes[sessionId] = on;
+        if (on)
+        {
+            return;
+        }
+
+        Run(sessionId, (profile, data, level) =>
+        {
+            if (data.DevAllPerks)
+            {
+                data.DevAllPerks = false;
+                store.Save(sessionId, data);
+                PerkSaveLoadRouter.ApplyPerkBonuses(profile, store, Config);
+                logger.Info($"[PrestigePerks] {sessionId}: 개발자 모드가 꺼져 개발용 all 을 껐습니다");
+            }
+
+            return BuildState(data, level);
+        });
     }
 
     /// <summary>개발용: 슬롯에 특전을 직접 넣는다 (특전 효과를 비교해 보려고). 다른 슬롯에 있던 특전이면 서로 바꾼다.</summary>
@@ -351,7 +380,6 @@ public class PerkService(
             Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActiveScales(data, level, Config)),
             BonusIds = BonusIds,
             SlotOpensAt = Config.SlotOpensAt(level),
-            Dev = DevBuild,
             Error = error == PerkError.None ? null : error.ToString(),
         };
 

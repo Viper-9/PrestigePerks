@@ -11,9 +11,6 @@ using SPTarkov.Server.Core.Models.Spt.Tables;
 
 namespace PrestigePerks.Commands;
 
-// 개발용 명령은 Dev 빌드에만 넣는다 (PrestigeCommandoCommand 참고)
-#if DEV_COMMANDS
-
 /// <summary>
 /// 개발용 "prestige coin boss [n]": 보스마다 SPT 봇 생성(BotGenerator.PrepareAndGenerateBot, 레이드에서 쓰는 것과 같은 경로)을
 /// n 번 돌려 코인과 GP 코인이 몇 명에게 들어갔는지 센다. 모든 보스를 레이드에서 만나 확인할 수 없어서 데이터로 확인한다.
@@ -150,4 +147,3 @@ public sealed class BossCoinTally
         return text.ToString();
     }
 }
-#endif

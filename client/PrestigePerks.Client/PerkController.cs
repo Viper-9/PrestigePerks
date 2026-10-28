@@ -145,10 +145,36 @@ namespace PrestigePerks
             _ = RefreshFromMainMenu();
         }
 
+        /// <summary>F12 에서 개발자 모드를 바꿨을 때. 로그인 전이면 다음 메인 메뉴에서 알린다.</summary>
+        public void SendDevMode()
+        {
+            if (PerkGame.Session == null)
+            {
+                return;
+            }
+
+            _ = SendDevModeAsync(Plugin.DevMode.Value);
+        }
+
+        private static async Task SendDevModeAsync(bool on)
+        {
+            try
+            {
+                await PerkApi.SetDevMode(on);
+                Log.Info($"developer mode {(on ? "on" : "off")}");
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"developer mode change failed: {e.Message}");
+            }
+        }
+
         private async Task RefreshFromMainMenu()
         {
             try
             {
+                // 서버를 다시 켰을 수 있어 메인 메뉴마다 알린다. 개발자 모드를 끄면 서버가 개발용 all 을 끄므로 state 보다 먼저
+                await PerkApi.SetDevMode(Plugin.DevMode.Value);
                 var fresh = await PerkApi.GetState();
                 if (fresh == null)
                 {
@@ -177,7 +203,7 @@ namespace PrestigePerks
             RequestIcons();
             WarnUnregisteredCodePerks();
             PerkBonusSync.Apply(state);
-            PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio, state.Dev);
+            PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio);
             if (state.NewPerks.Count == 0 && state.NewTierCap == null)
             {
                 return;
