@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildThisFileDirectory)PrestigePerks.local.props" Condition="Exists('$(MSBuildThisFileDirectory)PrestigePerks.local.props')" />
