@@ -31,6 +31,19 @@ public sealed class PerkAddonLoaderTests : IDisposable
     private static string Perk(string id, string? icon = null) =>
         $$"""{ "perks": [ { "id": "{{id}}", "kind": "code", "unit": "flat", "amount": 1{{(icon is null ? "" : $", \"icon\": \"{icon}\"")}} } ] }""";
 
+    // 게임 확인용 예제 (deploy-dev.ps1 -Example). 잘못된 항목은 noauthor 하나뿐이다
+    [Fact]
+    public void Example_addon_passes_the_checks_except_its_one_bad_entry()
+    {
+        var report = PerkAddonLoader.Load(Path.Combine(AppContext.BaseDirectory, "ExampleAddon"), warnings.Add);
+
+        Assert.Equal(["example"], report.Sources);
+        Assert.Equal(10, report.Perks.Count);
+        Assert.Equal(["example.porter"], report.Perks.Where(perk => perk.Kind == PerkKind.Patch).Select(perk => perk.Id));
+        Assert.Equal(["example.fuel", "example.health", "example.porter"], report.Icons.Keys.Order());
+        Assert.Contains("noauthor", Assert.Single(warnings));
+    }
+
     [Fact]
     public void Missing_folder_is_no_addons_and_no_warning()
     {
