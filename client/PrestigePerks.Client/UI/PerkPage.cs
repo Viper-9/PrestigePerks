@@ -12,7 +12,7 @@ using UnityEngine.UI;
 namespace PrestigePerks.UI
 {
     /// <summary>
-    /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 2안 + 개편 3안): 왼쪽 위 장착 슬롯 6칸, 왼쪽 아래 특전 20줄 (두 열), 오른쪽 코인·리롤·선택한 특전.
+    /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 2안 + 개편 3안): 왼쪽 위 장착 슬롯 6칸, 왼쪽 아래 특전 목록 (두 열, 20개를 넘으면 세로 스크롤), 오른쪽 코인·리롤·선택한 특전.
     /// 줄과 카드는 5.0 시즌 특전 줄과 프레스티지 보상 카드 스프라이트를 겹쳐 그린다 (<see cref="PerkSprites"/>).
     /// 그리기와 선택·드래그만 하고 서버 호출은 <see cref="PerkController"/> 가 한다. 열 때마다 화면 크기에 맞춰 다시 만든다.
     /// </summary>
@@ -28,8 +28,9 @@ namespace PrestigePerks.UI
 
         // 슬롯 육각 배지 (목업 1안): 틀 폭, 위쪽 y. 높이는 정육각형 비율(376:436)을 따른다
         private const float HexWidth = 104, HexTop = 32;
-        private const float RowHeight = 62, RowGap = 3, ColumnGap = 12;
-        private const int RowsPerColumn = 10;
+        private const float RowHeight = PerkListLayout.RowHeight, RowGap = PerkListLayout.RowGap, ColumnGap = 12;
+        // 목록 스크롤 영역은 머리줄 아래부터. 스크롤바는 폭 8, 줄과 2 띄운다 (Briefing 목록과 같음)
+        private const float ListScrollTop = 48, ScrollbarWidth = 8, ScrollbarSpacing = 2;
         private const float FlashTime = 0.9f;
 
         // 특전 줄 오른쪽 단계 칸 (I II III)
@@ -106,7 +107,13 @@ namespace PrestigePerks.UI
         private bool ownedOnly;
         private TextMeshProUGUI listEmpty;
         private readonly List<Tab> tabs = new List<Tab>();
-        private readonly List<Vector2> rowPlaces = new List<Vector2>();
+
+        // 목록 스크롤 (20개를 넘으면). 줄은 listContent 아래에 있다. 끌 수 없는 줄을 끌면 스크롤로 넘긴다 (scrollDrag)
+        private ScrollRect listScroll;
+        private RectTransform listContent;
+        private bool scrollDrag;
+        // 목록 밖(슬롯 클릭, 자동 선택, 릴 멈춤)에서 고른 특전은 다음 그리기 때 그 줄이 보이게 스크롤한다
+        private bool revealSelected;
 
         // 선택한 특전 칸. 페이지를 열고 처음 그릴 때 한 번 첫 슬롯 특전을 고른다
         private Picked picked;
@@ -480,6 +487,7 @@ namespace PrestigePerks.UI
 
             Destroy(measure.gameObject);
 
+            BuildListScroll(width, height);
             listEmpty = UiKit.Label(listPanel, "Empty", width / 2, height / 2, width - 32, locale.Get("ui.ownedEmpty"), 16, UiKit.Muted, TextAlignmentOptions.Center);
             listEmpty.enabled = false;
             listDropLabel = UiKit.Label(listPanel, "Drop", width - 16, 23, width / 2, locale.Get("ui.dropUnequip"), 16, SelectedLine, TextAlignmentOptions.Right);
@@ -488,6 +496,80 @@ namespace PrestigePerks.UI
 
             // 확정 칸을 끄는 동안 목록 전체 테두리 (줄 위에 그린다. 줄을 만든 뒤 맨 위로 올린다)
             listDropOutline = UiKit.Outline(listPanel, Color.clear);
+        }
+
+        /// <summary>
+        /// 목록 세로 스크롤 (Briefing 목록과 같은 구성): 휠·끌기를 받는 투명 영역 + RectMask2D 뷰포트 + 위 기준 콘텐츠 + 오른쪽 끝 표준 Scrollbar.
+        /// 탭·빈 목록 글자·놓기 표시는 패널에 있어 같이 움직이지 않는다. 내용이 뷰포트보다 작으면 스크롤바가 숨는다 (내장 20개)
+        /// </summary>
+        private void BuildListScroll(float width, float height)
+        {
+            // 오른쪽은 패널 테두리 안쪽으로 4 띄운다. 아래는 테두리 바로 위까지 (작업 표시줄만큼 패널이 낮아져 줄 20개가 겨우 들어간다)
+            var area = UiKit.Rect(listPanel, "ListScroll", 0, ListScrollTop, width - 4, height - ListScrollTop - 1);
+            UiKit.Image(area, Color.clear, raycast: true);
+            listScroll = area.gameObject.AddComponent<ScrollRect>();
+
+            var viewport = UiKit.Fill(area, "Viewport");
+            viewport.gameObject.AddComponent<RectMask2D>();
+            listContent = UiKit.Rect(viewport, "Content", 0, 0, 0, 0);
+            listContent.anchorMax = new Vector2(1, 1);
+            listContent.pivot = new Vector2(0.5f, 1);
+            listContent.offsetMin = listContent.offsetMax = Vector2.zero;
+
+            listScroll.viewport = viewport;
+            listScroll.content = listContent;
+            listScroll.horizontal = false;
+            listScroll.vertical = true;
+            listScroll.movementType = ScrollRect.MovementType.Clamped;
+            listScroll.scrollSensitivity = 30;
+            listScroll.inertia = false;
+
+            // 레일은 선 색, 손잡이는 흐린 글자 색 (마우스를 올리거나 끌면 밝게). 손잡이 크기는 Scrollbar 가 앵커로 정한다
+            var bar = UiKit.Rect(area, "Scrollbar", 0, 0, ScrollbarWidth, 0);
+            bar.anchorMin = new Vector2(1, 0);
+            bar.anchorMax = new Vector2(1, 1);
+            bar.pivot = new Vector2(1, 0.5f);
+            bar.anchoredPosition = Vector2.zero;
+            bar.sizeDelta = new Vector2(ScrollbarWidth, 0);
+            UiKit.Image(bar, UiKit.Line, raycast: true);
+            var handle = UiKit.Fill(UiKit.Fill(bar, "Sliding Area"), "Handle");
+            var handleImage = UiKit.Image(handle, Color.white, raycast: true);
+            var scrollbar = bar.gameObject.AddComponent<Scrollbar>();
+            scrollbar.handleRect = handle;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            scrollbar.navigation = new Navigation { mode = Navigation.Mode.None };
+            var colors = scrollbar.colors;
+            colors.normalColor = UiKit.Muted;
+            colors.highlightedColor = UiKit.Text;
+            colors.pressedColor = UiKit.Text;
+            colors.selectedColor = UiKit.Muted;
+            colors.disabledColor = UiKit.Muted;
+            colors.fadeDuration = 0.08f;
+            scrollbar.colors = colors;
+
+            listScroll.verticalScrollbar = scrollbar;
+            listScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+            listScroll.verticalScrollbarSpacing = ScrollbarSpacing;
+        }
+
+        /// <summary>그 줄이 보일 만큼만 스크롤한다 (Briefing QuestListView.ScrollTo 와 같은 방식). 범위를 넘으면 ScrollRect 가 끝에 맞춘다.</summary>
+        private void ScrollTo(RectTransform row)
+        {
+            var viewport = listScroll.viewport;
+            var corners = new Vector3[4];
+            row.GetWorldCorners(corners); // 0 은 왼쪽 아래, 1 은 왼쪽 위
+            var top = viewport.InverseTransformPoint(corners[1]).y;
+            var bottom = viewport.InverseTransformPoint(corners[0]).y;
+            var view = viewport.rect;
+            var move = top > view.yMax ? -(top - view.yMax) : bottom < view.yMin ? view.yMin - bottom : 0f;
+            if (move == 0f)
+            {
+                return;
+            }
+
+            listScroll.StopMovement();
+            listContent.anchoredPosition += new Vector2(0, move);
         }
 
         /// <summary>
@@ -512,11 +594,16 @@ namespace PrestigePerks.UI
 
             Destroy(measure.gameObject);
 
-            for (var i = 0; i < perks.Count; i++)
+            // 넘치면 스크롤바 자리(폭 + 간격)를 처음부터 뺀다. 스크롤바가 나타나도 줄 폭이 바뀌지 않게 (Briefing ScrollbarReserve 와 같은 이유)
+            if (PerkListLayout.Overflows(perks.Count))
             {
-                var perk = perks[i];
-                rowPlaces.Add(new Vector2(16 + i / RowsPerColumn * (rowWidth + ColumnGap), -(58 + i % RowsPerColumn * (RowHeight + RowGap))));
-                rows[perk] = BuildRow(listPanel, perk, rowPlaces[i].x, -rowPlaces[i].y, rowWidth, nameColumn);
+                rowWidth -= (ScrollbarWidth + ScrollbarSpacing) / 2;
+            }
+
+            // 자리는 보기마다 RenderListView 가 매긴다
+            foreach (var perk in perks)
+            {
+                rows[perk] = BuildRow(listContent, perk, 0, 0, rowWidth, nameColumn);
             }
 
             listDropOutline.transform.SetAsLastSibling();
@@ -542,6 +629,9 @@ namespace PrestigePerks.UI
                 ownedOnly = owned;
                 GameSounds(EUISoundType.ButtonOver);
                 Rerender();
+                // 보기를 바꾸면 맨 위부터 (Briefing RightColumnView 와 같음)
+                listScroll.StopMovement();
+                listScroll.verticalNormalizedPosition = 1;
             });
             RefreshTab(tab);
             return tab;
@@ -557,7 +647,8 @@ namespace PrestigePerks.UI
             SetTint(tab.Button, on ? ButtonTint : DarkTint);
         }
 
-        // 보기 탭과 줄 자리. 전체는 고정 자리, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다. perks 는 카탈로그 순서의 특전
+        // 보기 탭과 줄 자리. 전체는 카탈로그 순서 그대로, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다. perks 는 카탈로그 순서의 특전.
+        // 열당 줄 수는 보이는 줄 수로 보기마다 다시 구한다 (전체 24개 = 12줄, 도감 15개 = 10줄)
         private void RenderListView(PerkStateDto state, IReadOnlyList<string> perks)
         {
             foreach (var tab in tabs)
@@ -568,10 +659,28 @@ namespace PrestigePerks.UI
             // 확정 칸을 끄는 동안에는 오른쪽에 "여기에 놓으면 빠집니다"가 나온다
             listEmpty.enabled = ownedOnly && PerkPageModel.OwnedCount(state) == 0;
 
-            var place = 0;
-            for (var index = 0; index < perks.Count; index++)
+            var visible = 0;
+            foreach (var perk in perks)
             {
-                var perk = perks[index];
+                if (rows.ContainsKey(perk) && (!ownedOnly || PerkPageModel.OwnedTier(state, perk) > 0))
+                {
+                    visible++;
+                }
+            }
+
+            var rowsPerColumn = PerkListLayout.RowsPerColumn(visible);
+            var contentHeight = PerkListLayout.ContentHeight(rowsPerColumn) - ListScrollTop;
+            if (!PerkListLayout.Overflows(visible))
+            {
+                // 20개 이하는 스크롤하지 않는다 (지금 화면과 같게). 패널이 작업 표시줄만큼 낮아져 아래 여백이 모자라도 스크롤바가 생기지 않게 뷰포트에 맞춘다
+                contentHeight = Mathf.Min(contentHeight, listScroll.viewport.rect.height);
+            }
+
+            listContent.sizeDelta = new Vector2(listContent.sizeDelta.x, contentHeight);
+
+            var place = 0;
+            foreach (var perk in perks)
+            {
                 if (!rows.TryGetValue(perk, out var row))
                 {
                     continue;
@@ -581,7 +690,9 @@ namespace PrestigePerks.UI
                 row.Rect.gameObject.SetActive(show);
                 if (show)
                 {
-                    row.Rect.anchoredPosition = rowPlaces[ownedOnly ? place : index];
+                    // 패널 기준 자리가 스크롤 전과 같게 머리줄 오프셋을 뺀다
+                    var (column, line) = PerkListLayout.Place(place, rowsPerColumn);
+                    row.Rect.anchoredPosition = new Vector2(16 + column * (rowWidth + ColumnGap), -(PerkListLayout.Top - ListScrollTop + line * (RowHeight + RowGap)));
                     place++;
                 }
                 else if (row.Hover)
@@ -643,9 +754,34 @@ namespace PrestigePerks.UI
                 }
             });
             On(rect.gameObject, EventTriggerType.PointerClick, _ => OnRowClicked(perk));
+            // EventTrigger 가 휠·끌기를 받아 버리므로 스크롤할 것은 목록 ScrollRect 로 넘긴다 (끄는 중에는 ScrollRect 가 꺼져 있어 무시된다)
+            On(rect.gameObject, EventTriggerType.Scroll, data => listScroll.OnScroll(data));
             On(rect.gameObject, EventTriggerType.BeginDrag, data => BeginRowDrag(perk, data));
-            On(rect.gameObject, EventTriggerType.Drag, MoveDrag);
-            On(rect.gameObject, EventTriggerType.EndDrag, EndDrag);
+            On(rect.gameObject, EventTriggerType.Drag, data =>
+            {
+                if (scrollDrag)
+                {
+                    listScroll.OnDrag(data);
+                }
+                else
+                {
+                    MoveDrag(data);
+                }
+            });
+            On(rect.gameObject, EventTriggerType.EndDrag, data =>
+            {
+                if (scrollDrag)
+                {
+                    scrollDrag = false;
+                    listScroll.OnEndDrag(data);
+                    // 끌기가 끝난 그 자리에서 클릭이 와도 고르지 않는다
+                    dragEndFrame = Time.frameCount;
+                }
+                else
+                {
+                    EndDrag(data);
+                }
+            });
             SetEquipped(row, false);
             return row;
         }
@@ -869,6 +1005,7 @@ namespace PrestigePerks.UI
                 if (selectedPerk == null)
                 {
                     selectedPerk = PerkPageModel.FirstSlotPerk(state);
+                    revealSelected = true;
                 }
             }
 
@@ -885,6 +1022,14 @@ namespace PrestigePerks.UI
             }
 
             RenderListView(state, perks);
+            if (revealSelected && rows.Count > 0)
+            {
+                revealSelected = false;
+                if (selectedPerk != null && rows.TryGetValue(selectedPerk, out var selectedRow) && selectedRow.Rect.gameObject.activeSelf)
+                {
+                    ScrollTo(selectedRow.Rect);
+                }
+            }
 
             for (var i = 0; i < reels.Count; i++)
             {
@@ -1185,7 +1330,8 @@ namespace PrestigePerks.UI
             switch (PerkPageModel.KindOf(lastState, index))
             {
                 case SlotKind.Fixed:
-                    // 확정 칸은 잠글 필요가 없어 누르면 그 특전을 고른다
+                    // 확정 칸은 잠글 필요가 없어 누르면 그 특전을 고른다 (목록에서 그 줄이 보이게)
+                    revealSelected = true;
                     Select(lastState.Slots[index].Perk);
                     break;
                 case SlotKind.Roll:
@@ -1219,6 +1365,7 @@ namespace PrestigePerks.UI
             if (perk != null)
             {
                 Pick(perk);
+                revealSelected = true;
             }
         }
 
@@ -1238,10 +1385,18 @@ namespace PrestigePerks.UI
 
         private bool CanStartDrag => lastState != null && !lastBusy && spinning.Count == 0;
 
+        // 끌 수 없는 줄(미보유, 바쁨)을 끌면 목록을 민다 (Briefing 목록과 같은 동작)
         private void BeginRowDrag(string perk, PointerEventData data)
         {
+            scrollDrag = false;
             if (!CanStartDrag || !PerkPageModel.CanDragRow(lastState, perk))
             {
+                if (data != null)
+                {
+                    scrollDrag = true;
+                    listScroll.OnBeginDrag(data);
+                }
+
                 return;
             }
 
@@ -1277,6 +1432,9 @@ namespace PrestigePerks.UI
             UiKit.Label(ghost, "Name", 54, 17, 150, locale.PerkName(perk), 15, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             UiKit.Label(ghost, "Value", 54, 36, 150, $"{EffectValue(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
             GameSounds(EUISoundType.MenuInstallModFunc);
+            // 끄는 동안 휠·끌기로 목록이 움직이지 않게 한다 (CancelDrag 에서 되돌림)
+            listScroll.StopMovement();
+            listScroll.enabled = false;
             // 끌기 시작하면 바로 끄는 표시로 (슬롯 ↔ 줄 연결 테두리도 끈다)
             RenderDragMarks();
             MoveDrag(data);
@@ -1341,6 +1499,7 @@ namespace PrestigePerks.UI
                 ghost = null;
             }
 
+            listScroll.enabled = true;
             dragPerk = null;
             dragSlot = -1;
             dropReel = -1;
