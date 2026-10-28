@@ -1,4 +1,3 @@
-using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 
 namespace PrestigePerks.Perks;
@@ -15,12 +14,6 @@ public static class PerkArtisan
 
     /// <summary>바닐라 서버의 최소 생산 시간 (HideoutHelper.GetAdjustedCraftTimeWithSkills).</summary>
     public const double MinSeconds = 5;
-
-    /// <summary>서버 시작 때 넣는다 (<see cref="PrestigePerksMod"/>). 없으면 특전 없음으로 본다.</summary>
-    internal static PerkDataStore? Store { get; set; }
-
-    /// <summary>단계별 슬롯 수를 읽는다. 서버 시작 때 넣는다 (<see cref="PrestigePerksMod"/>).</summary>
-    internal static PerkConfig Config { get; set; } = new();
 
     /// <summary>효과 비율 scale 의 시간 배율: 1 − 0.2 × scale.</summary>
     public static double Factor(double scale) => 1 - (1 - TimeFactor) * scale;
@@ -43,19 +36,6 @@ public static class PerkArtisan
     /// <summary>이 PMC 가 17번을 적용받는가.</summary>
     public static bool Has(PmcData? pmc) => Scale(pmc) > 0;
 
-    /// <summary>이 PMC 의 17번 효과 비율 (없으면 0). 특전 데이터의 활성 특전(단계별 슬롯 수만큼, 개발용 all)과 적용 단계로 정한다.</summary>
-    public static double Scale(PmcData? pmc)
-    {
-        var store = Store;
-        if (store is null || pmc?.Info is null || (pmc.SessionId ?? pmc.Id) is not { } id || id.IsEmpty)
-        {
-            return 0;
-        }
-
-        lock (store.GetLock(id))
-        {
-            var data = store.Get(id);
-            return !data.LoadFailed && PerkRules.ActiveScales(data, pmc.Info.PrestigeLevel ?? 0, Config).TryGetValue(Perk, out var scale) ? scale : 0;
-        }
-    }
+    /// <summary>이 PMC 의 17번 효과 비율 (없으면 0, <see cref="PerkScales.Of"/>).</summary>
+    public static double Scale(PmcData? pmc) => PerkScales.Of(pmc, Perk);
 }

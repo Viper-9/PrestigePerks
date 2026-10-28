@@ -30,8 +30,8 @@ public class PrestigePerksMod(
     {
         CheckProfileConverters();
         LoadAddons();
-        PerkArtisan.Store = perkDataStore;
-        PerkArtisan.Config = perkConfigLoader.Config;
+        PerkScales.Store = perkDataStore;
+        PerkScales.Config = perkConfigLoader.Config;
         PrestigeCoinService.Instance = prestigeCoinService;
         prestigeDataLoader.Load();
         serverPatcher.PatchAll();

@@ -59,6 +59,7 @@ public class PrestigeCommandoCommand(
     private static readonly Regex AllRegex = new($"^{Prefix} {PerkCommand} all (on|off)$", RegexOptions.IgnoreCase);
     private static readonly Regex AddonsRegex = new($"^{Prefix} {PerkCommand} addons$", RegexOptions.IgnoreCase);
     private static readonly Regex BonusRegex = new($"^{Prefix} {PerkCommand} bonus$", RegexOptions.IgnoreCase);
+    private static readonly Regex ScaleRegex = new($"^{Prefix} {PerkCommand} scale ([a-z0-9_.-]+)$", RegexOptions.IgnoreCase);
 
     public string CommandPrefix => Prefix;
 
@@ -82,6 +83,7 @@ public class PrestigeCommandoCommand(
                             $"\t{Prefix} {PerkCommand} hideout\t\tshow server hideout times with artisan(17) applied (compare all on/off)\n" +
                             $"\t{Prefix} {PerkCommand} addons\t\tshow perk add-ons read from perks/ at server start and their warnings\n" +
                             $"\t{Prefix} {PerkCommand} bonus\t\tsum of PMC profile bonuses per add-on bonus type (perk bonuses in brackets)\n" +
+                            $"\t{Prefix} {PerkCommand} scale <perk>\t\tserver effect ratio of a perk (number or id) for your PMC, as server add-ons read it (0 = off)\n" +
                             $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, collection, free/paid rerolls (previous file kept as .bak)",
             _ => "",
         };
@@ -157,6 +159,17 @@ public class PrestigeCommandoCommand(
         if (BonusRegex.IsMatch(text?.Trim() ?? ""))
         {
             return DescribeBonuses(sessionId);
+        }
+
+        if (ScaleRegex.IsMatch(text?.Trim() ?? ""))
+        {
+            if (ParseScaleCommand(text) is not { } scalePerk)
+            {
+                return $"Unknown perk. Use a perk number or id ({Prefix} {PerkCommand} addons lists add-on perks).";
+            }
+
+            var pmc = saveServer.ProfileExists(sessionId) ? saveServer.GetProfile(sessionId).CharacterData?.PmcData : null;
+            return $"{PerkCatalog.Describe(scalePerk)} scale {PerkScales.Of(pmc, scalePerk):0.##}";
         }
 
         var parsed = ParsePerkCommand(text);
@@ -331,6 +344,13 @@ public class PrestigeCommandoCommand(
         text.Append($"\ncultist 43200 (12h) -> {(active ? PerkArtisan.CraftTime(43200, scale) : 43200):0}");
         text.Append($"\nbitcoin progress per 100 s elapsed -> {(active ? PerkArtisan.BitcoinElapsed(100, scale) : 100)} s");
         return text.ToString();
+    }
+
+    /// <summary>"prestige perk scale &lt;특전 번호 또는 ID&gt;" 의 특전 ID. 목록에 없으면 null.</summary>
+    internal static string? ParseScaleCommand(string? text)
+    {
+        var match = ScaleRegex.Match(text?.Trim() ?? "");
+        return match.Success ? PerkCatalog.Resolve(match.Groups[1].Value) : null;
     }
 
     /// <summary>"prestige perk addons".</summary>
