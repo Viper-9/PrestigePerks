@@ -228,7 +228,7 @@ public static class PerkRules
     /// 리롤 후보: 미보유 특전 중 잠긴 칸·확정 칸에 없는 것. 리롤 칸의 이전 특전은 다시 나올 수 있다.
     /// 열린 슬롯보다 뒤의 슬롯(단계가 내려갔거나 슬롯 수를 줄인 경우)은 효과가 없지만 겹치지 않게 뺀다.
     /// </summary>
-    private static List<string> RollPool(PerkData data, int slotCount)
+    internal static List<string> RollPool(PerkData data, int slotCount)
     {
         var active = ActiveSlots(data, slotCount);
         var kept = active.Where(slot => !slot.Rollable).Select(slot => slot.Perk)

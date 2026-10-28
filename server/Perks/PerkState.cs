@@ -106,6 +106,9 @@ public sealed record PerkCatalogEntry
 {
     public const string Percent = "percent", Points = "points", Flat = "flat";
 
+    /// <summary>add-on 특전 종류 (perks.json kind). 서버 안에서는 code 가 내장 패치 특전과 같은 <see cref="PerkKind.Patch"/> 다.</summary>
+    public const string BonusKind = "bonus", CodeKind = "code";
+
     [JsonPropertyName("id")]
     public string Id { get; init; } = "";
 
@@ -115,6 +118,46 @@ public sealed record PerkCatalogEntry
 
     [JsonPropertyName("unit")]
     public string Unit { get; init; } = Percent;
+
+    // 아래는 add-on 특전에만 실린다. 내장 특전 JSON 은 그대로다
+
+    /// <summary>add-on 특전 종류 ("bonus", "code"). 내장 특전은 null.</summary>
+    [JsonPropertyName("kind")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string? Kind { get; init; }
+
+    /// <summary>add-on 특전 문구 (게임 언어 코드 → 문구). 사용자 번역 파일이 먼저다.</summary>
+    [JsonPropertyName("texts")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public IReadOnlyDictionary<string, PerkTextsEntry>? Texts { get; init; }
+
+    /// <summary>add-on 아이콘이 있다 (/prestigeperks/icons 로 받는다).</summary>
+    [JsonPropertyName("icon")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Icon { get; init; }
+}
+
+/// <summary>add-on 특전 문구 한 언어. 효과 문구는 "체력 회복 {0}" 처럼 수치 자리를 둔다.</summary>
+public sealed record PerkTextsEntry
+{
+    [JsonPropertyName("name")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("effect")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Effect { get; init; }
+
+    [JsonPropertyName("detail")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; init; }
+}
+
+/// <summary>/prestigeperks/icons 응답: add-on 특전 ID → base64 PNG. 클라이언트가 한 번 받아 세션 동안 캐시한다.</summary>
+public sealed record PerkIconsResponse
+{
+    [JsonPropertyName("icons")]
+    public IReadOnlyDictionary<string, string> Icons { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>state 응답의 슬롯 한 칸.</summary>

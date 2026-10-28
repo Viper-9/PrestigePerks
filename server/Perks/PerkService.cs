@@ -27,7 +27,8 @@ public class PerkService(
     PaymentService paymentService,
     HttpResponseUtil httpResponseUtil)
 {
-    private static readonly IReadOnlyList<string> BonusIds = PerkCatalog.FilteredBonusIds.Select(id => id.ToString()).ToList();
+    // 정적 필드는 add-on 설치 전에 만들어질 수 있어 매번 지금 카탈로그에서 읽는다
+    private static IReadOnlyList<string> BonusIds => PerkCatalog.FilteredBonusIds.Select(id => id.ToString()).ToList();
 
     private readonly Random random = Random.Shared;
 
@@ -353,6 +354,9 @@ public class PerkService(
             Dev = DevBuild,
             Error = error == PerkError.None ? null : error.ToString(),
         };
+
+    /// <summary>add-on 아이콘 (특전 ID → base64 PNG). 프로필과 상관없다. 클라이언트가 실행마다 한 번 받는다.</summary>
+    public PerkIconsResponse Icons() => new() { Icons = PerkCatalog.Icons.ToDictionary(pair => pair.Key, pair => Convert.ToBase64String(pair.Value)) };
 
     /// <summary>"control(14) II fixed, empty, reload(29) I locked" (로그용).</summary>
     private string DescribeSlots(PerkData data, int level)

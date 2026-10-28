@@ -2,11 +2,13 @@ using System.Text;
 using System.Text.RegularExpressions;
 using PrestigePerks.Items;
 using PrestigePerks.Perks;
+using PrestigePerks.Saving;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Helpers.Dialogue.Commando;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Dialog;
 using SPTarkov.Server.Core.Models.Eft.Profile;
+using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Models.Spt.Config;
 using SPTarkov.Server.Core.Services.Commerce;
 using SPTarkov.Server.Core.Controllers;
@@ -50,11 +52,13 @@ public class PrestigeCommandoCommand(
     private static readonly Regex CoinPreviewRegex = new($"^{Prefix} {CoinCommand} preview$", RegexOptions.IgnoreCase);
     private static readonly Regex BossCheckRegex = new($"^{Prefix} {CoinCommand} boss(?: (\\S+))?$", RegexOptions.IgnoreCase);
     private static readonly Regex PerkRegex = new($"^{Prefix} {PerkCommand} ([a-z]+)(?: ([0-9]+))?$", RegexOptions.IgnoreCase);
-    private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([a-z0-9_.]+)$", RegexOptions.IgnoreCase);
+    private static readonly Regex SetRegex = new($"^{Prefix} {PerkCommand} set ([0-9]+) ([a-z0-9_.-]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex HideoutRegex = new($"^{Prefix} {PerkCommand} hideout$", RegexOptions.IgnoreCase);
-    private static readonly Regex TierRegex = new($"^{Prefix} {PerkCommand} tier ([a-z0-9_.]+) ([0-9]+)$", RegexOptions.IgnoreCase);
+    private static readonly Regex TierRegex = new($"^{Prefix} {PerkCommand} tier ([a-z0-9_.-]+) ([0-9]+)$", RegexOptions.IgnoreCase);
     private static readonly Regex CollectionResetRegex = new($"^{Prefix} {PerkCommand} collection reset$", RegexOptions.IgnoreCase);
     private static readonly Regex AllRegex = new($"^{Prefix} {PerkCommand} all (on|off)$", RegexOptions.IgnoreCase);
+    private static readonly Regex AddonsRegex = new($"^{Prefix} {PerkCommand} addons$", RegexOptions.IgnoreCase);
+    private static readonly Regex BonusRegex = new($"^{Prefix} {PerkCommand} bonus$", RegexOptions.IgnoreCase);
 
     public string CommandPrefix => Prefix;
 
@@ -76,6 +80,8 @@ public class PrestigeCommandoCommand(
                             $"\t{Prefix} {PerkCommand} collection reset\t\tclear the collection (fixed slots become reroll slots)\n" +
                             $"\t{Prefix} {PerkCommand} all on|off\t\tapply every perk at tier III regardless of slots (dev testing). Reopen the perk page or main menu to apply it in game\n" +
                             $"\t{Prefix} {PerkCommand} hideout\t\tshow server hideout times with artisan(17) applied (compare all on/off)\n" +
+                            $"\t{Prefix} {PerkCommand} addons\t\tshow perk add-ons read from perks/ at server start and their warnings\n" +
+                            $"\t{Prefix} {PerkCommand} bonus\t\tsum of PMC profile bonuses per add-on bonus type (perk bonuses in brackets)\n" +
                             $"\t{Prefix} {PerkCommand} reset\t\tclear perk data: slots, locks, collection, free/paid rerolls (previous file kept as .bak)",
             _ => "",
         };
@@ -141,6 +147,16 @@ public class PrestigeCommandoCommand(
         if (ParseAllCommand(text) is { } all)
         {
             return FormatState(perkService.SetAllPerks(sessionId, all));
+        }
+
+        if (IsAddonsCommand(text))
+        {
+            return FormatAddons(PerkAddonLoader.Last);
+        }
+
+        if (BonusRegex.IsMatch(text?.Trim() ?? ""))
+        {
+            return DescribeBonuses(sessionId);
         }
 
         var parsed = ParsePerkCommand(text);
@@ -317,6 +333,51 @@ public class PrestigeCommandoCommand(
         return text.ToString();
     }
 
+    /// <summary>"prestige perk addons".</summary>
+    internal static bool IsAddonsCommand(string? text) => AddonsRegex.IsMatch(text?.Trim() ?? "");
+
+    /// <summary>
+    /// add-ons: viper-extra, other
+    /// perks: viper.medic bonus percent 20, viper.sprint code percent 10
+    /// warning: perks/x/perks.json: ...
+    /// </summary>
+    internal static string FormatAddons(PerkAddonReport report)
+    {
+        var text = new StringBuilder($"add-ons: {(report.Sources.Count == 0 ? "none" : string.Join(", ", report.Sources))}");
+        text.Append($"\nperks: {(report.Perks.Count == 0 ? "none" : string.Join(", ", report.Perks.Select(perk =>
+            $"{perk.Id} {(perk.Kind == PerkKind.Patch ? PerkCatalogEntry.CodeKind : PerkCatalogEntry.BonusKind)} {perk.Unit.ToString().ToLowerInvariant()} {perk.Amount:0.##}")))}");
+        foreach (var warning in report.Warnings)
+        {
+            text.Append($"\nwarning: {warning}");
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>개발용: 메모리 PMC Bonuses 의 add-on 허용 타입별 합 (특전 Bonus 만의 합은 괄호). 게임 확인에서 특전 값 × 단계 비율이 들어갔는지 본다.</summary>
+    private string DescribeBonuses(MongoId sessionId)
+    {
+        if (!saveServer.ProfileExists(sessionId) || saveServer.GetProfile(sessionId).CharacterData?.PmcData is not { Info: not null } pmc)
+        {
+            return "No PMC profile.";
+        }
+
+        var bonuses = pmc.Bonuses ?? [];
+        var text = new StringBuilder("PMC bonuses (memory), perk bonuses in brackets:");
+        foreach (var type in PerkAddonFile.AllowedBonusTypes.Order())
+        {
+            var ofType = bonuses.Where(bonus => bonus.Type == type).ToList();
+            var perk = ofType.Where(PerkBonusApplier.IsPerkBonus).ToList();
+            text.Append($"\n{type}: {ofType.Sum(bonus => bonus.Value ?? 0):0.##} ({perk.Sum(bonus => bonus.Value ?? 0):0.##})");
+            if (type == BonusType.SkillGroupLevelingBoost && ofType.Count > 0)
+            {
+                text.Append($" [{string.Join(", ", ofType.GroupBy(bonus => bonus.SkillType).Select(group => $"{group.Key}: {group.Sum(bonus => bonus.Value ?? 0):0.##}"))}]");
+            }
+        }
+
+        return text.ToString();
+    }
+
     /// <summary>"prestige perk all on|off". 틀리면 null.</summary>
     internal static bool? ParseAllCommand(string? text)
     {
@@ -363,7 +424,7 @@ public class PrestigeCommandoCommand(
         text.Append($"\ncollection {state.Owned.Count} / {PerkCatalog.Ids.Count}");
         if (state.Owned.Count > 0)
         {
-            text.Append(": ").Append(string.Join(", ", state.Owned.OrderBy(pair => PerkCatalog.NumberOf(pair.Key) ?? int.MaxValue).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
+            text.Append(": ").Append(string.Join(", ", state.Owned.OrderBy(pair => PerkCatalog.NumberOf(pair.Key) is > 0 and var number ? number : int.MaxValue).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
         }
 
         text.Append($"\nfree rerolls {state.FreeRerollsLeft} | paid rerolls {state.PaidRerolls} | next reroll: ");

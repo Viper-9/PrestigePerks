@@ -7,6 +7,7 @@ using PrestigePerks.Saving;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
+using SPTarkov.Server.Core.Helpers.Server;
 using SPTarkov.Server.Core.Models.Eft.Profile;
 using SPTarkov.Server.Core.Utils;
 
@@ -18,6 +19,7 @@ public class PrestigePerksMod(
     ISptLogger<PrestigePerksMod> logger,
     ISptLogger<PerksFileLogger> fileLogger,
     JsonUtil jsonUtil,
+    ModHelper modHelper,
     PerkDataStore perkDataStore,
     ServerPatcher serverPatcher,
     PrestigeDataLoader prestigeDataLoader,
@@ -27,6 +29,7 @@ public class PrestigePerksMod(
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         CheckProfileConverters();
+        LoadAddons();
         PerkArtisan.Store = perkDataStore;
         PerkArtisan.Config = perkConfigLoader.Config;
         PrestigeCoinService.Instance = prestigeCoinService;
@@ -34,6 +37,28 @@ public class PrestigePerksMod(
         serverPatcher.PatchAll();
         logger.Success($"[PrestigePerks] v{ModMetadata.AssemblyVersion} loaded.");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// perks/ 의 add-on 특전을 카탈로그에 설치한다. 프로필 로드(Bonus 넣기, 데이터 파일 정리)보다 먼저여야
+    /// add-on 특전이 모르는 특전으로 정리되지 않는다 (Preload + 10 &lt; SaveCallbacks).
+    /// </summary>
+    private void LoadAddons()
+    {
+        var folder = Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PrestigePerksMod).Assembly), "perks");
+        var report = PerkAddonLoader.Load(folder, warning => fileLogger.Warning($"[PrestigePerks] {warning}"));
+        var installWarnings = PerkCatalog.Install(report.Perks);
+        foreach (var warning in installWarnings)
+        {
+            fileLogger.Warning($"[PrestigePerks] {warning}");
+        }
+
+        PerkCatalog.InstallIcons(report.Icons);
+        PerkAddonLoader.Last = report with { Perks = PerkCatalog.Addons, Warnings = [.. report.Warnings, .. installWarnings] };
+        if (PerkCatalog.Addons.Count > 0)
+        {
+            logger.Info($"[PrestigePerks] add-on 특전 {PerkCatalog.Addons.Count}개: {string.Join(", ", PerkCatalog.Addons.Select(perk => perk.Id))}");
+        }
     }
 
     /// <summary>
