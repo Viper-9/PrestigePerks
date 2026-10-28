@@ -160,4 +160,22 @@ public class PrestigeCommandoCommandTests
     {
         Assert.Null(PrestigeCommandoCommand.ParseTierCommand(text));
     }
+
+    [Theory]
+    [InlineData("prestige perk addons", true)]
+    [InlineData("  PRESTIGE PERK ADDONS ", true)]
+    [InlineData("prestige perk addon", false)]
+    public void Parses_addons_command(string text, bool matches)
+    {
+        Assert.Equal(matches, PrestigeCommandoCommand.IsAddonsCommand(text));
+    }
+
+    [Fact]
+    public void Formats_the_addon_report()
+    {
+        var text = PrestigeCommandoCommand.FormatAddons(new PerkAddonReport([], new Dictionary<string, byte[]>(), ["perks/x/perks.json: viper.x: 모르는 kind. 이 특전은 건너뜁니다"], ["x"]));
+        Assert.Contains("add-ons: x", text);
+        Assert.Contains("perks: none", text);
+        Assert.Contains("모르는 kind", text);
+    }
 }
