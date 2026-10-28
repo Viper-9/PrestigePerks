@@ -36,6 +36,6 @@ public record ModMetadata : IModMetadata
             { WttContentBackportGuid, new SemanticVersioning.Range("~2.0") },
         };
     public string? Url { get; init; } = "https://github.com/Viper-9/PrestigePerks";
-    public string License { get; init; } = "All Rights Reserved";
+    public string License { get; init; } = "MIT";
     public bool HasPrepatcher { get; init; } = false;
 }
