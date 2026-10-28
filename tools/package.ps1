@@ -40,6 +40,9 @@ $DevOnlyTypes = @('PrestigeCommandoCommand')
 
 # zip 에서 뺄 파일
 $Exclude = @('*.pdb', '*.deps.json', '*.staticwebassets.*.json', '.gitkeep')
+
+# zip 에 들어가면 안 되는 경로 조각 (예제 add-on 은 저장소에만 둔다, dev-docs 95). 있으면 멈춘다
+$Forbidden = @('examples', 'perks\example', 'PrestigePerks.ExampleAddon')
 # ---------------------------------------------------------------- 설정 끝
 
 $root = Split-Path $PSScriptRoot -Parent
@@ -121,6 +124,13 @@ if ($clientPaths) {
         $folderStage = Join-Path $clientStage $ClientFolders[$folder]
         New-Item -ItemType Directory -Force $folderStage | Out-Null
         Copy-Item (Join-Path (Join-Path $root $folder) '*') $folderStage
+    }
+}
+
+foreach ($item in Get-ChildItem $stage -Recurse) {
+    $relative = $item.FullName.Substring($stage.Length + 1)
+    foreach ($part in $Forbidden) {
+        if ($relative.IndexOf($part, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { throw "zip 에 들어가면 안 되는 파일이 있습니다: $relative" }
     }
 }
 

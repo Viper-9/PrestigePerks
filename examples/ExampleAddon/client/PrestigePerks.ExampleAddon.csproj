@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 예제 클라이언트 add-on (B형). 게임 확인용이고 배포하지 않는다 (tools\deploy-dev.ps1 -Example 만 복사한다).
+       PrestigePerks 플러그인 DLL 을 참조해 공개 API PrestigePerks.Api.PerkAddons 를 쓴다 -->
+  <PropertyGroup>
+    <AssemblyName>PrestigePerks.ExampleAddon</AssemblyName>
+    <RootNamespace>PrestigePerks.ExampleAddon</RootNamespace>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Managed>$(SptRoot)\EscapeFromTarkov_Data\Managed</Managed>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp"><HintPath>$(Managed)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(Managed)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(Managed)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx"><HintPath>$(SptRoot)\BepInEx\core\BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(SptRoot)\BepInEx\core\0Harmony.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- PrestigePerks.Client.dll 은 게임에 이미 있으므로 복사하지 않는다 -->
+    <ProjectReference Include="..\..\..\client\PrestigePerks.Client\PrestigePerks.Client.csproj" Private="false" />
+  </ItemGroup>
+  <Target Name="RequireSptRoot" BeforeTargets="ResolveAssemblyReferences;CoreCompile">
+    <Error Condition="'$(SptRoot)' == ''" Text="SptRoot is not set. Create PrestigePerks.local.props from PrestigePerks.local.props.example and set SptRoot." />
+  </Target>
+</Project>

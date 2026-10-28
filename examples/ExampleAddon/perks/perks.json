@@ -1,0 +1,115 @@
+// 예제 add-on (게임 확인용, 배포하지 않음). tools\deploy-dev.ps1 -Example 이 <서버>\perks\example\ 로 복사한다.
+// dev-docs 95 "add-on 파일 형식". 값은 확인하기 쉽게 크게 잡았다.
+{
+  "perks": [
+    // B형: 효과는 클라이언트 예제 DLL (PrestigePerks.ExampleAddon) 이 낸다. 내장 9번 짐꾼과 같은 지점에 +0.1 을 더한다
+    {
+      "id": "example.porter",
+      "kind": "code",
+      "unit": "points",
+      "amount": 10,
+      "icon": "icons/example.porter.png",
+      "texts": {
+        "en": { "name": "Example Porter", "effect": "Carry weight limit {0}", "detail": "Example add-on: client patch" },
+        "kr": { "name": "예제 짐꾼", "effect": "소지 무게 한도 {0}", "detail": "예제 add-on: 클라이언트 패치" }
+      }
+    },
+    // A형: 허용 후보 BonusType 마다 하나씩 (dev-docs 95 "허용 BonusType", 게임 확인 13~18번)
+    {
+      "id": "example.health",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "HealthRegeneration", "value": 50 } ],
+      "icon": "icons/example.health.png",
+      "texts": {
+        "en": { "name": "Example Medic", "effect": "Health regeneration {0}" },
+        "kr": { "name": "예제 회복", "effect": "체력 회복 {0}" }
+      }
+    },
+    {
+      "id": "example.energy",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "EnergyRegeneration", "value": 50 } ],
+      "texts": {
+        "en": { "name": "Example Energy", "effect": "Energy regeneration {0}" },
+        "kr": { "name": "예제 에너지", "effect": "에너지 회복 {0}" }
+      }
+    },
+    {
+      "id": "example.hydration",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "HydrationRegeneration", "value": 50 } ],
+      "texts": {
+        "en": { "name": "Example Hydration", "effect": "Hydration regeneration {0}" },
+        "kr": { "name": "예제 수분", "effect": "수분 회복 {0}" }
+      }
+    },
+    {
+      "id": "example.questmoney",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "QuestMoneyReward", "value": 50 } ],
+      "texts": {
+        "en": { "name": "Example Rewards", "effect": "Quest money rewards {0}" },
+        "kr": { "name": "예제 보상", "effect": "퀘스트 보상 금액 {0}" }
+      }
+    },
+    // kr 문구 없음 → en 으로 보여야 한다
+    {
+      "id": "example.ragfair",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "RagfairCommission", "value": -50 } ],
+      "texts": {
+        "en": { "name": "Example Trader", "effect": "Flea market fee {0}" }
+      }
+    },
+    {
+      "id": "example.insurance",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "InsuranceReturnTime", "value": -50 } ],
+      "texts": {
+        "en": { "name": "Example Insurance", "effect": "Insurance return time {0}" },
+        "kr": { "name": "예제 보험", "effect": "보험 반환 시간 {0}" }
+      }
+    },
+    {
+      "id": "example.fuel",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "FuelConsumption", "value": -50 } ],
+      "icon": "icons/example.fuel.png",
+      "texts": {
+        "en": { "name": "Example Fuel", "effect": "Generator fuel use {0}" },
+        "kr": { "name": "예제 연료", "effect": "발전기 연료 소모 {0}" }
+      }
+    },
+    {
+      "id": "example.repairweapon",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "RepairWeaponBonus", "value": 50 } ],
+      "texts": {
+        "en": { "name": "Example Gunsmith", "effect": "Weapon repair {0}" },
+        "kr": { "name": "예제 총기 수리", "effect": "무기 수리 {0}" }
+      }
+    },
+    // 문구 없음 → 이름 = ID, 효과 = 수치만
+    {
+      "id": "example.repairarmor",
+      "kind": "bonus",
+      "unit": "points",
+      "bonuses": [ { "type": "RepairArmorBonus", "value": 50 } ]
+    },
+    // 잘못된 항목 (점 없는 ID): 서버 로그에 경고 한 줄, 이 특전만 건너뛴다
+    {
+      "id": "noauthor",
+      "kind": "code",
+      "unit": "flat",
+      "amount": 1
+    }
+  ]
+}

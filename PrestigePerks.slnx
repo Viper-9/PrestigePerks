@@ -5,6 +5,9 @@
   <Folder Name="/client/">
     <Project Path="client/PrestigePerks.Client/PrestigePerks.Client.csproj" />
   </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/ExampleAddon/client/PrestigePerks.ExampleAddon.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PrestigePerks.Tests/PrestigePerks.Tests.csproj" />
   </Folder>
