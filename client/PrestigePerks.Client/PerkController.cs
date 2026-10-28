@@ -37,6 +37,9 @@ namespace PrestigePerks
         // add-on 아이콘은 실행마다 한 번만 묻는다 (실패해도 다시 묻지 않고 기본 아이콘)
         private static bool iconsRequested;
 
+        // 효과 코드가 없는 code 특전은 실행마다 한 번만 알린다
+        private static readonly System.Collections.Generic.HashSet<string> warnedCodePerks = new System.Collections.Generic.HashSet<string>();
+
         // BepInEx 가 살려 두는 플러그인 오브젝트에 붙인다
         public static PerkController Create()
         {
@@ -172,6 +175,7 @@ namespace PrestigePerks
             // 목록 줄(이름 칸 폭)을 그리기 전에 add-on 문구를 넣는다
             Locale.UseCatalog(state.Catalog);
             RequestIcons();
+            WarnUnregisteredCodePerks();
             PerkBonusSync.Apply(state);
             PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio, state.Dev);
             if (state.NewPerks.Count == 0 && state.NewTierCap == null)
@@ -213,6 +217,18 @@ namespace PrestigePerks
 
             iconsRequested = true;
             _ = FetchIcons();
+        }
+
+        /// <summary>서버에 code 특전이 있는데 그 효과를 낼 클라이언트 add-on 이 칸을 등록하지 않았으면 경고한다 (목록에는 보이지만 효과가 없다).</summary>
+        private void WarnUnregisteredCodePerks()
+        {
+            foreach (var entry in state.Catalog)
+            {
+                if (entry.Kind == PerkCatalogEntryDto.CodeKind && !PerkPatchSlots.IsRegistered(entry.Id) && warnedCodePerks.Add(entry.Id))
+                {
+                    Log.Warn($"perk {entry.Id} is a code perk but no client add-on registered it; it has no effect");
+                }
+            }
         }
 
         private async Task FetchIcons()
