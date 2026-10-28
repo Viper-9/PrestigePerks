@@ -1067,6 +1067,9 @@ namespace PrestigePerks.UI
 
         private void Rerender() => Render(lastState, lastCoins, lastBusy, lastMessage, lastBuyMessage);
 
+        /// <summary>마지막 상태로 다시 그린다 (add-on 아이콘이 늦게 왔을 때).</summary>
+        public void Redraw() => Rerender();
+
         /// <summary>
         /// 버튼 아래 줄. withCoin 이면 코인 그림(높이 CoinHeight, 폭은 그림 비율) + CoinGap + 글자를 한 묶음으로 가운데에 둔다.
         /// 글자 칸은 가운데 정렬 그대로 두고 왼쪽 여백만 그림 자리만큼 준다. 꺼진 버튼이면 그림도 흐리게.
@@ -1093,6 +1096,8 @@ namespace PrestigePerks.UI
 
         private void RenderRow(string perk, Row row, PerkStateDto state)
         {
+            // add-on 아이콘은 줄을 만든 뒤에 올 수 있어 매번 넣는다
+            row.Icon.sprite = PerkSprites.Icon(perk);
             var slot = PerkPageModel.SlotOf(state, perk);
             // 돌고 있는 슬롯에 있던 특전은 잠시 장착 표시를 비운다
             var equipped = slot >= 0 && !spinning.ContainsKey(slot);

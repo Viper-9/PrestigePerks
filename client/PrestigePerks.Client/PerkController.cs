@@ -34,6 +34,9 @@ namespace PrestigePerks
         private bool busy;
         private static bool screenHooked;
 
+        // add-on 아이콘은 실행마다 한 번만 묻는다 (실패해도 다시 묻지 않고 기본 아이콘)
+        private static bool iconsRequested;
+
         // BepInEx 가 살려 두는 플러그인 오브젝트에 붙인다
         public static PerkController Create()
         {
@@ -61,7 +64,19 @@ namespace PrestigePerks
             return instance;
         }
 
-        private PerkLocale Locale => locale ?? (locale = PerkGame.LoadLocale());
+        private PerkLocale Locale => locale ?? (locale = LoadLocale());
+
+        /// <summary>게임 언어 문구. 이미 받은 state 가 있으면 그 catalog 의 add-on 문구도 쓴다.</summary>
+        private PerkLocale LoadLocale()
+        {
+            var loaded = PerkGame.LoadLocale();
+            if (state != null)
+            {
+                loaded.UseCatalog(state.Catalog);
+            }
+
+            return loaded;
+        }
 
         /// <summary>MenuTaskBar.Awake 뒤. 다음 프레임에 버튼을 붙인다 (다른 모드가 같은 줄에 버튼을 넣는 것과 순서를 피한다).</summary>
         public void OnTaskBarAwake(MenuTaskBar taskBar) => StartCoroutine(InjectNextFrame(taskBar));
@@ -76,7 +91,7 @@ namespace PrestigePerks
                     yield break;
                 }
 
-                locale = PerkGame.LoadLocale();
+                locale = LoadLocale();
                 taskbarButton = PerkTaskbarButton.Inject(taskBar, Locale.Get("taskbar"), OnTaskbarToggle);
                 if (taskbarButton != null)
                 {
@@ -102,7 +117,7 @@ namespace PrestigePerks
         {
             try
             {
-                locale = PerkGame.LoadLocale();
+                locale = LoadLocale();
                 if (taskbarButton != null)
                 {
                     PerkTaskbarButton.SetLabel(taskbarButton, Locale.Get("taskbar"));
@@ -154,6 +169,9 @@ namespace PrestigePerks
         private void Accept(PerkStateDto fresh, string source)
         {
             state = fresh;
+            // 목록 줄(이름 칸 폭)을 그리기 전에 add-on 문구를 넣는다
+            Locale.UseCatalog(state.Catalog);
+            RequestIcons();
             PerkBonusSync.Apply(state);
             PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio, state.Dev);
             if (state.NewPerks.Count == 0 && state.NewTierCap == null)
@@ -185,6 +203,51 @@ namespace PrestigePerks
             }
         }
 
+        /// <summary>catalog 에 아이콘이 있다고 한 add-on 특전의 아이콘을 실행마다 한 번 받는다. 받으면 열린 페이지를 다시 그린다.</summary>
+        private void RequestIcons()
+        {
+            if (iconsRequested || !state.Catalog.Any(entry => entry.Icon && !PerkSprites.HasIcon(entry.Id)))
+            {
+                return;
+            }
+
+            iconsRequested = true;
+            _ = FetchIcons();
+        }
+
+        private async Task FetchIcons()
+        {
+            try
+            {
+                var icons = await PerkApi.Icons();
+                var added = 0;
+                foreach (var pair in icons)
+                {
+                    try
+                    {
+                        if (PerkSprites.AddIcon(pair.Key, Convert.FromBase64String(pair.Value ?? "")))
+                        {
+                            added++;
+                        }
+                    }
+                    catch (FormatException)
+                    {
+                        Log.Warn($"perk add-on icon unreadable: {pair.Key}");
+                    }
+                }
+
+                Log.Info($"perk add-on icons: {added} / {icons.Count}");
+                if (added > 0 && page != null)
+                {
+                    page.Redraw();
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"perk add-on icons failed: {e.Message}");
+            }
+        }
+
         private void OnTaskbarToggle(bool on)
         {
             PerkGame.Sound(EUISoundType.ButtonBottomBarClick);
@@ -207,7 +270,7 @@ namespace PrestigePerks
                     Destroy(page.gameObject);
                 }
 
-                locale = PerkGame.LoadLocale();
+                locale = LoadLocale();
                 bottomInset = taskbarButton != null ? PerkTaskbarButton.TopPixels(taskbarButton) : 0;
                 page = PerkPage.Create(Locale, bottomInset);
                 page.LockClicked += slot => _ = ToggleLock(slot);

@@ -182,10 +182,30 @@ namespace PrestigePerks.Model
     {
         public const string Percent = "percent", Points = "points", Flat = "flat";
 
+        /// <summary>add-on 특전 종류 (server PerkCatalogEntry.BonusKind, CodeKind).</summary>
+        public const string BonusKind = "bonus", CodeKind = "code";
+
         [JsonProperty("id")] public string Id;
 
         /// <summary>단계 III 효과량 (부호 포함, % 는 숫자만).</summary>
         [JsonProperty("amount")] public double Amount;
         [JsonProperty("unit")] public string Unit;
+
+        /// <summary>add-on 특전 종류 ("bonus", "code"). 내장 특전은 null.</summary>
+        [JsonProperty("kind")] public string Kind;
+
+        /// <summary>add-on 특전 문구 (게임 언어 코드 → 문구). 내장 특전과 문구 없는 add-on 은 null.</summary>
+        [JsonProperty("texts")] public Dictionary<string, PerkTextsDto> Texts;
+
+        /// <summary>add-on 아이콘이 있다 (/prestigeperks/icons 로 받는다).</summary>
+        [JsonProperty("icon")] public bool Icon;
+    }
+
+    /// <summary>add-on 특전 문구 한 언어 (server PerkTextsEntry).</summary>
+    public sealed class PerkTextsDto
+    {
+        [JsonProperty("name")] public string Name;
+        [JsonProperty("effect")] public string Effect;
+        [JsonProperty("detail")] public string Detail;
     }
 }

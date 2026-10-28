@@ -14,12 +14,54 @@ namespace PrestigePerks.UI
 
         private static readonly HashSet<string> resources = new HashSet<string>(typeof(PerkSprites).Assembly.GetManifestResourceNames());
 
+        // 서버에서 받은 add-on 아이콘 (이번 실행 동안)
+        private static readonly Dictionary<string, Sprite> addonIcons = new Dictionary<string, Sprite>();
+
         /// <summary>
         /// 특전 아이콘 (128px). 목록에서 50px 안팎으로 줄어 보이므로 mipmap 과 트릴리니어로 거칠지 않게 한다.
-        /// 그림이 없는 특전(add-on)은 작업 표시줄 버튼 아이콘을 쓴다 (없는 리소스를 매번 찾으며 경고하지 않게 미리 거른다).
+        /// 내장 리소스 → 서버에서 받은 add-on 아이콘(<see cref="AddIcon"/>) → 작업 표시줄 버튼 아이콘 순이다 (없는 리소스를 매번 찾으며 경고하지 않게 미리 거른다).
         /// </summary>
-        public static Sprite Icon(string perk) =>
-            perk != null && resources.Contains($"PrestigePerks.Icons.perk_{perk}.png") ? Load($"Icons.perk_{perk}", true) : TaskbarIcon;
+        public static Sprite Icon(string perk)
+        {
+            if (perk == null)
+            {
+                return TaskbarIcon;
+            }
+
+            if (resources.Contains($"PrestigePerks.Icons.perk_{perk}.png"))
+            {
+                return Load($"Icons.perk_{perk}", true);
+            }
+
+            return addonIcons.TryGetValue(perk, out var sprite) && sprite != null ? sprite : TaskbarIcon;
+        }
+
+        /// <summary>add-on 아이콘이 이미 있다 (내장 리소스 또는 받은 것).</summary>
+        public static bool HasIcon(string perk) =>
+            perk != null && (resources.Contains($"PrestigePerks.Icons.perk_{perk}.png") || (addonIcons.TryGetValue(perk, out var sprite) && sprite != null));
+
+        /// <summary>서버에서 받은 add-on 아이콘 PNG 를 넣는다. 내장 아이콘과 같게 mipmap·트릴리니어. 읽지 못하면 false.</summary>
+        public static bool AddIcon(string perk, byte[] png)
+        {
+            if (perk == null || png == null || png.Length == 0)
+            {
+                return false;
+            }
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, true);
+            if (!texture.LoadImage(png, true))
+            {
+                Object.Destroy(texture);
+                return false;
+            }
+
+            texture.name = $"perk_{perk}";
+            texture.filterMode = FilterMode.Trilinear;
+            texture.anisoLevel = 4;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            addonIcons[perk] = Wrap(texture, Vector4.zero);
+            return true;
+        }
 
         public static Sprite RowGradient => Load("Sprites.Sesons_PerkTemplate_Background-Gradient", false);
         public static Sprite RowGlow => Load("Sprites.Sesons_PerkTemplate_Background-GradientWhite", false);

@@ -101,7 +101,7 @@ namespace PrestigePerks.Game
 
             var fallback = PerkLocalePack.Merge(PerkLocale.ParseFile(ReadResource(PerkLocale.Fallback)), PerkLocaleFolder.Texts(PerkLocale.Fallback));
             var primary = string.IsNullOrEmpty(culture) ? null : PerkLocalePack.Merge(PerkLocale.ParseFile(ReadResource(culture)), PerkLocaleFolder.Texts(culture));
-            return new PerkLocale(primary, fallback);
+            return new PerkLocale(primary, fallback, culture);
         }
 
         private static string ReadResource(string culture)

@@ -36,6 +36,38 @@ namespace PrestigePerks.Model
             return (texts, game);
         }
 
+        /// <summary>state catalog 의 add-on 문구 중 그 언어 것을 특전 키(perk.&lt;id&gt;.name/effect/detail)로. 빈 값은 넣지 않는다.</summary>
+        public static Dictionary<string, string> CatalogTexts(IEnumerable<PerkCatalogEntryDto> catalog, string culture)
+        {
+            var result = new Dictionary<string, string>();
+            if (catalog == null || culture == null)
+            {
+                return result;
+            }
+
+            foreach (var entry in catalog)
+            {
+                if (entry?.Id == null || entry.Texts == null || !entry.Texts.TryGetValue(culture, out var texts) || texts == null)
+                {
+                    continue;
+                }
+
+                Add(result, $"perk.{entry.Id}.name", texts.Name);
+                Add(result, $"perk.{entry.Id}.effect", texts.Effect);
+                Add(result, $"perk.{entry.Id}.detail", texts.Detail);
+            }
+
+            return result;
+        }
+
+        private static void Add(Dictionary<string, string> texts, string key, string value)
+        {
+            if (!string.IsNullOrEmpty(value))
+            {
+                texts[key] = value;
+            }
+        }
+
         /// <summary>basis 에 overlay 를 덮어쓴 새 사전. 둘 다 바꾸지 않는다.</summary>
         public static Dictionary<string, string> Merge(Dictionary<string, string> basis, Dictionary<string, string> overlay)
         {

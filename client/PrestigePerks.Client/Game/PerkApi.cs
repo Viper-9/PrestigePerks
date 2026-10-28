@@ -15,10 +15,25 @@ namespace PrestigePerks.Game
         private const string LockRoute = "/prestigeperks/lock";
         private const string EquipRoute = "/prestigeperks/equip";
         private const string UnequipRoute = "/prestigeperks/unequip";
+        private const string IconsRoute = "/prestigeperks/icons";
 
         /// <summary>현재 상태. 새 특전 알림은 이 응답으로 받고 서버에서 지워진다. 실패하면 null.</summary>
         public static async Task<PerkStateDto> GetState() =>
             PerkStateDto.Parse(await RequestHandler.PostJsonAsync(StateRoute, "{}"));
+
+        /// <summary>add-on 특전 아이콘 (특전 ID → base64 PNG). 실패하면 빈 사전.</summary>
+        public static async Task<Dictionary<string, string>> Icons()
+        {
+            try
+            {
+                var response = JsonConvert.DeserializeObject<IconsResponse>(await RequestHandler.PostJsonAsync(IconsRoute, "{}"));
+                return response?.Icons ?? new Dictionary<string, string>();
+            }
+            catch (JsonException)
+            {
+                return new Dictionary<string, string>();
+            }
+        }
 
         /// <summary>확정 넣기: 장착 안 된 보유 특전을 슬롯에 놓는다 (확정 칸이면 서로 바뀐다).</summary>
         public static async Task<PerkStateDto> Equip(string perk, int slot) =>
@@ -52,6 +67,12 @@ namespace PrestigePerks.Game
 
             session.SendOperationRightNow(operation, result => completion.TrySetResult(result));
             return completion.Task;
+        }
+
+        /// <summary>server PerkIconsResponse.</summary>
+        private sealed class IconsResponse
+        {
+            [JsonProperty("icons")] public Dictionary<string, string> Icons { get; set; }
         }
 
         private sealed class EquipBody
