@@ -38,6 +38,9 @@ $ClientResources = @{
 # 상용 빌드 서버 DLL 에 있으면 안 되는 형식 이름 (개발용 명령)
 $DevOnlyTypes = @('PrestigeCommandoCommand')
 
+# 서버 모드 폴더와 클라 플러그인 폴더에 둘 다 넣을 라이선스 파일 (MIT 는 배포본에 문구를 넣어야 한다). 없으면 @()
+$LicenseFiles = @('LICENSE.md', 'THIRD_PARTY_NOTICES.md')
+
 # zip 에서 뺄 파일
 $Exclude = @('*.pdb', '*.deps.json', '*.staticwebassets.*.json', '.gitkeep')
 
@@ -47,6 +50,10 @@ $Forbidden = @('examples', 'perks\example', 'PrestigePerks.ExampleAddon')
 
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $ServerOut -and -not $ClientDlls) { throw '서버($ServerOut)와 클라($ClientDlls)가 둘 다 비어 있습니다' }
+$licensePaths = @($LicenseFiles | ForEach-Object { Join-Path $root $_ })
+foreach ($file in $licensePaths) {
+    if (-not (Test-Path $file)) { throw "라이선스 파일이 없습니다: $file" }
+}
 
 [xml]$build = Get-Content (Join-Path $root $VersionProps)
 $version = ($build.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
@@ -115,11 +122,13 @@ if ($ServerOut) {
         New-Item -ItemType Directory -Force (Split-Path $dest -Parent) | Out-Null
         Copy-Item $_.FullName $dest
     }
+    if ($licensePaths) { Copy-Item $licensePaths $serverStage }
 }
 if ($clientPaths) {
     $clientStage = Join-Path $stage "BepInEx\plugins\$ModName"
     New-Item -ItemType Directory -Force $clientStage | Out-Null
     Copy-Item $clientPaths $clientStage
+    if ($licensePaths) { Copy-Item $licensePaths $clientStage }
     foreach ($folder in $ClientFolders.Keys) {
         $folderStage = Join-Path $clientStage $ClientFolders[$folder]
         New-Item -ItemType Directory -Force $folderStage | Out-Null
