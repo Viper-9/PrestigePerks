@@ -469,6 +469,62 @@ public class ClientModelTests
         var partial = new PerkLocale(PerkLocalePack.Merge(null!, pack), LocaleFile("en"));
         Assert.Equal(LocaleFile("en")["ui.list"], partial.Get("ui.list"));
     }
+
+    private const string AddonCatalog = """
+        {
+          "prestigeLevel": 1,
+          "catalog": [
+            { "id": "control", "amount": -10, "unit": "points" },
+            { "id": "viper.medic", "amount": 20, "unit": "percent", "kind": "bonus", "icon": true,
+              "texts": { "en": { "name": "Medic", "effect": "Health regeneration {0}", "detail": "Faster" }, "kr": { "name": "의무병" } } }
+          ]
+        }
+        """;
+
+    [Fact]
+    public void Reads_addon_kind_texts_and_icon_from_the_catalog()
+    {
+        var state = PerkStateDto.Parse(AddonCatalog)!;
+
+        var medic = state.Info("viper.medic")!;
+        Assert.Equal(("bonus", true, "Medic"), (medic.Kind, medic.Icon, medic.Texts["en"].Name));
+        Assert.Null(state.Info("control")!.Kind);
+        Assert.False(state.Info("control")!.Icon);
+        Assert.Null(state.Info("control")!.Texts);
+    }
+
+    [Fact]
+    public void Catalog_texts_become_perk_keys_for_one_language()
+    {
+        var catalog = PerkStateDto.Parse(AddonCatalog)!.Catalog;
+
+        Assert.Equal(new Dictionary<string, string>
+        {
+            ["perk.viper.medic.name"] = "Medic",
+            ["perk.viper.medic.effect"] = "Health regeneration {0}",
+            ["perk.viper.medic.detail"] = "Faster",
+        }, PerkLocalePack.CatalogTexts(catalog, "en"));
+        Assert.Equal(new Dictionary<string, string> { ["perk.viper.medic.name"] = "의무병" }, PerkLocalePack.CatalogTexts(catalog, "kr"));
+        Assert.Empty(PerkLocalePack.CatalogTexts(catalog, "ru"));
+        Assert.Empty(PerkLocalePack.CatalogTexts(null!, "en"));
+    }
+
+    // 게임 언어 → 게임 언어 catalog → en → en catalog → ID. 사용자 번역 파일(DLL 위에 합친 것)이 catalog 보다 먼저다
+    [Fact]
+    public void Addon_texts_fall_back_by_language_and_user_files_win()
+    {
+        var catalog = PerkStateDto.Parse(AddonCatalog)!.Catalog;
+        var user = new Dictionary<string, string> { ["perk.viper.medic.detail"] = "내 번역" };
+        var locale = new PerkLocale(user, LocaleFile("en"), "kr");
+        locale.UseCatalog(catalog);
+
+        Assert.Equal("kr", locale.Culture);
+        Assert.Equal("의무병", locale.PerkName("viper.medic"));               // kr catalog
+        Assert.Equal("Health regeneration +10%", locale.PerkEffect("viper.medic", "+10%")); // en catalog
+        Assert.Equal("내 번역", locale.PerkDetail("viper.medic"));           // 사용자 파일
+        Assert.Equal("someone.else", locale.PerkName("someone.else"));
+        Assert.Equal(LocaleFile("en")["perk.mastery.name"], locale.PerkName("mastery"));
+    }
 }
 
 public class ReelScheduleTests
