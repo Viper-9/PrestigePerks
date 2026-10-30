@@ -204,9 +204,10 @@ The prestige screen tells you about the coins, and lists your perk collection un
 ### In raid
 
 - **Safes**: each safe has a 30% chance of 5–15 coins (also in Scav raids).
-- **Bosses**: each of the 13 bosses (followers excluded) has about a 23% chance of 20–35 coins. If another mod puts
-  GP coins in boss pockets, the two share the same draw: about 12.5% for 40–60 coins each.
-- Reshala's pockets are usually full of spare magazines, so he rarely carries coins.
+- **Bosses**: each boss has a 70% chance of 25–35 coins. That covers the 13 SPT bosses, plus the ISB bosses
+  (Commander, Firefly) and the Black Division boss (Wedge) when those mods are installed. Followers and other squad
+  members don't carry coins. Mods that add GP coins or Lega medals to bosses don't change this chance.
+- Coins go into the boss's pockets, vest or backpack. If all three are full, that boss has none.
 - Coins don't appear in airdrops or on PMC bots.
 
 ## Settings
@@ -233,7 +234,8 @@ Lowering a slot count keeps the perks of the closed slots in your data; they jus
 again.
 
 **`safeCoins`**: `chance` (0–1, 0 turns it off), `minStack`, `maxStack`.
-**`bossCoins`**: `enabled`, `minStack`/`maxStack` (alone), `sharedMinStack`/`sharedMaxStack` (sharing with GP coins).
+**`bossCoins`**: `enabled`, `chance` (0–1), `minStack`, `maxStack`, `roles` (bot roles that get coins; add other
+mods' bosses here).
 **`prestige`**: `stages` holds the requirements of P1–P6 from the table above (`level`, `skills`, `hideout`,
 `roubles`, `transferMultiplier` = share of progress **lost**, `newBeginningLevel`).
 
@@ -244,7 +246,7 @@ again.
   - With `WeaponHeatOff` on, the overheat half of Reliability does nothing.
 - **Skills Extended**: works alongside, and its effects stack with the perks. Once Shadow Connections is elite, the
   Scav cooldown is fixed, so the Scav perk has no effect.
-- **APBS (Progressive Bot System)**: boss coins work with it.
+- **APBS (Progressive Bot System)**, **ISB**: boss coins work with them.
 - **Fika** is not supported.
 
 ## Adding perks from other mods
