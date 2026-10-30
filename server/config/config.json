@@ -23,10 +23,14 @@
   },
   "bossCoins": {
     "enabled": true,
-    "minStack": 20,
+    "chance": 0.7,
+    "minStack": 25,
     "maxStack": 35,
-    "sharedMinStack": 40,
-    "sharedMaxStack": 60
+    "roles": [
+      "bossboar", "bossbully", "bossgluhar", "bosskilla", "bosskillaagro", "bossknight", "bosskojaniy",
+      "bosskolontay", "bosspartisan", "bosssanitar", "bosstagilla", "bosstagillaagro", "bosszryachiy",
+      "isbbosscommander", "isbbossfirefly", "bosswedge"
+    ]
   },
   "prestige": {
     "stages": [

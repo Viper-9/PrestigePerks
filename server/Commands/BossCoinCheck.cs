@@ -14,11 +14,11 @@ namespace PrestigePerks.Commands;
 /// <summary>
 /// 개발용 "prestige coin boss [n]": 보스마다 SPT 봇 생성(BotGenerator.PrepareAndGenerateBot, 레이드에서 쓰는 것과 같은 경로)을
 /// n 번 돌려 코인과 GP 코인이 몇 명에게 들어갔는지 센다. 모든 보스를 레이드에서 만나 확인할 수 없어서 데이터로 확인한다.
-/// 레이드 밖이라 APBS 대신 SPT 생성기를 타지만, 코인은 아이템 목록에만 넣고 APBS 보스 화폐 표도 같아 확률이 같다.
+/// 코인은 이 메서드의 후처리(BossCoinPatch)에서 들어가므로 ISB 프리셋까지 거친 결과를 센다.
 /// 추종자·카반 저격 경호원은 대조군으로 0 이어야 한다.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
-public class BossCoinCheck(BotGenerator botGenerator, BotTable botTable, PmcConfig pmcConfig, PerkConfigLoader configLoader)
+public class BossCoinCheck(BotGenerator botGenerator, BotTable botTable, PmcConfig pmcConfig, PerkConfigLoader configLoader, BossCoinService bossCoinService)
 {
     public const int DefaultBots = 30;
     public const int MaxBots = 200;
@@ -28,16 +28,13 @@ public class BossCoinCheck(BotGenerator botGenerator, BotTable botTable, PmcConf
 
     public string Describe(MongoId sessionId, int bots)
     {
-        var coin = new MongoId(PrestigeCoinItem.TemplateId);
-        var gp = new MongoId(BossCoinDrop.GpCoinTemplateId);
-        var shared = BossCoinDrop.Roles.Any(role => botTable.Types.GetValueOrDefault(role)?.BotInventory?.Items?.Pockets is { } pockets
-                                                     && pockets.ContainsKey(coin) && pockets.ContainsKey(gp));
-        var (minStack, maxStack) = configLoader.BossCoins.StackRange(shared);
+        var config = configLoader.BossCoins;
         var text = new StringBuilder($"boss coins check: {bots} generated bots per role, " +
-                                     $"{(shared ? "shared with GP coins (about 12.5% each)" : "about 23% per boss")}, {minStack}-{maxStack} coins");
-        foreach (var role in BossCoinDrop.Roles.Concat(ControlRoles))
+                                     (config.Enabled ? $"{config.Chance:P0} per boss, {config.MinStack}-{config.MaxStack} coins" : "boss coins off"));
+        var roles = config.Roles ?? [];
+        foreach (var role in roles.Concat(ControlRoles.Except(roles)))
         {
-            text.Append('\n').Append(DescribeRole(sessionId, role, bots));
+            text.Append('\n').Append(bossCoinService.Quietly(() => DescribeRole(sessionId, role, bots)));
         }
 
         return text.ToString();
@@ -45,17 +42,20 @@ public class BossCoinCheck(BotGenerator botGenerator, BotTable botTable, PmcConf
 
     private string DescribeRole(MongoId sessionId, string role, int bots)
     {
-        if (!botTable.Types.TryGetValue(role, out var type) || type is null)
+        // 다른 모드의 역할은 대소문자가 섞인 이름으로 들어온다 (ISBBossFirefly)
+        var key = botTable.Types.Keys.FirstOrDefault(key => string.Equals(key, role, StringComparison.OrdinalIgnoreCase));
+        if (key is null || botTable.Types[key] is null)
         {
             return $"{role}: not in bot database";
         }
 
         var tally = new BossCoinTally();
+        var noRoom = bossCoinService.NoRoom;
         try
         {
             for (var i = 0; i < bots; i++)
             {
-                var bot = botGenerator.PrepareAndGenerateBot(sessionId, Details(role));
+                var bot = botGenerator.PrepareAndGenerateBot(sessionId, Details(key));
                 tally.Add(bot.Inventory?.Items ?? []);
             }
         }
@@ -64,7 +64,8 @@ public class BossCoinCheck(BotGenerator botGenerator, BotTable botTable, PmcConf
             return $"{role}: ERROR after {tally.Bots} bots: {ex.GetType().Name}: {ex.Message}";
         }
 
-        return tally.Format(role);
+        noRoom = bossCoinService.NoRoom - noRoom;
+        return tally.Format(role) + (noRoom > 0 ? $", no room {noRoom}" : "");
     }
 
     /// <summary>BotController.GetBotGenerationDetailsForWave 와 같은 값 (PMC 가 아닌 봇, 맵 없음).</summary>

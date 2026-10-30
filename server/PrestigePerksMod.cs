@@ -24,7 +24,8 @@ public class PrestigePerksMod(
     ServerPatcher serverPatcher,
     PrestigeDataLoader prestigeDataLoader,
     PerkConfigLoader perkConfigLoader,
-    PrestigeCoinService prestigeCoinService) : IOnLoad
+    PrestigeCoinService prestigeCoinService,
+    BossCoinService bossCoinService) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
@@ -33,8 +34,10 @@ public class PrestigePerksMod(
         PerkScales.Store = perkDataStore;
         PerkScales.Config = perkConfigLoader.Config;
         PrestigeCoinService.Instance = prestigeCoinService;
+        BossCoinService.Instance = bossCoinService;
         prestigeDataLoader.Load();
         serverPatcher.PatchAll();
+        bossCoinService.LogSettings();
         logger.Success($"[PrestigePerks] v{ModMetadata.AssemblyVersion} loaded.");
         return Task.CompletedTask;
     }
