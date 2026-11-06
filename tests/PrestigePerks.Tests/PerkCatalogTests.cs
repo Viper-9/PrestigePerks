@@ -146,4 +146,84 @@ public class PerkCatalogTests
     {
         Assert.Equal(id, PerkCatalog.Resolve(token));
     }
+
+    [Fact]
+    public void Has_the_10_fixed_active_perks()
+    {
+        Assert.Equal(
+            ["firstaid", "secondwind", "sonarpulse", "steadfast", "focus", "emergencysurgery", "composure", "grit", "resupply", "fieldrepair"],
+            PerkCatalog.ActiveIds);
+        Assert.Equal([41, 42, 43, 44, 45, 46, 47, 48, 49, 50], PerkCatalog.BuiltinActive.Select(perk => perk.Number));
+        Assert.All(PerkCatalog.BuiltinActive, perk =>
+        {
+            Assert.Equal(PerkKind.Active, perk.Kind);
+            Assert.Empty(perk.Bonuses);
+            Assert.NotNull(perk.Active);
+            Assert.Equal(3, perk.Active!.Cooldown.Count);
+            Assert.Equal(3, perk.Active.Duration.Count);
+            Assert.All(perk.Active.Values.Values, tiers => Assert.Equal(3, tiers.Count));
+        });
+        Assert.Empty(PerkCatalog.ActiveIds.Intersect(PerkCatalog.Ids));
+        Assert.Empty(PerkCatalog.BuiltinActive.Select(perk => perk.Number).Intersect(PerkCatalog.Numbers.Concat(PerkCatalog.RetiredNumbers)));
+    }
+
+    [Fact]
+    public void Active_values_are_pinned()
+    {
+        ActivePerkSpec Spec(string id) => PerkCatalog.BuiltinActive.Single(perk => perk.Id == id).Active!;
+
+        Assert.Equal(ActiveLimit.OncePerRaid, Spec("firstaid").Limit);
+        Assert.Equal([30, 45, 60], Spec("firstaid").Duration);
+        Assert.Equal([3, 4, 5], Spec("firstaid").Values["regen"]);
+        Assert.Equal([30, 45, 60], Spec("firstaid").Values["bloodstop"]);
+        Assert.Equal(ActiveLimit.Cooldown, Spec("secondwind").Limit);
+        Assert.Equal([300, 240, 180], Spec("secondwind").Cooldown);
+        Assert.Equal([0, 0, 0], Spec("secondwind").Duration);
+        Assert.Equal([20, 30, 40], Spec("sonarpulse").Duration);
+        Assert.Equal([50, 75, 100], Spec("sonarpulse").Values["radius"]);
+        Assert.Equal([600, 600, 600], Spec("steadfast").Cooldown);
+        Assert.Equal([60, 80, 100], Spec("steadfast").Duration);
+        Assert.Equal([60, 80, 100], Spec("focus").Duration);
+        Assert.Equal([30, 50, 70], Spec("emergencysurgery").Values["restore"]);
+        Assert.Equal([300, 300, 300], Spec("composure").Cooldown);
+        Assert.Equal([15, 15, 15], Spec("composure").Duration);
+        Assert.Equal([30, 45, 60], Spec("composure").Values["reduction"]);
+        Assert.Equal([15, 22.5, 30], Spec("composure").Values["inertia"]);
+        Assert.Equal([10, 10, 10], Spec("grit").Duration);
+        Assert.Equal([30, 40, 50], Spec("grit").Values["reduction"]);
+        Assert.Equal([30, 45, 60], Spec("resupply").Values["fill"]);
+        Assert.Equal([15, 25, 35], Spec("fieldrepair").Values["repair"]);
+    }
+
+    [Fact]
+    public void Active_perks_are_found_by_id_and_number_but_stay_out_of_the_passive_lists()
+    {
+        Assert.True(PerkCatalog.IsKnown("grit"));
+        Assert.True(PerkCatalog.IsActive("grit"));
+        Assert.False(PerkCatalog.IsActive("porter"));
+        Assert.False(PerkCatalog.IsActive(null));
+        Assert.True(PerkCatalog.IsKnown(48));
+        Assert.Equal("grit", PerkCatalog.IdOf(48));
+        Assert.Equal(48, PerkCatalog.NumberOf("grit"));
+        Assert.Equal("grit", PerkCatalog.Resolve("48"));
+        Assert.Equal("grit", PerkCatalog.Resolve("GRIT"));
+        Assert.Equal("grit(48)", PerkCatalog.Describe("grit"));
+        Assert.DoesNotContain("grit", PerkCatalog.Ids);
+        Assert.DoesNotContain(PerkCatalog.All, perk => perk.Kind == PerkKind.Active);
+        Assert.DoesNotContain(PerkCatalog.Entries, entry => entry.Id == "grit");
+        Assert.Equal(20, PerkCatalog.Numbers.Count);
+    }
+
+    [Fact]
+    public void Active_entries_carry_kind_limit_and_values_as_json()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(PerkCatalog.ActiveEntries.Single(entry => entry.Id == "secondwind"));
+        Assert.Contains("\"kind\":\"active\"", json);
+        Assert.Contains("\"limit\":\"cooldown\"", json);
+        Assert.Contains("\"cooldown\":[300,240,180]", json);
+        Assert.Contains("\"limit\":\"raid\"", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.ActiveEntries[0]));
+        Assert.Contains("\"regen\":[3,4,5]", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.ActiveEntries[0]));
+        Assert.DoesNotContain("\"active\"", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.Entries[0]));
+        Assert.Equal(PerkCatalog.ActiveIds, PerkCatalog.ActiveEntries.Select(entry => entry.Id));
+    }
 }
