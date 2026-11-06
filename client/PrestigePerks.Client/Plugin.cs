@@ -31,8 +31,8 @@ public class Plugin : BaseUnityPlugin
     internal static ConfigEntry<int> ActiveTestTier;
     internal const string ActiveTestSlot = "slot";
 
-    /// <summary>개발자 모드: 액티브 특전 사용 기록·쿨타임 초기화 키, 표시 키 (스크린샷 + 상태 한 줄).</summary>
-    internal static ConfigEntry<KeyboardShortcut> ActiveResetKey, MarkKey;
+    /// <summary>개발자 모드: 액티브 특전 사용 기록·쿨타임 초기화 키, 표시 키 (스크린샷 + 상태 한 줄), 출혈 키 (시험용 출혈).</summary>
+    internal static ConfigEntry<KeyboardShortcut> ActiveResetKey, MarkKey, BleedKey;
 
     private void Awake()
     {
@@ -124,6 +124,9 @@ public class Plugin : BaseUnityPlugin
         MarkKey = Config.Bind("Developer", "Mark key", new KeyboardShortcut(UnityEngine.KeyCode.F10),
             new ConfigDescription("Developer mode only. Takes a screenshot and logs the active perk state in one line ([active][MARK]).",
                 null, ConfigText.Tag("developer", "markKey", 60)));
+        BleedKey = Config.Bind("Developer", "Bleed key", new KeyboardShortcut(UnityEngine.KeyCode.J, UnityEngine.KeyCode.LeftAlt),
+            new ConfigDescription("Developer mode only. In a raid: gives you a light bleeding, pressing again swaps it for a heavy one and back. Does nothing while a blood loss blocker is on.",
+                null, ConfigText.Tag("developer", "bleedKey", 50)));
     }
 
     // 하나가 실패해도 나머지는 걸리도록 패치 클래스마다 따로 등록한다.

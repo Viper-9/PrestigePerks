@@ -1,5 +1,6 @@
 using System;
 using EFT;
+using EFT.HealthSystem;
 using PrestigePerks.Game;
 using PrestigePerks.Model;
 using UnityEngine;
@@ -16,6 +17,8 @@ namespace PrestigePerks.Active
 
         // 지속·쿨타임 CHECK 의 허용 오차 (시계는 프레임마다 보므로 한두 프레임 늦게 끝날 수 있다)
         private const float ClockTolerance = 0.25f;
+
+        private const EBodyPart DevBleedPart = EBodyPart.Stomach;
 
         private ActivePerkUse use;
         private ActivePerkEffect effect;
@@ -334,7 +337,7 @@ namespace PrestigePerks.Active
             }
         }
 
-        // 개발자 모드일 때만: 초기화 키(위), 표시 키(스크린샷 + 상태 한 줄)
+        // 개발자 모드일 때만: 초기화 키(위), 표시 키(스크린샷 + 상태 한 줄), 출혈 키(아래)
         private void DevKeys(float now)
         {
             if (!PerkEffects.DevMode)
@@ -352,6 +355,35 @@ namespace PrestigePerks.Active
                 var detail = effect.Describe(use);
                 ActivePerkLog.Mark($"{use.Perk} T{use.Tier} {clock.Phase} {clock.Remaining(now):F1} s, target {hasTarget}{(string.IsNullOrEmpty(detail) ? "" : " | " + detail)}");
             }
+
+            if (Plugin.BleedKey.Value.IsDown())
+            {
+                DevBleed();
+            }
+        }
+
+        // 시험용 출혈: 가벼운 출혈 ↔ 심한 출혈. 출혈 피해는 걸린 부위와 상관없이 모든 부위에 들어간다.
+        // 게임처럼 출혈 막기 버프 중에는 걸지 않는다 (응급 처치의 firstaid.block 이 틀리게 실패하지 않도록)
+        private void DevBleed()
+        {
+            var health = use.Health;
+            if (health.HasBloodLossBlockers())
+            {
+                ActivePerkLog.Event("dev bleed: skipped, blood loss blocker is on");
+                return;
+            }
+
+            var heavy = health.FindExistingEffect<ActiveHealthController.LightBleeding>(DevBleedPart) != null;
+            if (heavy)
+            {
+                health.DoBleed<ActiveHealthController.HeavyBleeding>(DevBleedPart);
+            }
+            else
+            {
+                health.DoBleed<ActiveHealthController.LightBleeding>(DevBleedPart);
+            }
+
+            ActivePerkLog.Event($"dev bleed: {(heavy ? "heavy" : "light")} on {DevBleedPart}, added {health.FindExistingEffect<ActiveHealthController.Bleeding>(DevBleedPart) != null}");
         }
     }
 }

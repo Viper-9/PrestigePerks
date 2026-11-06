@@ -68,6 +68,8 @@
   "config.activeResetKey.desc": "개발자 모드 전용입니다. 레이드 안에서 켜진 효과를 끝내고, F12 시험 특전·단계가 바뀌었으면 그 특전으로 바꿉니다. 같으면 사용 기록과 쿨타임만 지웁니다.",
   "config.markKey.name": "표시 키",
   "config.markKey.desc": "개발자 모드 전용입니다. 스크린샷을 찍고 액티브 특전 상태를 로그 한 줄([active][MARK])로 남깁니다.",
+  "config.bleedKey.name": "출혈 키",
+  "config.bleedKey.desc": "개발자 모드 전용입니다. 레이드 안에서 가벼운 출혈을 겁니다. 다시 누르면 심한 출혈로, 또 누르면 가벼운 출혈로 바뀝니다. 출혈 막기 효과 중에는 걸리지 않습니다.",
   "config.activeKey.name": "사용 키",
   "config.activeKey.desc": "레이드에서 액티브 특전을 쓰는 키입니다. 서버 설정 activePerks.enabled 가 false 면 액티브 특전이 꺼집니다.",
   "config.sonarBrightness.name": "음파 탐지 밝기 (맨눈)",
