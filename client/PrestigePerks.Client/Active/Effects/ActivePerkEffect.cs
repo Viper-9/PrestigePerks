@@ -83,6 +83,8 @@ namespace PrestigePerks.Active
             {
                 case "secondwind":
                     return new SecondWind();
+                case "steadfast":
+                    return new Steadfast();
                 default:
                     return null;
             }
