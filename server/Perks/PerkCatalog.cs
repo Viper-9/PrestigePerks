@@ -103,8 +103,8 @@ public static class PerkCatalog
         ActivePerk(44, "steadfast", ActiveLimit.Cooldown, T(600, 600, 600), T(60, 80, 100)),
         ActivePerk(45, "focus", ActiveLimit.OncePerRaid, null, T(60, 80, 100)),
         ActivePerk(46, "emergencysurgery", ActiveLimit.OncePerRaid, null, null, ("restore", T(30, 50, 70))),
-        ActivePerk(47, "composure", ActiveLimit.Cooldown, T(300, 300, 300), T(15, 15, 15), ("reduction", T(30, 45, 60)), ("inertia", T(15, 22.5, 30))),
-        ActivePerk(48, "grit", ActiveLimit.OncePerRaid, null, T(10, 10, 10), ("reduction", T(30, 40, 50))),
+        ActivePerk(47, "composure", ActiveLimit.Cooldown, T(300, 300, 300), T(15, 25, 40), ("reduction", T(10, 15, 20)), ("inertia", T(5, 10, 15))),
+        ActivePerk(48, "grit", ActiveLimit.OncePerRaid, null, T(10, 15, 20), ("reduction", T(10, 15, 20))),
         ActivePerk(49, "resupply", ActiveLimit.OncePerRaid, null, null, ("fill", T(30, 45, 60))),
         ActivePerk(50, "fieldrepair", ActiveLimit.OncePerRaid, null, null, ("repair", T(15, 25, 35))),
     ];
