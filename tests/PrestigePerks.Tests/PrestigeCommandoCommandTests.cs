@@ -50,6 +50,7 @@ public class PrestigeCommandoCommandTests
     [InlineData("prestige perk ROLL", PrestigeCommandoCommand.PerkAction.Roll, 0)]
     [InlineData("prestige perk lock 1", PrestigeCommandoCommand.PerkAction.Lock, 1)]
     [InlineData("prestige perk unlock 6", PrestigeCommandoCommand.PerkAction.Unlock, 6)]
+    [InlineData("prestige perk lock 7", PrestigeCommandoCommand.PerkAction.Lock, 7)]
     [InlineData("prestige perk free 0", PrestigeCommandoCommand.PerkAction.Free, 0)]
     [InlineData("prestige perk free 100 ", PrestigeCommandoCommand.PerkAction.Free, 100)]
     [InlineData("prestige perk reset", PrestigeCommandoCommand.PerkAction.Reset, 0)]
@@ -62,7 +63,7 @@ public class PrestigeCommandoCommandTests
     [InlineData("prestige perk")]
     [InlineData("prestige perk lock")]
     [InlineData("prestige perk lock 0")]
-    [InlineData("prestige perk lock 7")]
+    [InlineData("prestige perk lock 8")]
     [InlineData("prestige perk free")]
     [InlineData("prestige perk free 101")]
     [InlineData("prestige perk roll 2")]
@@ -81,6 +82,8 @@ public class PrestigeCommandoCommandTests
     [InlineData("prestige perk set 1 2", 1, "conditioning")]
     [InlineData("  PRESTIGE PERK SET 6 29 ", 6, "reload")]
     [InlineData("prestige perk set 2 mastery", 2, "mastery")]
+    [InlineData("prestige perk set 7 grit", 7, "grit")]
+    [InlineData("prestige perk set 7 48", 7, "grit")]
     public void Parses_set_command(string text, int slot, string perk)
     {
         Assert.Equal((slot, perk), PrestigeCommandoCommand.ParseSetCommand(text));
@@ -88,7 +91,8 @@ public class PrestigeCommandoCommandTests
 
     [Theory]
     [InlineData("prestige perk set 0 2")]
-    [InlineData("prestige perk set 7 2")]
+    [InlineData("prestige perk set 8 2")]
+    [InlineData("prestige perk set 8 grit")]
     [InlineData("prestige perk set 1 999")]
     [InlineData("prestige perk set 1 someone.sprint")]
     [InlineData("prestige perk set 1")]
@@ -124,22 +128,33 @@ public class PrestigeCommandoCommandTests
             PrestigeLevel = 3,
             ActivePerks = Ids(1, 24, 8),
             ActiveTiers = new Dictionary<string, int> { [Id(1)] = 1, [Id(24)] = 2, [Id(8)] = 1 },
-            Owned = new Dictionary<string, int> { [Id(24)] = 3 },
+            Owned = new Dictionary<string, int> { [Id(24)] = 3, ["grit"] = 2 },
             TierCap = 2,
             Slots = [new PerkSlotState { Perk = Id(1), Locked = true }, new PerkSlotState { Perk = Id(24), Fixed = true }, new PerkSlotState { Perk = Id(8) }, new PerkSlotState()],
             NewPerks = Ids(8),
             FreeRerollsLeft = 0,
             PaidRerolls = 1,
             NextRerollCost = 90,
+            ActivePerksEnabled = true,
+            ActivePerkSlot = new PerkSlotState { Perk = "grit", Fixed = true },
+            ActivePerkTier = 2,
         });
 
         Assert.Equal(
             "P3 | tier cap II | active: experience(1) I, mastery(24) II, scav(8) I\n" +
             "new perks: scav(8)\n" +
             "slots:  [1] experience(1) I (locked)  [2] mastery(24) II (fixed)  [3] scav(8) I  [4] empty\n" +
-            "collection 1 / 20: mastery(24) III\n" +
+            "active slot [7]: grit(48) II (fixed)\n" +
+            "collection 1 / 20 | active 1 / 10: mastery(24) III, grit(48) II\n" +
             "free rerolls 0 | paid rerolls 1 | next reroll: 90 coins",
             text);
+    }
+
+    [Fact]
+    public void Formats_a_closed_or_turned_off_active_slot()
+    {
+        Assert.Contains("\nactive slot: opens at P3 (active perks off in config)\n", PrestigeCommandoCommand.FormatState(new PerkState { ActivePerkOpensAt = 3 }));
+        Assert.Contains("\nactive slot [7]: empty\n", PrestigeCommandoCommand.FormatState(new PerkState { ActivePerksEnabled = true, ActivePerkSlot = new PerkSlotState() }));
     }
 
     [Theory]
