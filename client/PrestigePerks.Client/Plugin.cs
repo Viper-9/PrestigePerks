@@ -81,6 +81,7 @@ public class Plugin : BaseUnityPlugin
         PatchOne(harmony, typeof(Active.ComposureRecoilPatch));
         PatchOne(harmony, typeof(Active.ComposureSwayPatch));
         PatchOne(harmony, typeof(Active.ComposureInertiaPatch));
+        PatchOne(harmony, typeof(Active.GritDamagePatch));
         foreach (var m in harmony.GetPatchedMethods()) Log.Info($"patched {m.DeclaringType?.Name}.{m.Name}");
         Log.Info($"PrestigePerks {Info.Metadata.Version} loaded");
     }

@@ -97,6 +97,8 @@ namespace PrestigePerks.Active
                     return new Focus();
                 case "composure":
                     return new Composure();
+                case "grit":
+                    return new Grit();
                 default:
                     return null;
             }
