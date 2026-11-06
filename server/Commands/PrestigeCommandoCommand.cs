@@ -73,7 +73,7 @@ public class PrestigeCommandoCommand(
             PerkCommand => $"{Prefix} {PerkCommand}\n========\nDev commands for prestige perks.\n\n" +
                             $"\t{Prefix} {PerkCommand} status\n" +
                             $"\t{Prefix} {PerkCommand} roll\t\tfree rerolls only (paid rerolls use inventory coins on the perk page)\n" +
-                            $"\t{Prefix} {PerkCommand} lock <slot>\t\tslot starts at 1\n" +
+                            $"\t{Prefix} {PerkCommand} lock <slot>\t\tslot starts at 1, slot {ActivePerkRules.SlotIndex + 1} = active perk slot\n" +
                             $"\t{Prefix} {PerkCommand} unlock <slot>\n" +
                             $"\t{Prefix} {PerkCommand} free <count>\t\tset free rerolls left (0-{MaxFreeRerolls})\n" +
                             $"\t{Prefix} {PerkCommand} set <slot> <perk>\t\tput a perk (number or id, e.g. 24 or mastery) in a slot (swaps if another slot has it). Reopen the perk page or main menu to apply it in game\n" +
@@ -281,7 +281,8 @@ public class PrestigeCommandoCommand(
 
         return action switch
         {
-            PerkAction.Lock or PerkAction.Unlock => hasArgument && argument is >= 1 and <= 6 ? (action, argument) : null,
+            // 슬롯 7 = 액티브 칸 (ActivePerkRules.SlotIndex + 1)
+            PerkAction.Lock or PerkAction.Unlock => hasArgument && argument >= 1 && argument <= ActivePerkRules.SlotIndex + 1 ? (action, argument) : null,
             PerkAction.Free => hasArgument && argument is >= 0 and <= MaxFreeRerolls ? (action, argument) : null,
             _ => hasArgument ? null : (action, 0),
         };
@@ -296,7 +297,7 @@ public class PrestigeCommandoCommand(
             return null;
         }
 
-        return slot is >= 1 and <= 6 ? (slot, perk) : null;
+        return slot >= 1 && slot <= ActivePerkRules.SlotIndex + 1 ? (slot, perk) : null;
     }
 
     /// <summary>"prestige perk tier &lt;특전 번호 또는 ID&gt; &lt;0~3&gt;". 특전은 목록에 있는 것. 틀리면 null.</summary>
@@ -442,10 +443,23 @@ public class PrestigeCommandoCommand(
                 : $"  [{i + 1}] {PerkCatalog.Describe(slot.Perk)} {Tier(slot.Perk)}{(slot.Fixed ? " (fixed)" : slot.Locked ? " (locked)" : "")}");
         }
 
-        text.Append($"\ncollection {state.Owned.Count} / {PerkCatalog.Ids.Count}");
+        var active = state.ActivePerkSlot;
+        text.Append(active is null
+            ? $"\nactive slot: opens at P{state.ActivePerkOpensAt}"
+            : active.IsEmpty
+                ? $"\nactive slot [{ActivePerkRules.SlotIndex + 1}]: empty"
+                : $"\nactive slot [{ActivePerkRules.SlotIndex + 1}]: {PerkCatalog.Describe(active.Perk)} {PerkService.TierName(state.ActivePerkTier)}{(active.Fixed ? " (fixed)" : active.Locked ? " (locked)" : "")}");
+        if (!state.ActivePerksEnabled)
+        {
+            text.Append(" (active perks off in config)");
+        }
+
+        var passiveOwned = state.Owned.Where(pair => !PerkCatalog.IsActive(pair.Key)).ToList();
+        var activeOwned = state.Owned.Where(pair => PerkCatalog.IsActive(pair.Key)).ToList();
+        text.Append($"\ncollection {passiveOwned.Count} / {PerkCatalog.Ids.Count} | active {activeOwned.Count} / {PerkCatalog.ActiveIds.Count}");
         if (state.Owned.Count > 0)
         {
-            text.Append(": ").Append(string.Join(", ", state.Owned.OrderBy(pair => PerkCatalog.NumberOf(pair.Key) is > 0 and var number ? number : int.MaxValue).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
+            text.Append(": ").Append(string.Join(", ", passiveOwned.Concat(activeOwned).OrderBy(pair => PerkCatalog.NumberOf(pair.Key) is > 0 and var number ? number : int.MaxValue).Select(pair => $"{PerkCatalog.Describe(pair.Key)} {PerkService.TierName(pair.Value)}")));
         }
 
         text.Append($"\nfree rerolls {state.FreeRerollsLeft} | paid rerolls {state.PaidRerolls} | next reroll: ");
