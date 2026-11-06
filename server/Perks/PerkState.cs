@@ -97,6 +97,31 @@ public sealed record PerkState
     [JsonPropertyName("catalog")]
     public IReadOnlyList<PerkCatalogEntry> Catalog { get; init; } = PerkCatalog.Entries;
 
+    // 아래는 액티브 특전 (dev-docs 94). 액티브 칸은 요청(lock·equip·unequip)에서 슬롯 번호 ActivePerkRules.SlotIndex(6) 다
+
+    /// <summary>config activePerks.enabled. false 면 클라이언트가 액티브 UI 를 없앤다.</summary>
+    [JsonPropertyName("activePerksEnabled")]
+    public bool ActivePerksEnabled { get; init; }
+
+    /// <summary>액티브 칸. null 이면 아직 열리지 않았다 (P3).</summary>
+    [JsonPropertyName("activePerkSlot")]
+    public PerkSlotState? ActivePerkSlot { get; init; }
+
+    /// <summary>액티브 칸 특전의 적용 단계 (1~3). 칸이 없거나 비었으면 0.</summary>
+    [JsonPropertyName("activePerkTier")]
+    public int ActivePerkTier { get; init; }
+
+    /// <summary>액티브 칸이 열리는 프레스티지. 열렸으면 null.</summary>
+    [JsonPropertyName("activePerkOpensAt")]
+    public int? ActivePerkOpensAt { get; init; }
+
+    /// <summary>액티브 단계 I·II·III 가격 (코드 값 80 / 200 / 350).</summary>
+    [JsonPropertyName("activePerkPrices")]
+    public IReadOnlyList<int> ActivePerkPrices { get; init; } = ActivePerkRules.TierPrices;
+
+    /// <summary>액티브 특전 목록 (표시 순서, 사용 제한, 단계별 값). 오류 응답에도 실린다.</summary>
+    [JsonPropertyName("activeCatalog")]
+    public IReadOnlyList<PerkCatalogEntry> ActiveCatalog { get; init; } = PerkCatalog.ActiveEntries;
 }
 
 /// <summary>state 의 catalog 한 줄. 단위는 문자열로 보낸다 (enum 직렬화 방식에 기대지 않는다).</summary>
