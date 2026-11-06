@@ -95,6 +95,8 @@ namespace PrestigePerks.Active
                     return new FirstAid();
                 case "focus":
                     return new Focus();
+                case "composure":
+                    return new Composure();
                 default:
                     return null;
             }

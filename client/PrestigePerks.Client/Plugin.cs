@@ -78,6 +78,9 @@ public class Plugin : BaseUnityPlugin
         PatchOne(harmony, typeof(Patches.CraftTimeFloorPatch));
         // 액티브 특전 (dev-docs 93): 레이드 시작
         PatchOne(harmony, typeof(Active.GameStartedPatch));
+        PatchOne(harmony, typeof(Active.ComposureRecoilPatch));
+        PatchOne(harmony, typeof(Active.ComposureSwayPatch));
+        PatchOne(harmony, typeof(Active.ComposureInertiaPatch));
         foreach (var m in harmony.GetPatchedMethods()) Log.Info($"patched {m.DeclaringType?.Name}.{m.Name}");
         Log.Info($"PrestigePerks {Info.Metadata.Version} loaded");
     }
