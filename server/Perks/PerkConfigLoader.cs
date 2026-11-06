@@ -24,6 +24,8 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
 
     public PerkConfig Config => config.Value.Perks;
 
+    public ActivePerkConfig ActivePerks => config.Value.ActivePerks;
+
     public PrestigeConfig Prestige => config.Value.Prestige;
 
     public SafeCoinConfig SafeCoins => config.Value.SafeCoins;
@@ -51,7 +53,7 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
         return new ModConfig();
     }
 
-    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige, safeCoins, bossCoins)마다 검사해 잘못된 항목만 기본값으로 바꾼다.</summary>
+    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige, safeCoins, bossCoins)마다 검사해 잘못된 항목만 기본값으로 바꾼다. activePerks 가 null 이면 기본값(켬).</summary>
     internal static ModConfig Validated(ModConfig config, Action<string> warn)
     {
         var perks = (config.Perks ?? new PerkConfig()).Clamped(warn);
@@ -82,7 +84,7 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
             bossCoins = new BossCoinConfig();
         }
 
-        return config with { Perks = perks, Prestige = prestige, SafeCoins = safeCoins, BossCoins = bossCoins };
+        return config with { Perks = perks, ActivePerks = config.ActivePerks ?? new ActivePerkConfig(), Prestige = prestige, SafeCoins = safeCoins, BossCoins = bossCoins };
     }
 
     internal static ModConfig ParseModConfig(string json) => JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig();
