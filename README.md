@@ -165,6 +165,36 @@ multiplied.
 - Handling helps low-ergonomics builds most. Ergonomics still stops at 100.
 - Scav is a PMC perk: it shortens the cooldown before your next Scav raid.
 
+### Active perks
+
+- At **P3** an **active slot** opens to the right of the six perk slots. It holds one of 10 active perks that you
+  use in raid with a key: **V** by default (F12 menu, `Active perk` > `Use key`).
+- Rerolls, locks, keeping, tiers and dragging work as in the other slots, but the active slot only rolls active
+  perks and active perks only fit the active slot. Prices: tier I **80**, II **200**, III **350** coins. The tier
+  cap is the same. The **PASSIVE** / **ACTIVE** tabs switch the list.
+- In raid a hexagon at the bottom right shows the perk and its state: ready, running (time left), cooldown, used this
+  raid, or no target. Pressing the key when there is nothing to use it on does nothing and doesn't use it.
+- A running effect can't be restarted or extended. Cooldowns start when the effect ends. Once-per-raid uses and
+  cooldowns reset every raid. PMC raids only.
+
+| Perk | Effect | Use | I | II | III |
+|---|---|---|---|---|---|
+| First Aid | Stops all bleeding, blocks new bleeding and restores health per second for a while | Once per raid | 3/s · 30 s | 4/s · 45 s | 5/s · 60 s |
+| Second Wind | Refills stamina, arm stamina and oxygen and clears fatigue | Cooldown | 300 s | 240 s | 180 s |
+| Sonar Pulse | A pulse every 4 s leaves echoes of the enemies it reaches, visible through walls | Once per raid | 50 m · 20 s | 75 m · 30 s | 100 m · 40 s |
+| Steadfast | Overweight no longer slows you or drains stamina (inertia stays). Cooldown 600 s | Cooldown | 60 s | 80 s | 100 s |
+| Focus | Painkiller effect (pain, tremor and limb injury penalties) and no tunnel vision | Once per raid | 60 s | 80 s | 100 s |
+| Emergency Surgery | Restores one blacked-out part, head and chest included, like a CMS kit (max HP share, 1 HP now) | Once per raid | 30% | 50% | 70% |
+| Composure | Recoil and aim sway down, weapon inertia down by half as much, unlimited breath hold, for 15 s. Cooldown 300 s | Cooldown | −30% | −45% | −60% |
+| Grit | Damage from enemies, bleeding and falls down on every body part for 10 s | Once per raid | −30% | −40% | −50% |
+| Resupply | Fills energy and hydration by a share of the maximum | Once per raid | +30% | +45% | +60% |
+| Field Repair | Restores worn body armor (plates included), armored rigs and helmets by a share of their max durability | Once per raid | +15% | +25% | +35% |
+
+- Emergency Surgery picks the head, then the chest, stomach, legs and arms. Like a CMS kit, the restored part keeps a
+  lower max HP for the rest of the raid.
+- Sonar Pulse echo brightness (naked eye, night vision, thermal) and the wave ring are in the F12 menu under
+  `Active perk`.
+
 ## Prestige coins
 
 <img src="media/coin.png" width="450" alt="Prestige coin">
@@ -236,6 +266,8 @@ again.
 **`safeCoins`**: `chance` (0–1, 0 turns it off), `minStack`, `maxStack`.
 **`bossCoins`**: `enabled`, `chance` (0–1), `minStack`, `maxStack`, `roles` (bot roles that get coins; add other
 mods' bosses here).
+**`activePerks`**: `enabled` (default `true`). `false` hides the active slot and the active perks on the perk page
+and in raid. Your active slot and owned active perks stay in your data.
 **`prestige`**: `stages` holds the requirements of P1–P6 from the table above (`level`, `skills`, `hideout`,
 `roubles`, `transferMultiplier` = share of progress **lost**, `newBeginningLevel`).
 
