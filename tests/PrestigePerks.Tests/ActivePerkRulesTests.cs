@@ -3,7 +3,7 @@ using static PrestigePerks.Tests.TestPerks;
 
 namespace PrestigePerks.Tests;
 
-/// <summary>액티브 특전 칸 규칙 (dev-docs 94 1절, 93 Task 3). 칸 하나, P3 에서 열림, 슬롯 번호 6, 가격 80 / 200 / 350.</summary>
+/// <summary>액티브 특전 칸 규칙 (dev-docs 94 1절, 93 Task 3). 칸 하나, 기본 P1 에서 열림 (config opensAt), 슬롯 번호 6, 가격 80 / 200 / 350.</summary>
 public class ActivePerkRulesTests
 {
     private static readonly PerkConfig Config = new();
@@ -17,13 +17,56 @@ public class ActivePerkRulesTests
     }
 
     [Fact]
-    public void Active_slot_opens_at_prestige_three_with_a_drawn_active_perk()
+    public void Active_slot_opens_at_prestige_one_with_a_drawn_active_perk()
     {
-        Assert.Null(Entered(2, 1).ActivePerkSlot);
-        var data = Entered(3, 1);
+        Assert.Null(Entered(0, 1).ActivePerkSlot);
+        var data = Entered(1, 1);
         Assert.Contains(data.ActivePerkSlot!.Perk, PerkCatalog.ActiveIds);
         Assert.Contains(data.ActivePerkSlot.Perk!, data.UnseenNewPerks);
         Assert.All(data.Slots, slot => Assert.False(PerkCatalog.IsActive(slot.Perk)));
+    }
+
+    [Fact]
+    public void Opens_at_zero_opens_the_active_slot_before_any_prestige()
+    {
+        var data = new PerkData();
+        var (changed, newPerks) = PerkRules.EnterLevel(data, 0, Config, new Random(1), activeOpensAt: 0);
+        Assert.True(changed);
+        Assert.Contains(data.ActivePerkSlot!.Perk, PerkCatalog.ActiveIds);
+        Assert.Equal([data.ActivePerkSlot.Perk!], newPerks);
+        Assert.Empty(data.Slots);
+        Assert.Equal(Config.FreeRerolls, data.Rerolls.FreeLeft);
+        Assert.Equal(PerkError.None, PerkRules.CheckRoll(data, 0));
+    }
+
+    [Fact]
+    public void Opens_at_waits_for_the_configured_prestige_level()
+    {
+        var data = new PerkData();
+        PerkRules.EnterLevel(data, 2, Config, new Random(1), activeOpensAt: 3);
+        Assert.Null(data.ActivePerkSlot);
+        PerkRules.EnterLevel(data, 3, Config, new Random(1), activeOpensAt: 3);
+        Assert.NotNull(data.ActivePerkSlot);
+    }
+
+    [Fact]
+    public void An_open_active_slot_stays_when_opens_at_goes_up()
+    {
+        var data = Entered(1, 1);
+        var perk = data.ActivePerkSlot!.Perk;
+        PerkRules.EnterLevel(data, 1, Config, new Random(2), activeOpensAt: 3);
+        Assert.Equal(perk, data.ActivePerkSlot!.Perk);
+    }
+
+    [Fact]
+    public void Opens_at_comes_from_config_and_is_clamped()
+    {
+        Assert.Equal(1, PerkConfigLoader.ParseModConfig("{}").ActivePerks.OpensAt);
+        Assert.Equal(0, PerkConfigLoader.ParseModConfig("""{ "activePerks": { "opensAt": 0 } }""").ActivePerks.OpensAt);
+        var warnings = new List<string>();
+        Assert.Equal(6, PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig("""{ "activePerks": { "opensAt": 9 } }"""), warnings.Add).ActivePerks.OpensAt);
+        Assert.Equal(0, PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig("""{ "activePerks": { "opensAt": -1 } }"""), warnings.Add).ActivePerks.OpensAt);
+        Assert.Equal(2, warnings.Count);
     }
 
     [Fact]
@@ -170,12 +213,12 @@ public class ActivePerkRulesTests
     }
 
     [Fact]
-    public void Active_slot_index_is_invalid_before_prestige_three()
+    public void Active_slot_index_is_invalid_before_the_slot_opens()
     {
-        var data = Entered(2, 1);
-        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetLock(data, 2, A, true));
-        Assert.Equal(PerkError.InvalidSlot, PerkRules.Unequip(data, 2, A));
-        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 2, A, "grit"));
+        var data = Entered(0, 1);
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetLock(data, 0, A, true));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.Unequip(data, 0, A));
+        Assert.Equal(PerkError.InvalidSlot, PerkRules.SetPerk(data, 0, A, "grit"));
     }
 
     [Fact]
