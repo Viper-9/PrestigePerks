@@ -60,7 +60,7 @@ namespace PrestigePerks.Model
         /// <summary>서버 config activePerks.enabled. false 면 <see cref="Parse"/> 가 액티브를 모두 지운다 (화면·알림·레이드에 액티브가 없다).</summary>
         [JsonProperty("activePerksEnabled")] public bool ActivePerksEnabled;
 
-        /// <summary>액티브 칸. null 이면 아직 열리지 않았다 (P3).</summary>
+        /// <summary>액티브 칸. null 이면 아직 열리지 않았다 (서버 config activePerks.opensAt).</summary>
         [JsonProperty("activePerkSlot")] public PerkSlotDto ActivePerkSlot;
 
         /// <summary>액티브 칸 특전의 적용 단계. 빈 칸이면 0.</summary>

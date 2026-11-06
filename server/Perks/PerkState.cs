@@ -103,7 +103,7 @@ public sealed record PerkState
     [JsonPropertyName("activePerksEnabled")]
     public bool ActivePerksEnabled { get; init; }
 
-    /// <summary>액티브 칸. null 이면 아직 열리지 않았다 (P3).</summary>
+    /// <summary>액티브 칸. null 이면 아직 열리지 않았다 (config activePerks.opensAt).</summary>
     [JsonPropertyName("activePerkSlot")]
     public PerkSlotState? ActivePerkSlot { get; init; }
 

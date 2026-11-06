@@ -113,14 +113,14 @@ public static class PerkRules
     /// <summary>
     /// 새 단계 진입 처리. 단계가 기록보다 높으면 무료 횟수를 다시 채우고 유료 회차를 0 으로 되돌린다. 단계 상한이 올랐으면 알림으로 남긴다.
     /// 같은 단계에서 config freeRerolls 가 이 단계에 준 값과 다르면 차이만큼 남은 무료 횟수를 고친다 (0 아래로는 내리지 않는다).
-    /// P0(프레스티지 전)은 prestigeLevel0Slots 가 1 이상일 때만 처리하고, 무료 횟수는 처음 한 번 준다 (P1 로 올라가면 다시 채운다).
+    /// P0(프레스티지 전)은 prestigeLevel0Slots 가 1 이상이거나 activeOpensAt 이 0 일 때만 처리하고, 무료 횟수는 처음 한 번 준다 (P1 로 올라가면 다시 채운다).
     /// 슬롯이 단계의 슬롯 수보다 적으면 새 칸을 "전체 − 칸에 있는 특전 − 보유 특전"에서 자동 추첨한다 (무료 횟수 차감 없음). 후보가 없으면 빈 칸.
-    /// P3 이상인데 액티브 칸이 없으면 만들고 미보유 액티브에서 같은 방법으로 뽑는다 (새 특전 알림에 들어간다).
+    /// activeOpensAt 단계 이상인데 액티브 칸이 없으면 만들고 미보유 액티브에서 같은 방법으로 뽑는다 (새 특전 알림에 들어간다).
     /// </summary>
     /// <returns>데이터가 바뀌었는지와 새로 뽑은 특전.</returns>
-    public static (bool Changed, IReadOnlyList<string> NewPerks) EnterLevel(PerkData data, int prestigeLevel, PerkConfig config, Random random)
+    public static (bool Changed, IReadOnlyList<string> NewPerks) EnterLevel(PerkData data, int prestigeLevel, PerkConfig config, Random random, int activeOpensAt = ActivePerkRules.DefaultOpensAt)
     {
-        if (prestigeLevel < 0 || (prestigeLevel == 0 && config.Slots(0) == 0))
+        if (prestigeLevel < 0 || (prestigeLevel == 0 && config.Slots(0) == 0 && activeOpensAt > 0))
         {
             return (false, []);
         }
@@ -158,7 +158,7 @@ public static class PerkRules
             }
         }
 
-        if (prestigeLevel >= ActivePerkRules.OpensAt && data.ActivePerkSlot is null)
+        if (prestigeLevel >= activeOpensAt && data.ActivePerkSlot is null)
         {
             var active = Take(ActivePerkRules.RollPool(data), random);
             data.ActivePerkSlot = new PerkSlot { Perk = active };

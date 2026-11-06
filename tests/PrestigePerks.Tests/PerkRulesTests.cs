@@ -221,6 +221,7 @@ public class PerkRulesTests
     {
         var data = Entered(1, 7);
         PerkRules.SetLock(data, 1, 0, true);
+        PerkRules.SetLock(data, 1, ActivePerkRules.SlotIndex, true);
 
         Assert.Equal(PerkError.NothingToRoll, PerkRules.CheckRoll(data, 1));
         Assert.Equal(PerkError.NothingToRoll, PerkRules.Roll(data, 1, Config, new Random()).Error);
@@ -710,7 +711,7 @@ public class PerkRulesTests
     {
         var data = WithSlots(1, 4);
         data.Rerolls = new PerkRerolls { Level = 2, FreeLeft = 0 };
-        Assert.False(PerkRules.EnterLevel(data, 2, Config, new Random(1)).Changed);
+        Assert.False(PerkRules.EnterLevel(data, 2, Config, new Random(1), activeOpensAt: 3).Changed);
         Assert.Null(data.Rerolls.FreeGranted);
 
         PerkRules.EnterLevel(data, 2, Config with { FreeRerolls = 5 }, new Random(1));
@@ -765,7 +766,7 @@ public class PerkRulesTests
         var before = data.Slots.Select(slot => slot.Perk).ToList();
         data.Rerolls.FreeLeft = 0;
 
-        var (_, newPerks) = PerkRules.EnterLevel(data, 1, config, new Random(1));
+        var (_, newPerks) = PerkRules.EnterLevel(data, 1, config, new Random(1), activeOpensAt: 3);
         Assert.Equal(before, data.Slots.Take(2).Select(slot => slot.Perk));
         Assert.Single(newPerks);
         Assert.Equal(3, data.Rerolls.FreeLeft);

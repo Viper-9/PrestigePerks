@@ -349,7 +349,7 @@ public class PerkService(
             return;
         }
 
-        var (changed, newPerks) = PerkRules.EnterLevel(data, level, Config, random);
+        var (changed, newPerks) = PerkRules.EnterLevel(data, level, Config, random, configLoader.ActivePerks.OpensAt);
         if (!changed)
         {
             return;
@@ -385,7 +385,7 @@ public class PerkService(
             ActivePerksEnabled = ActivePerksEnabled,
             ActivePerkSlot = data.ActivePerkSlot is { } activeSlot ? PerkSlotState.From(activeSlot) : null,
             ActivePerkTier = ActivePerkRules.AppliedTier(data, level, Config),
-            ActivePerkOpensAt = data.ActivePerkSlot is null ? ActivePerkRules.OpensAt : null,
+            ActivePerkOpensAt = data.ActivePerkSlot is null ? configLoader.ActivePerks.OpensAt : null,
             Error = error == PerkError.None ? null : error.ToString(),
         };
 

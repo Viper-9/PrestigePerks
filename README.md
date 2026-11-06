@@ -13,7 +13,7 @@ prestige leaves you a little stronger for the next run:
 - **Perk slots**: one more slot per prestige level. Slots are filled by random rolls you can lock and reroll.
   Keep the perks you like with coins, upgrade them from tier I to III, and drop them into slots so rerolls leave
   them alone.
-- **Active perks**: from P3, one extra slot holds a perk you use in raid with a key.
+- **Active perks**: from P1, one extra slot holds a perk you use in raid with a key.
 - **Prestige coins**: the items you hand over when you prestige turn into coins, and the coins you already have
   carry over to your next prestige. You also find coins in safes and on bosses.
 
@@ -79,7 +79,7 @@ The page follows the game language: Korean, English for everything else. The F12
 | Prestige | P1 | P2 | P3 | P4 | P5 | P6 |
 |---|---|---|---|---|---|---|
 | Slots | 1 | 2 | 3 | 4 | 5 | 6 |
-| Active slot | — | — | 1 | 1 | 1 | 1 |
+| Active slot | 1 | 1 | 1 | 1 | 1 | 1 |
 | Tier cap | I | I | II | II | III | III |
 
 - The first time you log in after a prestige, the new slot is rolled for you and applies at once.
@@ -171,7 +171,7 @@ multiplied.
 
 ![Active perks on the perk page](media/active-page.png)
 
-- At **P3** an **active slot** opens to the right of the six perk slots. It holds one of 10 active perks that you
+- At **P1** an **active slot** opens to the right of the six perk slots. It holds one of 10 active perks that you
   use in raid with a key: **V** by default (F12 menu, `Active perk` > `Use key`).
 - Rerolls, locks, keeping, tiers and dragging work as in the other slots, but the active slot only rolls active
   perks and active perks only fit the active slot. Prices: tier I **80**, II **200**, III **350** coins. The tier
@@ -206,7 +206,7 @@ While you drag an active perk the other slots dim, because it only fits the acti
 - Sonar Pulse echo brightness (naked eye, night vision, thermal) and the wave ring are in the F12 menu under
   `Active perk`.
 
-![Sonar Pulse echoes through walls](https://i.imgur.com/JFRBrTD.gif)
+[![Sonar Pulse echoes through walls](https://i.imgur.com/JFRBrTD.gif)](https://imgur.com/a/JXVHIVV)
 
 Sonar Pulse in use: the yellow figures are echoes of enemies behind walls.
 
@@ -282,7 +282,9 @@ again.
 **`bossCoins`**: `enabled`, `chance` (0–1), `minStack`, `maxStack`, `roles` (bot roles that get coins; add other
 mods' bosses here).
 **`activePerks`**: `enabled` (default `true`). `false` hides the active slot and the active perks on the perk page
-and in raid. Your active slot and owned active perks stay in your data.
+and in raid. Your active slot and owned active perks stay in your data. `opensAt` (0–6, default `1`) is the prestige
+level that opens the active slot. `0` opens it before your first prestige. Raising it later doesn't close a slot that
+is already open.
 **`prestige`**: `stages` holds the requirements of P1–P6 from the table above (`level`, `skills`, `hideout`,
 `roubles`, `transferMultiplier` = share of progress **lost**, `newBeginningLevel`).
 
