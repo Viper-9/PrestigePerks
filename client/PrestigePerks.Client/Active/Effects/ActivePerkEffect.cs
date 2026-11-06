@@ -93,6 +93,8 @@ namespace PrestigePerks.Active
                     return new EmergencySurgery();
                 case "firstaid":
                     return new FirstAid();
+                case "focus":
+                    return new Focus();
                 default:
                     return null;
             }
