@@ -17,7 +17,8 @@
     "tierPrices": [40, 100, 200]
   },
   "activePerks": {
-    "enabled": true
+    "enabled": true,
+    "opensAt": 1
   },
   "safeCoins": {
     "chance": 0.3,

@@ -9,7 +9,7 @@ namespace PrestigePerks.Active
 {
     /// <summary>
     /// 레이드 하나의 액티브 특전: 키 → 시계 → 효과, HUD, 로그. GameWorld 에 붙고 OnDestroy 에서 정리한다.
-    /// 슬롯이 비었거나 P3 전이거나 서버 설정이 꺼졌으면(state 에 액티브 없음) 붙지 않는다. PMC 레이드만.
+    /// 슬롯이 비었거나 칸이 열리기 전이거나 서버 설정이 꺼졌으면(state 에 액티브 없음) 붙지 않는다. PMC 레이드만.
     /// </summary>
     internal sealed class ActivePerkRaid : MonoBehaviour
     {

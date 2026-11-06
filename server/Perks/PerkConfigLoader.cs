@@ -84,7 +84,7 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
             bossCoins = new BossCoinConfig();
         }
 
-        return config with { Perks = perks, ActivePerks = config.ActivePerks ?? new ActivePerkConfig(), Prestige = prestige, SafeCoins = safeCoins, BossCoins = bossCoins };
+        return config with { Perks = perks, ActivePerks = (config.ActivePerks ?? new ActivePerkConfig()).Clamped(warn), Prestige = prestige, SafeCoins = safeCoins, BossCoins = bossCoins };
     }
 
     internal static ModConfig ParseModConfig(string json) => JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig();

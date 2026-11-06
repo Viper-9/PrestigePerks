@@ -16,7 +16,7 @@ public sealed class PerkData
     [JsonPropertyName("slots")]
     public List<PerkSlot> Slots { get; set; } = [];
 
-    /// <summary>액티브 특전 칸 (dev-docs 94). P3 진입 때 만들고(<see cref="PerkRules.EnterLevel"/>), 그 전에는 null 이라 파일에 쓰지 않는다. 칸 규칙은 패시브 칸과 같다.</summary>
+    /// <summary>액티브 특전 칸 (dev-docs 94). 열리는 단계에 들어갈 때 만들고(<see cref="PerkRules.EnterLevel"/>), 그 전에는 null 이라 파일에 쓰지 않는다. 칸 규칙은 패시브 칸과 같다.</summary>
     [JsonPropertyName("activePerkSlot")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PerkSlot? ActivePerkSlot { get; set; }
