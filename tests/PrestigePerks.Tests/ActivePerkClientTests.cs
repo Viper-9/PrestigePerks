@@ -194,21 +194,21 @@ public class ActivePerkClientTests
         }
     }
 
-    [Theory]
-    [InlineData("en")]
-    [InlineData("kr")]
-    public void Locale_files_name_every_f12_setting(string culture)
+    [Fact]
+    public void F12_settings_are_written_in_english()
     {
-        var file = PerkLocale.ParseFile(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ClientLocales", $"{culture}.json")));
         var plugin = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ClientSource", "Plugin.cs.txt"));
-        var tags = System.Text.RegularExpressions.Regex.Matches(plugin, "ConfigText\\.Tag\\(\"(\\w+)\", \"(\\w+)\"");
-        Assert.Equal(11, tags.Count);
-        foreach (System.Text.RegularExpressions.Match tag in tags)
+        var binds = System.Text.RegularExpressions.Regex.Matches(plugin, @"Config\.Bind\([^;]+;");
+        Assert.Equal(11, binds.Count);
+        foreach (System.Text.RegularExpressions.Match bind in binds)
         {
-            foreach (var key in new[] { $"config.section.{tag.Groups[1].Value}", $"config.{tag.Groups[2].Value}.name", $"config.{tag.Groups[2].Value}.desc" })
-            {
-                Assert.False(string.IsNullOrWhiteSpace(file.GetValueOrDefault(key)), $"{culture}: {key}");
-            }
+            Assert.DoesNotMatch("[가-힣]", bind.Value);
+        }
+
+        foreach (var culture in new[] { "en", "kr" })
+        {
+            var file = PerkLocale.ParseFile(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ClientLocales", $"{culture}.json")));
+            Assert.DoesNotContain(file.Keys, key => key.StartsWith("config.", StringComparison.Ordinal));
         }
     }
 

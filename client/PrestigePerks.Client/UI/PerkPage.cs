@@ -30,7 +30,7 @@ namespace PrestigePerks.UI
         private const float DividerGap = 24;
 
         // 액티브 줄의 사용 제한 글자 칸 ("Once per raid", "Cooldown 300 s"). 단계 칸 왼쪽
-        private const float LimitWidth = 130;
+        private const float LimitWidth = 100;
 
         // 선택한 특전의 큰 효과 글자 크기 (길면 최소 크기까지 줄인다)
         private const float ValueSize = 30, ValueMinSize = 20;
