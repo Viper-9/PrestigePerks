@@ -206,7 +206,7 @@ While you drag an active perk the other slots dim, because it only fits the acti
 - Sonar Pulse echo brightness (naked eye, night vision, thermal) and the wave ring are in the F12 menu under
   `Active perk`.
 
-[![Sonar Pulse echoes through walls](https://i.imgur.com/JFRBrTD.gif)](https://imgur.com/a/JXVHIVV)
+[![Sonar Pulse echoes through walls](media/active-sonar.gif)](https://imgur.com/a/JXVHIVV)
 
 Sonar Pulse in use: the yellow figures are echoes of enemies behind walls.
 
