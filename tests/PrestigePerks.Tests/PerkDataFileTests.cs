@@ -306,4 +306,52 @@ public sealed class PerkDataFileTests : IDisposable
         Assert.Empty(result.Data.Slots);
         Assert.Equal(SlotPerks(1, 24, 8), Perks(PerkDataFile.Read(BackupPath).Data));
     }
+
+    [Fact]
+    public void Active_slot_round_trips_and_is_left_out_when_missing()
+    {
+        var data = new PerkData { ActivePerkSlot = new PerkSlot { Perk = "grit", Locked = true } };
+        var json = PerkDataFile.Serialize(data);
+        Assert.Contains("\"activePerkSlot\"", json);
+        var back = PerkDataFile.Deserialize(json);
+        Assert.Equal("grit", back.ActivePerkSlot!.Perk);
+        Assert.True(back.ActivePerkSlot.Locked);
+        Assert.DoesNotContain("activePerkSlot", PerkDataFile.Serialize(new PerkData()));
+    }
+
+    [Fact]
+    public void Normalize_empties_slots_that_hold_the_wrong_kind()
+    {
+        var data = new PerkData
+        {
+            Slots = [new PerkSlot { Perk = "grit", Locked = true }, new PerkSlot { Perk = "porter" }],
+            ActivePerkSlot = new PerkSlot { Perk = "control", Fixed = true },
+        };
+        var warnings = new List<string>();
+        var normalized = PerkDataFile.Normalize(data, warnings);
+        Assert.Null(normalized.Slots[0].Perk);
+        Assert.False(normalized.Slots[0].Locked);
+        Assert.Equal("porter", normalized.Slots[1].Perk);
+        Assert.Null(normalized.ActivePerkSlot!.Perk);
+        Assert.False(normalized.ActivePerkSlot.Fixed);
+        Assert.Single(warnings);
+    }
+
+    [Fact]
+    public void Normalize_keeps_a_fixed_active_slot_only_when_owned()
+    {
+        var owned = PerkDataFile.Normalize(new PerkData { Owned = new() { ["grit"] = 2 }, ActivePerkSlot = new PerkSlot { Perk = "grit", Fixed = true } }, []);
+        Assert.True(owned.ActivePerkSlot!.Fixed);
+        Assert.Equal(2, owned.Owned["grit"]);
+        var notOwned = PerkDataFile.Normalize(new PerkData { ActivePerkSlot = new PerkSlot { Perk = "grit", Fixed = true, Locked = true } }, []);
+        Assert.False(notOwned.ActivePerkSlot!.Fixed);
+        Assert.True(notOwned.ActivePerkSlot.Locked);
+    }
+
+    [Fact]
+    public void Unseen_new_perks_keep_the_drawn_active_perk()
+    {
+        var data = PerkDataFile.Normalize(new PerkData { ActivePerkSlot = new PerkSlot { Perk = "grit" }, UnseenNewPerks = ["grit"] }, []);
+        Assert.Equal(["grit"], data.UnseenNewPerks);
+    }
 }
