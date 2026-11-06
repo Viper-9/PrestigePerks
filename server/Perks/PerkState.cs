@@ -96,6 +96,7 @@ public sealed record PerkState
     /// <summary>특전 목록 (표시 순서, III 효과량, 단위). 클라이언트는 이것으로 목록과 수치를 그린다. 오류 응답에도 실린다 (클라이언트가 오류 응답을 새 state 로 받는다).</summary>
     [JsonPropertyName("catalog")]
     public IReadOnlyList<PerkCatalogEntry> Catalog { get; init; } = PerkCatalog.Entries;
+
 }
 
 /// <summary>state 의 catalog 한 줄. 단위는 문자열로 보낸다 (enum 직렬화 방식에 기대지 않는다).</summary>
@@ -105,6 +106,9 @@ public sealed record PerkCatalogEntry
 
     /// <summary>add-on 특전 종류 (perks.json kind). 서버 안에서는 code 가 내장 패치 특전과 같은 <see cref="PerkKind.Patch"/> 다.</summary>
     public const string BonusKind = "bonus", CodeKind = "code";
+
+    /// <summary>내장 액티브 특전 종류. state 의 activeCatalog 에만 있다.</summary>
+    public const string ActiveKind = "active";
 
     [JsonPropertyName("id")]
     public string Id { get; init; } = "";
@@ -118,7 +122,7 @@ public sealed record PerkCatalogEntry
 
     // 아래는 add-on 특전에만 실린다. 내장 특전 JSON 은 그대로다
 
-    /// <summary>add-on 특전 종류 ("bonus", "code"). 내장 특전은 null.</summary>
+    /// <summary>add-on 특전 종류 ("bonus", "code"), 액티브 특전 "active". 내장 패시브는 null.</summary>
     [JsonPropertyName("kind")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public string? Kind { get; init; }
@@ -132,6 +136,29 @@ public sealed record PerkCatalogEntry
     [JsonPropertyName("icon")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Icon { get; init; }
+
+    /// <summary>액티브 특전의 사용 제한과 단계별 값. 패시브는 null.</summary>
+    [JsonPropertyName("active")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public ActivePerkEntry? Active { get; init; }
+}
+
+/// <summary>activeCatalog 한 줄의 액티브 값. 목록은 [I, II, III].</summary>
+public sealed record ActivePerkEntry
+{
+    public const string OncePerRaid = "raid", CooldownLimit = "cooldown";
+
+    [JsonPropertyName("limit")]
+    public string Limit { get; init; } = OncePerRaid;
+
+    [JsonPropertyName("cooldown")]
+    public IReadOnlyList<double> Cooldown { get; init; } = [];
+
+    [JsonPropertyName("duration")]
+    public IReadOnlyList<double> Duration { get; init; } = [];
+
+    [JsonPropertyName("values")]
+    public IReadOnlyDictionary<string, IReadOnlyList<double>> Values { get; init; } = new Dictionary<string, IReadOnlyList<double>>();
 }
 
 /// <summary>add-on 특전 문구 한 언어. 효과 문구는 "체력 회복 {0}" 처럼 수치 자리를 둔다.</summary>
