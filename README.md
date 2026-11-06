@@ -13,6 +13,7 @@ prestige leaves you a little stronger for the next run:
 - **Perk slots**: one more slot per prestige level. Slots are filled by random rolls you can lock and reroll.
   Keep the perks you like with coins, upgrade them from tier I to III, and drop them into slots so rerolls leave
   them alone.
+- **Active perks**: from P3, one extra slot holds a perk you use in raid with a key.
 - **Prestige coins**: the items you hand over when you prestige turn into coins, and the coins you already have
   carry over to your next prestige. You also find coins in safes and on bosses.
 
@@ -49,7 +50,7 @@ a raid.
 
 ![Taskbar button](media/taskbar.png)
 
-The page follows the game language: Korean, English for everything else.
+The page follows the game language: Korean, English for everything else. The F12 settings are always in English.
 
 ## Prestige requirements
 
@@ -78,6 +79,7 @@ The page follows the game language: Korean, English for everything else.
 | Prestige | P1 | P2 | P3 | P4 | P5 | P6 |
 |---|---|---|---|---|---|---|
 | Slots | 1 | 2 | 3 | 4 | 5 | 6 |
+| Active slot | — | — | 1 | 1 | 1 | 1 |
 | Tier cap | I | I | II | II | III | III |
 
 - The first time you log in after a prestige, the new slot is rolled for you and applies at once.
@@ -167,11 +169,20 @@ multiplied.
 
 ### Active perks
 
+![Active perks on the perk page](media/active-page.png)
+
 - At **P3** an **active slot** opens to the right of the six perk slots. It holds one of 10 active perks that you
   use in raid with a key: **V** by default (F12 menu, `Active perk` > `Use key`).
 - Rerolls, locks, keeping, tiers and dragging work as in the other slots, but the active slot only rolls active
   perks and active perks only fit the active slot. Prices: tier I **80**, II **200**, III **350** coins. The tier
   cap is the same. The **PASSIVE** / **ACTIVE** tabs switch the list.
+
+![Dragging an active perk](media/active-drag.png)
+
+While you drag an active perk the other slots dim, because it only fits the active slot.
+
+![Active perk in raid, running and used](media/active-hud.png)
+
 - In raid a hexagon at the bottom right shows the perk and its state: ready, running (time left), cooldown, used this
   raid, or no target. Pressing the key when there is nothing to use it on does nothing and doesn't use it.
 - A running effect can't be restarted or extended. Cooldowns start when the effect ends. Once-per-raid uses and
@@ -194,6 +205,10 @@ multiplied.
   lower max HP for the rest of the raid.
 - Sonar Pulse echo brightness (naked eye, night vision, thermal) and the wave ring are in the F12 menu under
   `Active perk`.
+
+![Sonar Pulse echoes through walls](https://i.imgur.com/JFRBrTD.gif)
+
+Sonar Pulse in use: the yellow figures are echoes of enemies behind walls.
 
 ## Prestige coins
 
