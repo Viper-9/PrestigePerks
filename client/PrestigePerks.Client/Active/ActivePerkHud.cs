@@ -86,6 +86,8 @@ namespace PrestigePerks.Active
             keyLine = UiKit.Outline(keyBox, UiKit.Line);
             key = UiKit.Label(keyBox, "Label", 22, 8.5f, 44, KeyText(Plugin.ActiveKey.Value), 12, UiKit.Text, TextAlignmentOptions.Center, FontStyles.Bold);
             key.overflowMode = TextOverflowModes.Overflow;
+            // 레이드 중에 F12 에서 키를 바꿔도 칸의 글자가 따라간다
+            Plugin.ActiveKey.SettingChanged += OnKeyChanged;
 
             var textRight = hexX - TextGap;
             name = UiKit.Label(parent, "Name", textRight, middle - 10, 260, $"{locale.PerkName(perk)} {PerkPage.TierName(tier)}", 16, UiKit.Text, TextAlignmentOptions.Right, FontStyles.Bold);
@@ -172,8 +174,17 @@ namespace PrestigePerks.Active
             PerkGame.Sound(EUISoundType.ErrorMessage);
         }
 
+        private void OnKeyChanged(object sender, EventArgs args)
+        {
+            if (key != null)
+            {
+                key.text = KeyText(Plugin.ActiveKey.Value);
+            }
+        }
+
         public void Destroy()
         {
+            Plugin.ActiveKey.SettingChanged -= OnKeyChanged;
             if (root != null)
             {
                 UnityEngine.Object.Destroy(root);
