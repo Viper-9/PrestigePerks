@@ -89,6 +89,8 @@ namespace PrestigePerks.Active
                     return new Resupply();
                 case "fieldrepair":
                     return new FieldRepair();
+                case "emergencysurgery":
+                    return new EmergencySurgery();
                 default:
                     return null;
             }
