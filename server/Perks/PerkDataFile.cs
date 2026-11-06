@@ -137,9 +137,10 @@ public static class PerkDataFile
 
         data.Owned = owned;
 
-        // 모르는 특전(add-on 을 뺀 경우)·겹친 특전이 있던 칸은 그 자리의 빈 칸이 된다 (확정 빼기와 같다: 다음 리롤 때 채운다). 도감 보유는 위에서 그대로 남는다
+        // 모르는 특전(add-on 을 뺀 경우)·종류가 틀린 특전(패시브 칸의 액티브, 액티브 칸의 패시브)·겹친 특전이 있던 칸은 그 자리의 빈 칸이 된다
+        // (확정 빼기와 같다: 다음 리롤 때 채운다). 도감 보유는 위에서 그대로 남는다
         var seen = new HashSet<string>();
-        var before = DescribeSlots(data.Slots);
+        var before = DescribeSlots(data.Slots.Append(data.ActivePerkSlot));
         var fixedUp = false;
         var slots = new List<PerkSlot>();
         foreach (var slot in data.Slots)
@@ -150,28 +151,18 @@ public static class PerkDataFile
                 continue;
             }
 
-            if (!slot.IsEmpty && (!PerkCatalog.IsKnown(slot.Perk) || !seen.Add(slot.Perk!)))
-            {
-                slot.Perk = PerkSlot.Empty;
-                fixedUp = true;
-            }
-
-            // 확정 칸은 보유한 특전만, 잠금과 함께 켜지지 않는다. 빈 칸은 잠그거나 확정할 수 없다
-            var shouldFix = slot.Fixed && !slot.IsEmpty && owned.ContainsKey(slot.Perk!);
-            var shouldLock = slot.Locked && !shouldFix && !slot.IsEmpty;
-            if (shouldFix != slot.Fixed || shouldLock != slot.Locked)
-            {
-                slot.Fixed = shouldFix;
-                slot.Locked = shouldLock;
-                fixedUp = true;
-            }
-
+            fixedUp |= FixSlot(slot, active: false, owned, seen);
             slots.Add(slot);
+        }
+
+        if (data.ActivePerkSlot is { } activeSlot)
+        {
+            fixedUp |= FixSlot(activeSlot, active: true, owned, seen);
         }
 
         if (fixedUp)
         {
-            warnings.Add($"모르는 특전·중복 슬롯을 빈 칸으로 바꾸고 잘못된 칸 상태를 정리했습니다: [{before}] → [{DescribeSlots(slots)}]");
+            warnings.Add($"모르는 특전·중복 슬롯을 빈 칸으로 바꾸고 잘못된 칸 상태를 정리했습니다: [{before}] → [{DescribeSlots(slots.Append(data.ActivePerkSlot))}]");
         }
 
         data.Slots = slots;
@@ -192,6 +183,29 @@ public static class PerkDataFile
         }
 
         return data;
+    }
+
+    /// <summary>칸 하나 정리. 바뀌었으면 true.</summary>
+    private static bool FixSlot(PerkSlot slot, bool active, IReadOnlyDictionary<string, int> owned, HashSet<string> seen)
+    {
+        var changed = false;
+        if (!slot.IsEmpty && (!PerkCatalog.IsKnown(slot.Perk) || PerkCatalog.IsActive(slot.Perk) != active || !seen.Add(slot.Perk!)))
+        {
+            slot.Perk = PerkSlot.Empty;
+            changed = true;
+        }
+
+        // 확정 칸은 보유한 특전만, 잠금과 함께 켜지지 않는다. 빈 칸은 잠그거나 확정할 수 없다
+        var shouldFix = slot.Fixed && !slot.IsEmpty && owned.ContainsKey(slot.Perk!);
+        var shouldLock = slot.Locked && !shouldFix && !slot.IsEmpty;
+        if (shouldFix != slot.Fixed || shouldLock != slot.Locked)
+        {
+            slot.Fixed = shouldFix;
+            slot.Locked = shouldLock;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static string DescribeSlots(IEnumerable<PerkSlot?> slots) =>

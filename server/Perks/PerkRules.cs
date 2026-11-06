@@ -38,6 +38,8 @@ public enum PerkError
     SlotEmpty,
     /// <summary>확정 칸이 아니라 뺄 수 없다.</summary>
     NotFixed,
+    /// <summary>패시브 칸에 액티브, 액티브 칸에 패시브를 넣으려 했다.</summary>
+    WrongKind,
 }
 
 public readonly record struct RollOutcome(PerkError Error, int Cost)
@@ -65,11 +67,19 @@ public static class PerkRules
         return (int)Math.Ceiling(cost - 1e-9);
     }
 
-    /// <summary>다음 리롤 비용. 무료 횟수가 남았으면 0.</summary>
+    /// <summary>다음 리롤 비용. 무료 횟수가 남았으면 0. 잠근 개수에 액티브 칸도 센다.</summary>
     public static int NextRerollCost(PerkConfig config, int prestigeLevel, PerkData data) =>
         data.Rerolls.FreeLeft > 0
             ? 0
-            : RerollCost(config, prestigeLevel, ActiveSlots(data, config.Slots(prestigeLevel)).Count(slot => slot.Locked), data.Rerolls.Paid + 1);
+            : RerollCost(config, prestigeLevel,
+                ActiveSlots(data, config.Slots(prestigeLevel)).Count(slot => slot.Locked) + (data.ActivePerkSlot?.Locked == true ? 1 : 0),
+                data.Rerolls.Paid + 1);
+
+    /// <summary>슬롯 번호의 칸: 0 ~ 열린 수−1 은 패시브, <see cref="ActivePerkRules.SlotIndex"/> 는 액티브 칸. 없으면 null.</summary>
+    private static PerkSlot? SlotAt(PerkData data, int slotCount, int slotIndex) =>
+        slotIndex == ActivePerkRules.SlotIndex ? data.ActivePerkSlot
+        : slotIndex >= 0 && slotIndex < ActiveSlots(data, slotCount).Count ? data.Slots[slotIndex]
+        : null;
 
     /// <summary>효과가 적용되는 슬롯: 앞에서부터 slotCount 개 (단계별 슬롯 수, <see cref="PerkConfig.Slots"/>).</summary>
     public static IReadOnlyList<PerkSlot> ActiveSlots(PerkData data, int slotCount) =>
@@ -105,6 +115,7 @@ public static class PerkRules
     /// 같은 단계에서 config freeRerolls 가 이 단계에 준 값과 다르면 차이만큼 남은 무료 횟수를 고친다 (0 아래로는 내리지 않는다).
     /// P0(프레스티지 전)은 prestigeLevel0Slots 가 1 이상일 때만 처리하고, 무료 횟수는 처음 한 번 준다 (P1 로 올라가면 다시 채운다).
     /// 슬롯이 단계의 슬롯 수보다 적으면 새 칸을 "전체 − 칸에 있는 특전 − 보유 특전"에서 자동 추첨한다 (무료 횟수 차감 없음). 후보가 없으면 빈 칸.
+    /// P3 이상인데 액티브 칸이 없으면 만들고 미보유 액티브에서 같은 방법으로 뽑는다 (새 특전 알림에 들어간다).
     /// </summary>
     /// <returns>데이터가 바뀌었는지와 새로 뽑은 특전.</returns>
     public static (bool Changed, IReadOnlyList<string> NewPerks) EnterLevel(PerkData data, int prestigeLevel, PerkConfig config, Random random)
@@ -147,19 +158,30 @@ public static class PerkRules
             }
         }
 
+        if (prestigeLevel >= ActivePerkRules.OpensAt && data.ActivePerkSlot is null)
+        {
+            var active = Take(ActivePerkRules.RollPool(data), random);
+            data.ActivePerkSlot = new PerkSlot { Perk = active };
+            changed = true;
+            if (active is not null)
+            {
+                newPerks.Add(active);
+            }
+        }
+
         data.UnseenNewPerks.AddRange(newPerks);
         return (changed, newPerks);
     }
 
-    /// <summary>슬롯 잠금. slotIndex 는 0 부터. 확정 칸과 빈 칸은 잠글 수 없다 (풀기는 늘 된다).</summary>
+    /// <summary>슬롯 잠금. slotIndex 는 0 부터 (액티브 칸은 <see cref="ActivePerkRules.SlotIndex"/>). 확정 칸과 빈 칸은 잠글 수 없다 (풀기는 늘 된다).</summary>
     public static PerkError SetLock(PerkData data, int slotCount, int slotIndex, bool locked)
     {
-        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, slotCount).Count)
+        var slot = SlotAt(data, slotCount, slotIndex);
+        if (slot is null)
         {
             return PerkError.InvalidSlot;
         }
 
-        var slot = data.Slots[slotIndex];
         if (locked && slot.Fixed)
         {
             return PerkError.SlotFixed;
@@ -174,25 +196,30 @@ public static class PerkRules
         return PerkError.None;
     }
 
-    /// <summary>리롤할 수 있는지 (코인 제외).</summary>
+    /// <summary>리롤할 수 있는지 (코인 제외). 패시브 칸과 액티브 칸 중 한쪽이라도 새로 뽑을 것이 있으면 된다.</summary>
     public static PerkError CheckRoll(PerkData data, int slotCount)
     {
         var slots = ActiveSlots(data, slotCount);
-        if (slots.Count == 0)
+        var active = data.ActivePerkSlot;
+        if (slots.Count == 0 && active is null)
         {
             return PerkError.NoSlots;
         }
 
-        if (!slots.Any(slot => slot.Rollable))
+        var passiveRolls = slots.Any(slot => slot.Rollable);
+        var activeRolls = active is { Rollable: true };
+        if (!passiveRolls && !activeRolls)
         {
             return PerkError.NothingToRoll;
         }
 
-        return RollPool(data, slotCount).Count == 0 ? PerkError.CollectionComplete : PerkError.None;
+        // 패시브 도감을 다 채워도 액티브 칸은 돈다 (반대도 같다)
+        var anything = (passiveRolls && RollPool(data, slotCount).Count > 0) || (activeRolls && ActivePerkRules.RollPool(data).Count > 0);
+        return anything ? PerkError.None : PerkError.CollectionComplete;
     }
 
     /// <summary>
-    /// 리롤. 리롤 칸과 빈 칸을 전부 다시 뽑는다. 무료 횟수가 남았으면 무료 −1, 아니면 유료 회차 +1.
+    /// 리롤. 리롤 칸과 빈 칸을 전부 다시 뽑는다 (액티브 칸은 액티브 풀에서). 무료 횟수가 남았으면 무료 −1, 아니면 유료 회차 +1.
     /// 유료면 비용(<see cref="RollOutcome.Cost"/>)을 부르는 쪽이 미리 받아 두어야 한다.
     /// </summary>
     public static RollOutcome Roll(PerkData data, int prestigeLevel, PerkConfig config, Random random)
@@ -221,6 +248,11 @@ public static class PerkRules
             slot.Perk = Take(pool, random) ?? PerkSlot.Empty;
         }
 
+        if (data.ActivePerkSlot is { Rollable: true } activeSlot)
+        {
+            activeSlot.Perk = Take(ActivePerkRules.RollPool(data), random) ?? PerkSlot.Empty;
+        }
+
         return new RollOutcome(PerkError.None, cost);
     }
 
@@ -237,8 +269,12 @@ public static class PerkRules
         return PerkCatalog.Ids.Where(perk => !kept.Contains(perk) && data.OwnedTier(perk) == 0).ToList();
     }
 
+    /// <summary>단계 가격: 액티브는 80 / 200 / 350 (코드), 패시브는 config tierPrices.</summary>
+    public static int TierPrice(PerkConfig config, string perk, int tier) =>
+        PerkCatalog.IsActive(perk) ? ActivePerkRules.TierPrice(tier) : config.TierPrice(tier);
+
     /// <summary>
-    /// 단계 구매를 확인한다 (코인 제외). I 은 지금 열린 칸에 있는 미보유 특전만, II·III 은 바로 아래 단계를 가졌고 상한 이하일 때만.
+    /// 단계 구매를 확인한다 (코인 제외). I 은 지금 열린 칸(액티브는 액티브 칸)에 있는 미보유 특전만, II·III 은 바로 아래 단계를 가졌고 상한 이하일 때만.
     /// 이미 그 단계를 가졌으면 <see cref="PerkError.AlreadyOwned"/> (부르는 쪽이 결제 없이 성공으로 돌려준다).
     /// </summary>
     public static PerkError CheckBuy(PerkData data, int prestigeLevel, PerkConfig config, string perk, int tier)
@@ -269,7 +305,15 @@ public static class PerkRules
             return PerkError.TierCapped;
         }
 
-        return tier == 1 && ActiveSlots(data, config.Slots(prestigeLevel)).All(slot => slot.Perk != perk) ? PerkError.NotInSlot : PerkError.None;
+        if (tier != 1)
+        {
+            return PerkError.None;
+        }
+
+        var inSlot = PerkCatalog.IsActive(perk)
+            ? data.ActivePerkSlot?.Perk == perk
+            : ActiveSlots(data, config.Slots(prestigeLevel)).Any(slot => slot.Perk == perk);
+        return inSlot ? PerkError.None : PerkError.NotInSlot;
     }
 
     /// <summary>단계 구매 (결제 뒤). I 을 사면 그 칸이 바로 확정 칸이 되고, 잠긴 칸이었다면 잠금이 풀린다.</summary>
@@ -284,7 +328,7 @@ public static class PerkRules
         data.Owned[perk] = tier;
         if (tier == 1)
         {
-            var slot = ActiveSlots(data, config.Slots(prestigeLevel)).First(slot => slot.Perk == perk);
+            var slot = PerkCatalog.IsActive(perk) ? data.ActivePerkSlot! : ActiveSlots(data, config.Slots(prestigeLevel)).First(slot => slot.Perk == perk);
             slot.Fixed = true;
             slot.Locked = false;
         }
@@ -294,12 +338,12 @@ public static class PerkRules
 
     /// <summary>
     /// 확정 넣기: 칸에 없는 보유 특전을 리롤 칸·빈 칸·확정 칸에 놓는다. 리롤 칸의 미보유 특전은 사라지고, 확정 칸이면 서로 바뀐다 (원래 특전은 목록으로).
-    /// 잠긴 칸에는 놓을 수 없다.
+    /// 잠긴 칸에는 놓을 수 없다. 액티브는 액티브 칸(<see cref="ActivePerkRules.SlotIndex"/>)에만, 패시브는 패시브 칸에만 놓는다.
     /// </summary>
     public static PerkError Equip(PerkData data, int slotCount, string perk, int slotIndex)
     {
-        var active = ActiveSlots(data, slotCount);
-        if (slotIndex < 0 || slotIndex >= active.Count)
+        var target = SlotAt(data, slotCount, slotIndex);
+        if (target is null)
         {
             return PerkError.InvalidSlot;
         }
@@ -309,27 +353,36 @@ public static class PerkRules
             return PerkError.UnknownPerk;
         }
 
+        var toActive = slotIndex == ActivePerkRules.SlotIndex;
+        if (PerkCatalog.IsActive(perk) != toActive)
+        {
+            return PerkError.WrongKind;
+        }
+
         if (data.OwnedTier(perk) == 0)
         {
             return PerkError.NotOwned;
         }
 
-        if (active.Any(slot => slot.Perk == perk))
+        var active = ActiveSlots(data, slotCount);
+        if (toActive ? target.Perk == perk : active.Any(slot => slot.Perk == perk))
         {
             return PerkError.AlreadyEquipped;
         }
 
-        var target = active[slotIndex];
         if (target.Locked)
         {
             return PerkError.SlotLocked;
         }
 
-        // 효과 없는 뒤쪽 슬롯(슬롯 수를 줄인 경우)에 남아 있던 같은 특전은 비운다 (겹치지 않게)
-        foreach (var hidden in data.Slots.Skip(active.Count).Where(slot => slot.Perk == perk))
+        if (!toActive)
         {
-            hidden.Perk = PerkSlot.Empty;
-            hidden.Fixed = false;
+            // 효과 없는 뒤쪽 슬롯(슬롯 수를 줄인 경우)에 남아 있던 같은 특전은 비운다 (겹치지 않게)
+            foreach (var hidden in data.Slots.Skip(active.Count).Where(slot => slot.Perk == perk))
+            {
+                hidden.Perk = PerkSlot.Empty;
+                hidden.Fixed = false;
+            }
         }
 
         target.Perk = perk;
@@ -340,12 +393,12 @@ public static class PerkRules
     /// <summary>확정 빼기: 그 칸은 빈 칸이 되어 다음 리롤 때 채워지고, 특전은 보유한 채 목록에 남는다.</summary>
     public static PerkError Unequip(PerkData data, int slotCount, int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, slotCount).Count)
+        var slot = SlotAt(data, slotCount, slotIndex);
+        if (slot is null)
         {
             return PerkError.InvalidSlot;
         }
 
-        var slot = data.Slots[slotIndex];
         if (!slot.Fixed)
         {
             return PerkError.NotFixed;
@@ -358,11 +411,12 @@ public static class PerkRules
 
     /// <summary>
     /// 개발용: 슬롯에 특전을 직접 넣는다. 다른 슬롯이 그 특전을 갖고 있으면 서로 바꾼다 (겹치지 않게).
-    /// 보유한 특전이 들어간 칸은 확정 칸, 아니면 리롤 칸이 된다 (잠금은 미보유일 때만 그대로).
+    /// 보유한 특전이 들어간 칸은 확정 칸, 아니면 리롤 칸이 된다 (잠금은 미보유일 때만 그대로). 액티브는 액티브 칸에만.
     /// </summary>
     public static PerkError SetPerk(PerkData data, int slotCount, int slotIndex, string perk)
     {
-        if (slotIndex < 0 || slotIndex >= ActiveSlots(data, slotCount).Count)
+        var slot = SlotAt(data, slotCount, slotIndex);
+        if (slot is null)
         {
             return PerkError.InvalidSlot;
         }
@@ -372,13 +426,22 @@ public static class PerkRules
             return PerkError.UnknownPerk;
         }
 
-        var other = data.Slots.FindIndex(slot => slot.Perk == perk);
-        if (other >= 0 && other != slotIndex)
+        var toActive = slotIndex == ActivePerkRules.SlotIndex;
+        if (PerkCatalog.IsActive(perk) != toActive)
         {
-            Put(data, data.Slots[other], data.Slots[slotIndex].Perk);
+            return PerkError.WrongKind;
         }
 
-        Put(data, data.Slots[slotIndex], perk);
+        if (!toActive)
+        {
+            var other = data.Slots.FindIndex(s => s.Perk == perk);
+            if (other >= 0 && other != slotIndex)
+            {
+                Put(data, data.Slots[other], data.Slots[slotIndex].Perk);
+            }
+        }
+
+        Put(data, slot, perk);
         return PerkError.None;
     }
 
@@ -398,7 +461,7 @@ public static class PerkRules
         if (tier == 0)
         {
             data.Owned.Remove(perk);
-            foreach (var slot in data.Slots.Where(slot => slot.Perk == perk))
+            foreach (var slot in AllSlots(data).Where(slot => slot.Perk == perk))
             {
                 slot.Fixed = false;
             }
@@ -415,11 +478,14 @@ public static class PerkRules
     public static void ResetCollection(PerkData data)
     {
         data.Owned.Clear();
-        foreach (var slot in data.Slots)
+        foreach (var slot in AllSlots(data))
         {
             slot.Fixed = false;
         }
     }
+
+    /// <summary>패시브 칸 전부 + 액티브 칸 (있으면).</summary>
+    private static IEnumerable<PerkSlot> AllSlots(PerkData data) => data.Slots.Append(data.ActivePerkSlot).OfType<PerkSlot>();
 
     private static void Put(PerkData data, PerkSlot slot, string? perk)
     {

@@ -16,6 +16,9 @@
     "tierCapByPrestige": [1, 1, 1, 2, 2, 3, 3],
     "tierPrices": [40, 100, 200]
   },
+  "activePerks": {
+    "enabled": true
+  },
   "safeCoins": {
     "chance": 0.3,
     "minStack": 5,

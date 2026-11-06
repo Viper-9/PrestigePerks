@@ -28,6 +28,9 @@ namespace PrestigePerks
 
         private PerkLocale locale;
         private PerkStateDto state;
+
+        /// <summary>마지막으로 받은 서버 state (레이드 액티브 특전이 읽는다). 아직 없으면 null.</summary>
+        internal PerkStateDto State => state;
         private PerkPage page;
         private AnimatedToggle taskbarButton;
         private float bottomInset;
@@ -67,9 +70,9 @@ namespace PrestigePerks
             return instance;
         }
 
-        private PerkLocale Locale => locale ?? (locale = LoadLocale());
+        internal PerkLocale Locale => locale ?? (locale = LoadLocale());
 
-        /// <summary>게임 언어 문구. 이미 받은 state 가 있으면 그 catalog 의 add-on 문구도 쓴다.</summary>
+        /// <summary>게임 언어 문구. 이미 받은 state 가 있으면 그 catalog 의 add-on 문구도 쓴다. F12 설정 창 문구도 같은 언어로 맞춘다.</summary>
         private PerkLocale LoadLocale()
         {
             var loaded = PerkGame.LoadLocale();
@@ -78,6 +81,7 @@ namespace PrestigePerks
                 loaded.UseCatalog(state.Catalog);
             }
 
+            ConfigText.Apply(loaded);
             return loaded;
         }
 
@@ -142,6 +146,16 @@ namespace PrestigePerks
         public void OnMainMenuShown()
         {
             PerkEffects.FlushDevLog();
+            try
+            {
+                // 현장 수선(액티브)이 올린 방어구 내구도가 레이드 뒤 프로필에 남았는지 (개발자 모드 CHECK)
+                Active.FieldRepair.CheckSaved();
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"field repair save check failed: {e.Message}");
+            }
+
             _ = RefreshFromMainMenu();
         }
 
@@ -204,6 +218,12 @@ namespace PrestigePerks
             WarnUnregisteredCodePerks();
             PerkBonusSync.Apply(state);
             PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio);
+            // 첫 state 가 페이지보다 늦게 왔거나 서버 설정을 바꿨으면 액티브 칸·탭이 맞게 페이지를 다시 만든다 (리롤 중에는 두지 않는다)
+            if (page != null && !busy && page.ShowsActive != state.ActivePerksEnabled)
+            {
+                OpenPage();
+            }
+
             if (state.NewPerks.Count == 0 && state.NewTierCap == null)
             {
                 return;
@@ -211,9 +231,17 @@ namespace PrestigePerks
 
             // 새 특전과 단계 상한을 알림 한 줄에 함께 보인다
             var parts = new System.Collections.Generic.List<string>();
-            if (state.NewPerks.Count > 0)
+            // 패시브와 액티브는 따로 한 덩어리씩 (액티브를 끈 서버면 Parse 가 이미 지웠다)
+            var newPassive = state.NewPerks.Where(perk => !PerkPageModel.IsActivePerk(state, perk)).ToList();
+            var newActive = state.NewPerks.Where(perk => PerkPageModel.IsActivePerk(state, perk)).ToList();
+            if (newPassive.Count > 0)
             {
-                parts.Add(Locale.Format("ui.newPerk", string.Join(", ", state.NewPerks.Select(Locale.PerkName))));
+                parts.Add(Locale.Format("ui.newPerk", string.Join(", ", newPassive.Select(Locale.PerkName))));
+            }
+
+            if (newActive.Count > 0)
+            {
+                parts.Add(Locale.Format("ui.newActivePerk", string.Join(", ", newActive.Select(Locale.PerkName))));
             }
 
             if (state.NewTierCap is int cap)
@@ -314,7 +342,7 @@ namespace PrestigePerks
 
                 locale = LoadLocale();
                 bottomInset = taskbarButton != null ? PerkTaskbarButton.TopPixels(taskbarButton) : 0;
-                page = PerkPage.Create(Locale, bottomInset);
+                page = PerkPage.Create(Locale, bottomInset, state?.ActivePerksEnabled ?? false);
                 page.LockClicked += slot => _ = ToggleLock(slot);
                 page.RollClicked += () => _ = Roll();
                 page.BuyClicked += (perk, tier, price) => _ = Buy(perk, tier, price);
@@ -378,7 +406,8 @@ namespace PrestigePerks
 
         private async Task ToggleLock(int slot)
         {
-            if (busy || state == null || slot >= state.Slots.Count)
+            var target = PerkPageModel.SlotAt(state, slot);
+            if (busy || target == null)
             {
                 return;
             }
@@ -387,7 +416,7 @@ namespace PrestigePerks
             PerkGame.Sound(EUISoundType.MenuCheckBox);
             try
             {
-                var fresh = await PerkApi.SetLock(slot, !state.Slots[slot].Locked);
+                var fresh = await PerkApi.SetLock(slot, !target.Locked);
                 if (fresh != null)
                 {
                     state = fresh;
@@ -458,12 +487,17 @@ namespace PrestigePerks
             var effect = ReelSchedule.PickEffect(random);
             // 멈출 칸 바로 위에 다른 슬롯 특전이 나오지 않게
             var held = new System.Collections.Generic.HashSet<string>(state.Slots.Where(slot => !slot.IsEmpty).Select(slot => slot.Perk));
+            if (state.ActivePerkSlot != null && !state.ActivePerkSlot.IsEmpty)
+            {
+                held.Add(state.ActivePerkSlot.Perk);
+            }
+
             for (var i = 0; i < targets.Count; i++)
             {
-                var slot = targets[i];
-                if (page != null && slot < state.Slots.Count)
+                var slot = PerkPageModel.SlotAt(state, targets[i]);
+                if (page != null && slot != null)
                 {
-                    page.Land(slot, state.Slots[slot].Perk, state.Slots[slot].Locked, first + i * StopInterval, i == targets.Count - 1 ? effect : ReelEffect.Normal, held);
+                    page.Land(targets[i], slot.Perk, slot.Locked, first + i * StopInterval, i == targets.Count - 1 ? effect : ReelEffect.Normal, held);
                 }
             }
 

@@ -192,6 +192,9 @@ public sealed record ModConfig
     [JsonPropertyName("perks")]
     public PerkConfig Perks { get; init; } = new();
 
+    [JsonPropertyName("activePerks")]
+    public ActivePerkConfig ActivePerks { get; init; } = new();
+
     [JsonPropertyName("prestige")]
     public PrestigeConfig Prestige { get; init; } = new();
 

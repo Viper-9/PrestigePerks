@@ -246,7 +246,7 @@ public class ClientModelTests
         Assert.False(PerkPageModel.CanDragRow(state, Id(24))); // 미보유
         Assert.True(PerkPageModel.CanDragSlot(state, 0));
         Assert.False(PerkPageModel.CanDragSlot(state, 2));
-        Assert.Equal([true, true, false, false], Enumerable.Range(0, 4).Select(i => PerkPageModel.CanDrop(state, i)));
+        Assert.Equal([true, true, false, false], Enumerable.Range(0, 4).Select(i => PerkPageModel.CanDrop(state, i, Id(26))));
     }
 
     [Fact]

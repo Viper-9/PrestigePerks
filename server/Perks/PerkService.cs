@@ -38,6 +38,8 @@ public class PerkService(
 
     private PerkConfig Config => configLoader.Config;
 
+    private bool ActivePerksEnabled => configLoader.ActivePerks.Enabled;
+
     /// <summary>게임 시작: 새 단계면 처리하고, 특전 Bonus 를 다시 넣는다 (다른 모드가 Bonuses 를 새로 만들었을 때 대비).</summary>
     public void OnGameStart(MongoId sessionId)
     {
@@ -151,7 +153,7 @@ public class PerkService(
                 return BuildState(data, level, error);
             }
 
-            var cost = Config.TierPrice(request.Tier);
+            var cost = PerkRules.TierPrice(Config, perk, request.Tier);
             if (cost != request.ExpectedCost)
             {
                 return BuildState(data, level, PerkError.CostChanged);
@@ -380,19 +382,26 @@ public class PerkService(
             Bonuses = PerkBonusApplier.CreateBonuses(PerkRules.ActiveScales(data, level, Config)),
             BonusIds = BonusIds,
             SlotOpensAt = Config.SlotOpensAt(level),
+            ActivePerksEnabled = ActivePerksEnabled,
+            ActivePerkSlot = data.ActivePerkSlot is { } activeSlot ? PerkSlotState.From(activeSlot) : null,
+            ActivePerkTier = ActivePerkRules.AppliedTier(data, level, Config),
+            ActivePerkOpensAt = data.ActivePerkSlot is null ? ActivePerkRules.OpensAt : null,
             Error = error == PerkError.None ? null : error.ToString(),
         };
 
     /// <summary>add-on 아이콘 (특전 ID → base64 PNG). 프로필과 상관없다. 클라이언트가 실행마다 한 번 받는다.</summary>
     public PerkIconsResponse Icons() => new() { Icons = PerkCatalog.Icons.ToDictionary(pair => pair.Key, pair => Convert.ToBase64String(pair.Value)) };
 
-    /// <summary>"control(14) II fixed, empty, reload(29) I locked" (로그용).</summary>
+    /// <summary>"control(14) II fixed, empty, reload(29) I locked | active grit(48) I" (로그용).</summary>
     private string DescribeSlots(PerkData data, int level)
     {
         var tiers = PerkRules.ActiveTiers(data, level, Config);
-        return string.Join(", ", PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot =>
-            slot.IsEmpty ? "empty" : $"{PerkCatalog.Describe(slot.Perk)} {TierName(tiers.GetValueOrDefault(slot.Perk!, 1))}{(slot.Fixed ? " fixed" : slot.Locked ? " locked" : "")}"));
+        var text = string.Join(", ", PerkRules.ActiveSlots(data, Config.Slots(level)).Select(slot => DescribeSlot(slot, tiers.GetValueOrDefault(slot.Perk ?? "", 1))));
+        return data.ActivePerkSlot is { } active ? $"{text} | active {DescribeSlot(active, ActivePerkRules.AppliedTier(data, level, Config))}" : text;
     }
+
+    private static string DescribeSlot(PerkSlot slot, int tier) =>
+        slot.IsEmpty ? "empty" : $"{PerkCatalog.Describe(slot.Perk)} {TierName(tier)}{(slot.Fixed ? " fixed" : slot.Locked ? " locked" : "")}";
 
     internal static string TierName(int tier) => tier switch { 1 => "I", 2 => "II", 3 => "III", _ => "-" };
 

@@ -81,6 +81,9 @@ namespace PrestigePerks.Model
         public int Price;
         public BuyBlock Block;
 
+        /// <summary>액티브 특전 (가격·칸이 액티브 것).</summary>
+        public bool Active;
+
         /// <summary><see cref="BuyBlock.Capped"/> 일 때 다음 단계가 열리는 프레스티지. 모르면 null.</summary>
         public int? OpensAt;
     }
@@ -93,11 +96,23 @@ namespace PrestigePerks.Model
     {
         public const int MaxSlots = 6, MaxTier = 3;
 
+        /// <summary>액티브 칸의 슬롯 번호 (server ActivePerkRules.SlotIndex). 패시브 0~5 다음.</summary>
+        public const int ActiveSlot = MaxSlots;
+
         /// <summary>서버 config 를 받지 못했을 때 쓰는 단계 가격 기본값 (I, II, III).</summary>
         public static readonly int[] DefaultPrices = { 40, 100, 200 };
 
-        /// <summary>목록에 보여 줄 특전 (서버 카탈로그 순서). state 를 받기 전에는 비어 있다.</summary>
+        /// <summary>서버 값을 받지 못했을 때 쓰는 액티브 특전 단계 가격 (server ActivePerkRules.TierPrices).</summary>
+        public static readonly int[] DefaultActivePrices = { 80, 200, 350 };
+
+        /// <summary>목록에 보여 줄 (패시브) 특전 (서버 카탈로그 순서). state 를 받기 전에는 비어 있다.</summary>
         public static IReadOnlyList<string> Perks(PerkStateDto state) => state?.CatalogIds ?? (IReadOnlyList<string>)new string[0];
+
+        /// <summary>액티브 특전 (목록 순서). 액티브를 끈 서버면 비어 있다.</summary>
+        public static IReadOnlyList<string> ActivePerks(PerkStateDto state) =>
+            state?.ActiveCatalog.Select(entry => entry.Id).ToList() ?? (IReadOnlyList<string>)new string[0];
+
+        public static bool IsActivePerk(PerkStateDto state, string perk) => state?.ActiveInfo(perk) != null;
 
         public static RollBlock CheckRoll(PerkStateDto state, int inventoryCoins, bool busy)
         {
@@ -106,17 +121,20 @@ namespace PrestigePerks.Model
                 return RollBlock.Busy;
             }
 
-            if (state == null || state.Slots.Count == 0)
+            if (state == null || (state.Slots.Count == 0 && state.ActivePerkSlot == null))
             {
                 return RollBlock.NoSlots;
             }
 
-            if (!state.Slots.Any(Rollable))
+            var passiveRolls = state.Slots.Any(Rollable);
+            var activeRolls = state.ActivePerkSlot != null && Rollable(state.ActivePerkSlot);
+            if (!passiveRolls && !activeRolls)
             {
                 return RollBlock.NothingToRoll;
             }
 
-            if (RollPool(state).Count == 0)
+            // 서버 PerkRules.CheckRoll 처럼 두 후보 중 하나라도 남으면 리롤할 수 있다
+            if (!(passiveRolls && RollPool(state).Count > 0) && !(activeRolls && ActiveRollPool(state).Count > 0))
             {
                 return RollBlock.CollectionComplete;
             }
@@ -124,11 +142,19 @@ namespace PrestigePerks.Model
             return state.NextRerollCost > inventoryCoins ? RollBlock.NotEnoughCoins : RollBlock.None;
         }
 
-        /// <summary>리롤에서 돌아갈 슬롯 (리롤 칸·빈 칸 번호, 0 부터).</summary>
-        public static List<int> SpinTargets(PerkStateDto state) =>
-            state == null
+        /// <summary>리롤에서 돌아갈 슬롯 (리롤 칸·빈 칸 번호, 0 부터, 액티브 칸은 <see cref="ActiveSlot"/>).</summary>
+        public static List<int> SpinTargets(PerkStateDto state)
+        {
+            var targets = state == null
                 ? new List<int>()
                 : state.Slots.Select((slot, index) => new { slot, index }).Where(x => Rollable(x.slot)).Select(x => x.index).ToList();
+            if (state?.ActivePerkSlot != null && Rollable(state.ActivePerkSlot))
+            {
+                targets.Add(ActiveSlot);
+            }
+
+            return targets;
+        }
 
         /// <summary>리롤 후보: 미보유 특전 중 잠긴 칸·확정 칸에 없는 것 (서버 PerkRules 와 같은 규칙). 릴 띠에도 쓴다.</summary>
         public static List<string> RollPool(PerkStateDto state)
@@ -142,36 +168,61 @@ namespace PrestigePerks.Model
             return Perks(state).Where(perk => !kept.Contains(perk) && OwnedTier(state, perk) == 0).ToList();
         }
 
-        public static int LockedCount(PerkStateDto state) => state?.Slots.Count(slot => slot.Locked) ?? 0;
+        /// <summary>액티브 칸 리롤 후보: 미보유 액티브 특전 중 잠긴 칸·확정 칸에 없는 것 (서버 ActivePerkRules.RollPool).</summary>
+        public static List<string> ActiveRollPool(PerkStateDto state)
+        {
+            var slot = state?.ActivePerkSlot;
+            if (slot == null)
+            {
+                return new List<string>();
+            }
 
-        public static int FixedCount(PerkStateDto state) => state?.Slots.Count(slot => slot.Fixed) ?? 0;
+            var kept = Rollable(slot) ? null : slot.Perk;
+            return ActivePerks(state).Where(perk => perk != kept && OwnedTier(state, perk) == 0).ToList();
+        }
 
-        public static int OwnedCount(PerkStateDto state) => state?.Owned.Count(pair => pair.Value > 0) ?? 0;
+        public static int LockedCount(PerkStateDto state) => (state?.Slots.Count(slot => slot.Locked) ?? 0) + (state?.ActivePerkSlot?.Locked == true ? 1 : 0);
+
+        public static int FixedCount(PerkStateDto state) => (state?.Slots.Count(slot => slot.Fixed) ?? 0) + (state?.ActivePerkSlot?.Fixed == true ? 1 : 0);
+
+        /// <summary>패시브 도감 수 (머리줄 "Collection n / 20").</summary>
+        public static int OwnedCount(PerkStateDto state) => state?.Owned.Count(pair => pair.Value > 0 && state.Info(pair.Key) != null) ?? 0;
+
+        /// <summary>액티브 보유 수 (머리줄 "Active n / 10").</summary>
+        public static int ActiveOwnedCount(PerkStateDto state) => state?.Owned.Count(pair => pair.Value > 0 && state.ActiveInfo(pair.Key) != null) ?? 0;
+
+        /// <summary>슬롯 번호의 칸 (액티브 칸은 <see cref="ActiveSlot"/>). 닫혔거나 없으면 null.</summary>
+        public static PerkSlotDto SlotAt(PerkStateDto state, int index) =>
+            state == null ? null
+            : index == ActiveSlot ? state.ActivePerkSlot
+            : index >= 0 && index < state.Slots.Count ? state.Slots[index]
+            : null;
 
         /// <summary>슬롯 칸 상태: 열림(보유 특전), 아직 닫힘(다음 단계에서 열림).</summary>
-        public static bool IsSlotOpen(PerkStateDto state, int index) => state != null && index >= 0 && index < state.Slots.Count;
+        public static bool IsSlotOpen(PerkStateDto state, int index) => SlotAt(state, index) != null;
 
         public static SlotKind KindOf(PerkStateDto state, int index)
         {
-            if (!IsSlotOpen(state, index))
-            {
-                return SlotKind.Closed;
-            }
-
-            var slot = state.Slots[index];
-            return slot.Fixed ? SlotKind.Fixed : slot.Locked ? SlotKind.Locked : slot.IsEmpty ? SlotKind.Empty : SlotKind.Roll;
+            var slot = SlotAt(state, index);
+            return slot == null ? SlotKind.Closed : slot.Fixed ? SlotKind.Fixed : slot.Locked ? SlotKind.Locked : slot.IsEmpty ? SlotKind.Empty : SlotKind.Roll;
         }
 
-        /// <summary>닫힌 칸이 열리는 단계 (서버 config 의 단계별 슬롯 수로 정한다). 더 높은 단계에서도 열리지 않으면 null.</summary>
+        /// <summary>닫힌 칸이 열리는 단계 (서버 config 의 단계별 슬롯 수로 정한다, 액티브 칸은 P3). 더 높은 단계에서도 열리지 않으면 null.</summary>
         public static int? OpensAt(PerkStateDto state, int index) =>
-            state?.SlotOpensAt != null && index >= 0 && index < state.SlotOpensAt.Count ? state.SlotOpensAt[index] : null;
+            index == ActiveSlot ? state?.ActivePerkOpensAt
+            : state?.SlotOpensAt != null && index >= 0 && index < state.SlotOpensAt.Count ? state.SlotOpensAt[index] : null;
 
-        /// <summary>특전 ID → 들어 있는 슬롯 번호 (0 부터). 없으면 -1. 빈 칸(null)은 찾지 않는다.</summary>
+        /// <summary>특전 ID → 들어 있는 슬롯 번호 (0 부터, 액티브 칸은 <see cref="ActiveSlot"/>). 없으면 -1. 빈 칸(null)은 찾지 않는다.</summary>
         public static int SlotOf(PerkStateDto state, string perk)
         {
             if (state == null || perk == null)
             {
                 return -1;
+            }
+
+            if (state.ActivePerkSlot != null && state.ActivePerkSlot.Perk == perk)
+            {
+                return ActiveSlot;
             }
 
             for (var i = 0; i < state.Slots.Count; i++)
@@ -185,13 +236,14 @@ namespace PrestigePerks.Model
             return -1;
         }
 
-        /// <summary>슬롯에 든 특전 (0 부터). 닫힌 칸·빈 칸이면 null.</summary>
-        public static string PerkInSlot(PerkStateDto state, int index) =>
-            IsSlotOpen(state, index) && !state.Slots[index].IsEmpty ? state.Slots[index].Perk : null;
+        /// <summary>슬롯에 든 특전 (0 부터, 액티브 칸은 <see cref="ActiveSlot"/>). 닫힌 칸·빈 칸이면 null.</summary>
+        public static string PerkInSlot(PerkStateDto state, int index) => SlotAt(state, index) is PerkSlotDto slot && !slot.IsEmpty ? slot.Perk : null;
 
-        /// <summary>특전이 든 첫 열린 슬롯의 특전 (페이지를 열 때 자동 선택). 없으면 null.</summary>
+        /// <summary>특전이 든 첫 열린 슬롯의 특전 (페이지를 열 때 자동 선택). 패시브 칸이 모두 비면 액티브 칸. 없으면 null.</summary>
         public static string FirstSlotPerk(PerkStateDto state) =>
-            state == null ? null : Enumerable.Range(0, state.Slots.Count).Select(index => PerkInSlot(state, index)).FirstOrDefault(perk => perk != null);
+            state == null
+                ? null
+                : Enumerable.Range(0, state.Slots.Count).Select(index => PerkInSlot(state, index)).FirstOrDefault(perk => perk != null) ?? PerkInSlot(state, ActiveSlot);
 
         /// <summary>보유한 단계. 없으면 0.</summary>
         public static int OwnedTier(PerkStateDto state, string perk) =>
@@ -204,6 +256,11 @@ namespace PrestigePerks.Model
         /// </summary>
         public static int ShownTier(PerkStateDto state, string perk)
         {
+            if (perk != null && state?.ActivePerkSlot != null && state.ActivePerkSlot.Perk == perk && state.ActivePerkTier > 0)
+            {
+                return Math.Max(1, Math.Min(state.ActivePerkTier, MaxTier));
+            }
+
             if (perk != null && SlotOf(state, perk) >= 0 && state.ActiveTiers != null && state.ActiveTiers.TryGetValue(perk, out var active))
             {
                 return Math.Max(1, Math.Min(active, MaxTier));
@@ -215,11 +272,14 @@ namespace PrestigePerks.Model
         /// <summary>지금 효과가 적용되는 단계 (칸에 있으면). 아니면 0.</summary>
         public static int AppliedTier(PerkStateDto state, string perk) => SlotOf(state, perk) >= 0 ? ShownTier(state, perk) : 0;
 
-        /// <summary>단계 가격. 서버 값이 없으면 기본값.</summary>
-        public static int Price(PerkStateDto state, int tier)
+        /// <summary>특전의 단계 가격 (액티브는 액티브 가격). 서버 값이 없으면 기본값.</summary>
+        public static int Price(PerkStateDto state, string perk, int tier)
         {
             var index = Math.Max(1, Math.Min(tier, MaxTier)) - 1;
-            return state?.TierPrices != null && state.TierPrices.Count > index ? state.TierPrices[index] : DefaultPrices[index];
+            var active = IsActivePerk(state, perk);
+            var prices = active ? state.ActivePerkPrices : state?.TierPrices;
+            var fallback = active ? DefaultActivePrices : DefaultPrices;
+            return prices != null && prices.Count > index ? prices[index] : fallback[index];
         }
 
         /// <summary>효과 수치 문구 (그 단계 값). pointUnit 은 더해지는 특전의 단위 (<see cref="PerkAmounts.Format"/>).</summary>
@@ -232,9 +292,14 @@ namespace PrestigePerks.Model
         /// <summary>슬롯에서 끌 수 있는 칸: 확정 칸 (목록에 놓으면 빠진다).</summary>
         public static bool CanDragSlot(PerkStateDto state, int index) => KindOf(state, index) == SlotKind.Fixed;
 
-        /// <summary>보유 특전을 놓을 수 있는 칸: 리롤 칸·빈 칸·확정 칸 (잠긴 칸·닫힌 칸은 안 됨).</summary>
-        public static bool CanDrop(PerkStateDto state, int index)
+        /// <summary>보유 특전 perk 를 놓을 수 있는 칸: 같은 종류(패시브·액티브)의 리롤 칸·빈 칸·확정 칸 (잠긴 칸·닫힌 칸은 안 됨).</summary>
+        public static bool CanDrop(PerkStateDto state, int index, string perk)
         {
+            if (IsActivePerk(state, perk) != (index == ActiveSlot))
+            {
+                return false;
+            }
+
             var kind = KindOf(state, index);
             return kind == SlotKind.Roll || kind == SlotKind.Empty || kind == SlotKind.Fixed;
         }
@@ -243,18 +308,20 @@ namespace PrestigePerks.Model
         public static Selection Select(PerkStateDto state, string perk, int inventoryCoins)
         {
             var selection = new Selection { Perk = perk };
-            if (state == null || state.Info(perk) == null)
+            if (state == null || state.AnyInfo(perk) == null)
             {
                 selection.Kind = SelectionKind.None;
                 return selection;
             }
+
+            selection.Active = IsActivePerk(state, perk);
 
             var owned = OwnedTier(state, perk);
             selection.Slot = SlotOf(state, perk);
             selection.Tier = ShownTier(state, perk);
             if (selection.Slot >= 0)
             {
-                var slot = state.Slots[selection.Slot];
+                var slot = SlotAt(state, selection.Slot);
                 selection.Kind = slot.Fixed || owned > 0 ? SelectionKind.Fixed : slot.Locked ? SelectionKind.LockedSlot : SelectionKind.RollSlot;
             }
             else
@@ -268,7 +335,7 @@ namespace PrestigePerks.Model
                 return selection;
             }
 
-            selection.Price = Price(state, selection.NextTier);
+            selection.Price = Price(state, perk, selection.NextTier);
             if (selection.NextTier > TierCap(state))
             {
                 selection.Block = BuyBlock.Capped;

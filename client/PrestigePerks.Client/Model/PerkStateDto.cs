@@ -57,35 +57,63 @@ namespace PrestigePerks.Model
         /// <summary>특전 목록 (서버 PerkCatalog 순서). 화면 목록·수치의 유일한 출처다.</summary>
         [JsonProperty("catalog")] public List<PerkCatalogEntryDto> Catalog = new List<PerkCatalogEntryDto>();
 
+        /// <summary>서버 config activePerks.enabled. false 면 <see cref="Parse"/> 가 액티브를 모두 지운다 (화면·알림·레이드에 액티브가 없다).</summary>
+        [JsonProperty("activePerksEnabled")] public bool ActivePerksEnabled;
+
+        /// <summary>액티브 칸. null 이면 아직 열리지 않았다 (P3).</summary>
+        [JsonProperty("activePerkSlot")] public PerkSlotDto ActivePerkSlot;
+
+        /// <summary>액티브 칸 특전의 적용 단계. 빈 칸이면 0.</summary>
+        [JsonProperty("activePerkTier")] public int ActivePerkTier;
+
+        /// <summary>액티브 칸이 열리는 프레스티지. 열렸으면 null.</summary>
+        [JsonProperty("activePerkOpensAt")] public int? ActivePerkOpensAt;
+
+        /// <summary>액티브 특전 단계 I·II·III 가격.</summary>
+        [JsonProperty("activePerkPrices")] public List<int> ActivePerkPrices = new List<int>();
+
+        /// <summary>액티브 특전 목록 (서버 PerkCatalog.ActiveEntries 순서).</summary>
+        [JsonProperty("activeCatalog")] public List<PerkCatalogEntryDto> ActiveCatalog = new List<PerkCatalogEntryDto>();
+
         private Dictionary<string, PerkCatalogEntryDto> byId = new Dictionary<string, PerkCatalogEntryDto>();
         private List<PerkCatalogEntryDto> byIdSource = new List<PerkCatalogEntryDto>();
+        private Dictionary<string, PerkCatalogEntryDto> activeById = new Dictionary<string, PerkCatalogEntryDto>();
+        private List<PerkCatalogEntryDto> activeByIdSource = new List<PerkCatalogEntryDto>();
 
         /// <summary>목록 순서의 특전 ID.</summary>
         [JsonIgnore] public IReadOnlyList<string> CatalogIds => Catalog.Select(entry => entry.Id).ToList();
 
-        /// <summary>카탈로그의 특전. 없으면 (빈 칸, 서버가 모르는 특전) null.</summary>
-        public PerkCatalogEntryDto Info(string perk)
+        /// <summary>카탈로그의 (패시브) 특전. 없으면 (빈 칸, 서버가 모르는 특전, 액티브 특전) null.</summary>
+        public PerkCatalogEntryDto Info(string perk) => Find(perk, Catalog, ref byIdSource, ref byId);
+
+        /// <summary>액티브 특전 목록의 특전. 없으면 null.</summary>
+        public PerkCatalogEntryDto ActiveInfo(string perk) => Find(perk, ActiveCatalog, ref activeByIdSource, ref activeById);
+
+        /// <summary>패시브 또는 액티브 특전. 없으면 null.</summary>
+        public PerkCatalogEntryDto AnyInfo(string perk) => Info(perk) ?? ActiveInfo(perk);
+
+        private static PerkCatalogEntryDto Find(string perk, List<PerkCatalogEntryDto> list, ref List<PerkCatalogEntryDto> source, ref Dictionary<string, PerkCatalogEntryDto> map)
         {
-            if (perk == null)
+            if (perk == null || list == null)
             {
                 return null;
             }
 
-            // 테스트는 Catalog 를 바꿔 끼우므로 목록이 바뀌면 다시 만든다
-            if (!ReferenceEquals(byIdSource, Catalog))
+            // 테스트는 목록을 바꿔 끼우므로 목록이 바뀌면 다시 만든다
+            if (!ReferenceEquals(source, list))
             {
-                byIdSource = Catalog;
-                byId = new Dictionary<string, PerkCatalogEntryDto>();
-                foreach (var entry in Catalog)
+                source = list;
+                map = new Dictionary<string, PerkCatalogEntryDto>();
+                foreach (var entry in list)
                 {
-                    if (entry?.Id != null && !byId.ContainsKey(entry.Id))
+                    if (entry?.Id != null && !map.ContainsKey(entry.Id))
                     {
-                        byId[entry.Id] = entry;
+                        map[entry.Id] = entry;
                     }
                 }
             }
 
-            return byId.TryGetValue(perk, out var info) ? info : null;
+            return map.TryGetValue(perk, out var info) ? info : null;
         }
 
         /// <summary>JSON 을 읽는다. 비었거나 형식이 틀리면 null.</summary>
@@ -116,6 +144,15 @@ namespace PrestigePerks.Model
                 state.TierPrices = state.TierPrices ?? new List<int>();
                 state.TierEffectRatio = state.TierEffectRatio ?? new List<double>();
                 state.Catalog = (state.Catalog ?? new List<PerkCatalogEntryDto>()).Where(entry => !string.IsNullOrEmpty(entry?.Id)).ToList();
+                state.ActivePerkPrices = state.ActivePerkPrices ?? new List<int>();
+                state.ActiveCatalog = (state.ActiveCatalog ?? new List<PerkCatalogEntryDto>()).Where(entry => !string.IsNullOrEmpty(entry?.Id) && entry.Active != null).ToList();
+                if (!state.ActivePerksEnabled)
+                {
+                    // 액티브를 끈 서버: 칸·목록이 없는 것으로 본다. 아래 DropUnknownPerks 가 보유·새 특전의 액티브도 지운다
+                    state.ActiveCatalog = new List<PerkCatalogEntryDto>();
+                    state.ActivePerkSlot = null;
+                }
+
                 state.DropUnknownPerks();
                 return state;
             }
@@ -143,10 +180,17 @@ namespace PrestigePerks.Model
                 }
             }
 
+            if (ActivePerkSlot != null && (ActivePerkSlot.IsEmpty || ActiveInfo(ActivePerkSlot.Perk) == null))
+            {
+                ActivePerkSlot.Perk = null;
+                ActivePerkSlot.Locked = false;
+                ActivePerkSlot.Fixed = false;
+            }
+
             ActivePerks = ActivePerks.Where(perk => Info(perk) != null).ToList();
-            NewPerks = NewPerks.Where(perk => Info(perk) != null).ToList();
+            NewPerks = NewPerks.Where(perk => AnyInfo(perk) != null).ToList();
             ActiveTiers = ActiveTiers.Where(pair => Info(pair.Key) != null).ToDictionary(pair => pair.Key, pair => pair.Value);
-            Owned = Owned.Where(pair => Info(pair.Key) != null).ToDictionary(pair => pair.Key, pair => pair.Value);
+            Owned = Owned.Where(pair => AnyInfo(pair.Key) != null).ToDictionary(pair => pair.Key, pair => pair.Value);
         }
     }
 
@@ -182,6 +226,9 @@ namespace PrestigePerks.Model
         /// <summary>add-on 특전 종류 (server PerkCatalogEntry.BonusKind, CodeKind).</summary>
         public const string BonusKind = "bonus", CodeKind = "code";
 
+        /// <summary>액티브 특전 종류 (server PerkCatalogEntry.ActiveKind).</summary>
+        public const string ActiveKind = "active";
+
         [JsonProperty("id")] public string Id;
 
         /// <summary>단계 III 효과량 (부호 포함, % 는 숫자만).</summary>
@@ -196,6 +243,31 @@ namespace PrestigePerks.Model
 
         /// <summary>add-on 아이콘이 있다 (/prestigeperks/icons 로 받는다).</summary>
         [JsonProperty("icon")] public bool Icon;
+
+        /// <summary>액티브 특전의 사용 제한·단계 값. 패시브는 null.</summary>
+        [JsonProperty("active")] public ActivePerkInfoDto Active;
+    }
+
+    /// <summary>server ActivePerkEntry. 목록은 [I, II, III]. 모자라면 0.</summary>
+    public sealed class ActivePerkInfoDto
+    {
+        public const string OncePerRaid = "raid", Cooldown = "cooldown";
+
+        [JsonProperty("limit")] public string Limit;
+        [JsonProperty("cooldown")] public List<double> CooldownTiers = new List<double>();
+        [JsonProperty("duration")] public List<double> DurationTiers = new List<double>();
+        [JsonProperty("values")] public Dictionary<string, List<double>> Values = new Dictionary<string, List<double>>();
+
+        /// <summary>레이드당 한 번 (쿨타임 특전이 아니면 모두).</summary>
+        [JsonIgnore] public bool IsOncePerRaid => Limit != Cooldown;
+
+        public double CooldownAt(int tier) => At(CooldownTiers, tier);
+
+        public double DurationAt(int tier) => At(DurationTiers, tier);
+
+        public double Value(string name, int tier) => name != null && Values != null && Values.TryGetValue(name, out var tiers) ? At(tiers, tier) : 0;
+
+        private static double At(List<double> tiers, int tier) => tiers != null && tier >= 1 && tier <= tiers.Count ? tiers[tier - 1] : 0;
     }
 
     /// <summary>add-on 특전 문구 한 언어 (server PerkTextsEntry).</summary>

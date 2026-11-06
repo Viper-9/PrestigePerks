@@ -9,7 +9,26 @@ public enum PerkKind
 {
     Bonus,
     Patch,
+    /// <summary>액티브 특전: 레이드 중 키로 쓴다 (dev-docs 94). 내장 10개뿐이고 add-on 액티브는 없다.</summary>
+    Active,
 }
+
+/// <summary>액티브 특전 사용 제한. 둘 다 레이드를 시작할 때 초기화한다.</summary>
+public enum ActiveLimit
+{
+    OncePerRaid,
+    Cooldown,
+}
+
+/// <summary>
+/// 액티브 특전의 단계별 값. 목록은 모두 [I, II, III].
+/// Cooldown 은 쿨타임 초(레이드당 1회면 0), Duration 은 지속 초(즉시 효과면 0), Values 는 이름 → 값 (클라이언트 효과·문구가 이름으로 읽는다).
+/// </summary>
+public sealed record ActivePerkSpec(
+    ActiveLimit Limit,
+    IReadOnlyList<double> Cooldown,
+    IReadOnlyList<double> Duration,
+    IReadOnlyDictionary<string, IReadOnlyList<double>> Values);
 
 /// <summary>Bonus 특전이 PMC 프로필에 넣는 Bonus 하나. Id 는 고정이며 저장 때 이 ID 로 걸러 낸다.</summary>
 public sealed record PerkBonus(string Id, BonusType Type, double Value, BonusSkillType? SkillType = null);
@@ -33,13 +52,15 @@ public sealed record PerkAddonInfo(string Source, IReadOnlyDictionary<string, Pe
 /// Number 는 schema 3 까지의 파일을 옮길 때와 개발용 명령 입력에만 쓴다.
 /// Amount 는 단계 III 효과량(문구 방향의 부호 포함, % 는 숫자만)이다. 화면 수치이고, Bonus 특전은 Bonus 값과 같다.
 /// add-on 특전(dev-docs 95)은 Number 0 이고 Addon 에 출처·문구·아이콘 경로가 있다.
+/// 액티브 특전(dev-docs 94)은 Active 에 사용 제한과 단계별 값이 있고 Amount 0, Unit Flat 이다.
 /// </summary>
-public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, double Amount, PerkUnit Unit, IReadOnlyList<PerkBonus> Bonuses, PerkAddonInfo? Addon = null);
+public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, double Amount, PerkUnit Unit, IReadOnlyList<PerkBonus> Bonuses, PerkAddonInfo? Addon = null, ActivePerkSpec? Active = null);
 
 /// <summary>
-/// 특전 정의: 내장 20개 (dev-docs 2_특전.md 3절, 6절) + 서버 시작 때 설치한 add-on 특전 (dev-docs 95, <see cref="Install"/>).
+/// 특전 정의: 내장 패시브 20개 (dev-docs 2_특전.md 3절, 6절) + 서버 시작 때 설치한 add-on 특전 (dev-docs 95, <see cref="Install"/>) + 내장 액티브 10개 (dev-docs 94, <see cref="BuiltinActive"/>).
 /// 번호·ID·Bonus ID 는 한 번 정하면 바꾸거나 재사용하지 않는다. 테스트가 값을 고정한다.
-/// 번호(<see cref="Numbers"/>, <see cref="TryGet(int, out PerkDefinition)"/>, <see cref="IdOf"/>)는 내장만 본다. ID 로 찾는 것은 설치한 add-on 까지 본다.
+/// 번호(<see cref="TryGet(int, out PerkDefinition)"/>, <see cref="IdOf"/>)는 내장(패시브 + 액티브)만 본다. ID 로 찾는 것은 설치한 add-on 과 액티브까지 본다.
+/// 목록(<see cref="All"/>, <see cref="Ids"/>, <see cref="Entries"/>, <see cref="Numbers"/>)은 패시브만이다. 액티브는 <see cref="ActiveIds"/>, <see cref="ActiveEntries"/>.
 /// </summary>
 public static class PerkCatalog
 {
@@ -70,6 +91,29 @@ public static class PerkCatalog
         Patch(31, "reliability", -20, PerkUnit.Percent), // 고장·과열
         Patch(32, "agility", 5, PerkUnit.Percent),     // 이동 속도
     ];
+    // ActivePerk() 가 쓰므로 BuiltinActive 보다 앞에 둔다 (정적 초기화 순서)
+    private static readonly double[] NoTiers = [0, 0, 0];
+
+    /// <summary>내장 액티브 특전 10개 (dev-docs 94 2절). 번호 41~50. 바뀌지 않는다.</summary>
+    public static IReadOnlyList<PerkDefinition> BuiltinActive { get; } =
+    [
+        ActivePerk(41, "firstaid", ActiveLimit.OncePerRaid, null, T(30, 45, 60), ("regen", T(3, 4, 5)), ("bloodstop", T(30, 45, 60))),
+        ActivePerk(42, "secondwind", ActiveLimit.Cooldown, T(300, 240, 180), null),
+        ActivePerk(43, "sonarpulse", ActiveLimit.OncePerRaid, null, T(20, 30, 40), ("radius", T(50, 75, 100))),
+        ActivePerk(44, "steadfast", ActiveLimit.Cooldown, T(600, 600, 600), T(60, 80, 100)),
+        ActivePerk(45, "focus", ActiveLimit.OncePerRaid, null, T(60, 80, 100)),
+        ActivePerk(46, "emergencysurgery", ActiveLimit.OncePerRaid, null, null, ("restore", T(30, 50, 70))),
+        ActivePerk(47, "composure", ActiveLimit.Cooldown, T(300, 300, 300), T(15, 15, 15), ("reduction", T(30, 45, 60)), ("inertia", T(15, 22.5, 30))),
+        ActivePerk(48, "grit", ActiveLimit.OncePerRaid, null, T(10, 10, 10), ("reduction", T(30, 40, 50))),
+        ActivePerk(49, "resupply", ActiveLimit.OncePerRaid, null, null, ("fill", T(30, 45, 60))),
+        ActivePerk(50, "fieldrepair", ActiveLimit.OncePerRaid, null, null, ("repair", T(15, 25, 35))),
+    ];
+
+    public static IReadOnlyList<string> ActiveIds { get; } = BuiltinActive.Select(perk => perk.Id).ToList();
+
+    /// <summary>state 의 activeCatalog (목록 순서). 서버 설정과 상관없이 늘 같다.</summary>
+    public static IReadOnlyList<PerkCatalogEntry> ActiveEntries { get; } = BuiltinActive.Select(ActiveEntry).ToList();
+
     /// <summary>제외·통합한 번호. 다시 쓰지 않는다.</summary>
     public static IReadOnlyList<int> RetiredNumbers { get; } = [5, 6, 7, 12, 13, 18, 19, 20, 21, 22, 23, 28];
 
@@ -78,7 +122,7 @@ public static class PerkCatalog
 
     public static IReadOnlyList<int> Numbers { get; } = Builtin.Select(perk => perk.Number).ToList();
 
-    private static readonly Dictionary<int, PerkDefinition> ByNumber = Builtin.ToDictionary(perk => perk.Number);
+    private static readonly Dictionary<int, PerkDefinition> ByNumber = Builtin.Concat(BuiltinActive).ToDictionary(perk => perk.Number);
 
     // 설치 때 한 번에 바꾼다 (읽는 쪽이 반쯤 바뀐 표를 보지 않게). 서버 시작(Preload + 10)에 한 번이고, 그 뒤로는 읽기만 한다
     private sealed record Tables(
@@ -117,7 +161,7 @@ public static class PerkCatalog
     public static IReadOnlyList<string> Install(IReadOnlyList<PerkDefinition> addons)
     {
         var warnings = new List<string>();
-        var ids = Builtin.Select(perk => perk.Id).ToHashSet(StringComparer.Ordinal);
+        var ids = Builtin.Concat(BuiltinActive).Select(perk => perk.Id).ToHashSet(StringComparer.Ordinal);
         var bonusIds = Builtin.SelectMany(perk => perk.Bonuses).Select(bonus => bonus.Id).Concat(RetiredBonusIds).ToHashSet(StringComparer.Ordinal);
         var accepted = new List<PerkDefinition>();
         foreach (var perk in addons)
@@ -158,7 +202,7 @@ public static class PerkCatalog
             addons.ToList(),
             all.Select(perk => perk.Id).ToList(),
             all.Select(perk => Entry(perk, kept)).ToList(),
-            all.ToDictionary(perk => perk.Id),
+            all.Concat(BuiltinActive).ToDictionary(perk => perk.Id),
             all.SelectMany(perk => perk.Bonuses).Select(bonus => bonus.Id)
                 .Concat(RetiredBonusIds)
                 .Select(id => new MongoId(id))
@@ -197,6 +241,9 @@ public static class PerkCatalog
     }
 
     public static bool IsKnown(int number) => ByNumber.ContainsKey(number);
+
+    /// <summary>액티브 특전인지 (모르는 ID·빈 칸은 false).</summary>
+    public static bool IsActive(string? id) => TryGet(id, out var perk) && perk.Kind == PerkKind.Active;
 
     public static bool IsKnown(string? id) => id is not null && tables.ById.ContainsKey(id);
 
@@ -241,4 +288,26 @@ public static class PerkCatalog
         new(number, id, PerkKind.Bonus, bonuses[0].Value, unit, bonuses);
 
     private static PerkDefinition Patch(int number, string id, double amount, PerkUnit unit) => new(number, id, PerkKind.Patch, amount, unit, []);
+
+    private static double[] T(params double[] tiers) => tiers;
+
+    private static PerkDefinition ActivePerk(int number, string id, ActiveLimit limit, double[]? cooldown, double[]? duration, params (string Name, double[] Tiers)[] values) =>
+        new(number, id, PerkKind.Active, 0, PerkUnit.Flat, [],
+            Active: new ActivePerkSpec(limit, cooldown ?? NoTiers, duration ?? NoTiers,
+                values.ToDictionary(value => value.Name, value => (IReadOnlyList<double>)value.Tiers)));
+
+    private static PerkCatalogEntry ActiveEntry(PerkDefinition perk) => new()
+    {
+        Id = perk.Id,
+        Amount = 0,
+        Unit = PerkCatalogEntry.Flat,
+        Kind = PerkCatalogEntry.ActiveKind,
+        Active = new ActivePerkEntry
+        {
+            Limit = perk.Active!.Limit == ActiveLimit.Cooldown ? ActivePerkEntry.CooldownLimit : ActivePerkEntry.OncePerRaid,
+            Cooldown = perk.Active.Cooldown,
+            Duration = perk.Active.Duration,
+            Values = perk.Active.Values,
+        },
+    };
 }

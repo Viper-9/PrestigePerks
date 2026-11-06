@@ -15,6 +15,9 @@ namespace PrestigePerks.Model
 
         public static bool Overflows(int count) => RowsPerColumn(count) > VisibleRows;
 
+        /// <summary>액티브 목록의 열당 줄 수 (두 열, 10개 → 5). 스크롤 없이 짧다.</summary>
+        public static int ActiveRowsPerColumn(int count) => Math.Max(1, (count + 1) / 2);
+
         public static (int Column, int Row) Place(int index, int rowsPerColumn) => (index / rowsPerColumn, index % rowsPerColumn);
 
         /// <summary>목록 콘텐츠 높이 (머리 자리 포함, 패널 위에서부터).</summary>

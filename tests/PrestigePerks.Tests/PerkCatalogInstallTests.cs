@@ -39,6 +39,15 @@ public sealed class PerkCatalogInstallTests : IDisposable
     }
 
     [Fact]
+    public void Addons_cannot_take_an_active_perk_id()
+    {
+        var warnings = PerkCatalog.Install([new PerkDefinition(0, "firstaid", PerkKind.Patch, 5, PerkUnit.Percent, [], new PerkAddonInfo("x", new Dictionary<string, PerkTexts>(), null))]);
+        Assert.Single(warnings);
+        Assert.Empty(PerkCatalog.Addons);
+        Assert.True(PerkCatalog.IsActive("firstaid"));
+    }
+
+    [Fact]
     public void State_entries_carry_kind_texts_and_icon_only_for_addons()
     {
         PerkCatalog.Install([Medic(), Sprint()]);

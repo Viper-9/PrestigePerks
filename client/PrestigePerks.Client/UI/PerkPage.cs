@@ -26,6 +26,15 @@ namespace PrestigePerks.UI
         private const float SlotsTop = 68, SlotsHeight = 238, ListTop = 318;
         private const float CardHeight = 168, CardGap = 12;
 
+        // 패시브 6칸과 액티브 칸 사이 (가운데에 세로 구분선)
+        private const float DividerGap = 24;
+
+        // 액티브 줄의 사용 제한 글자 칸 ("Once per raid", "Cooldown 300 s"). 단계 칸 왼쪽
+        private const float LimitWidth = 130;
+
+        // 선택한 특전의 큰 효과 글자 크기 (길면 최소 크기까지 줄인다)
+        private const float ValueSize = 30, ValueMinSize = 20;
+
         // 슬롯 육각 배지 (목업 1안): 틀 폭, 위쪽 y. 높이는 정육각형 비율(376:436)을 따른다
         private const float HexWidth = 104, HexTop = 32;
         private const float RowHeight = PerkListLayout.RowHeight, RowGap = PerkListLayout.RowGap, ColumnGap = 12;
@@ -105,6 +114,10 @@ namespace PrestigePerks.UI
 
         // 목록 보기: 전체(카탈로그 순서의 고정 자리) 또는 보유만 (보유한 줄을 같은 두 열 순서로 위에서부터 채운다). 페이지를 열면 전체
         private bool ownedOnly;
+
+        // 액티브 특전 (서버 activePerks.enabled): 액티브 칸·종류 탭을 만든다. activeList 는 종류 탭 (false = 패시브, true = 액티브)
+        private bool showActive;
+        private bool activeList;
         private TextMeshProUGUI listEmpty;
         private readonly List<Tab> tabs = new List<Tab>();
 
@@ -181,6 +194,9 @@ namespace PrestigePerks.UI
             public CanvasGroup Group;
             public Image Glow, Square, SquareLine, Icon, Outline, Flash;
             public TextMeshProUGUI Name, Effect;
+
+            // 액티브 줄만: 사용 제한 (레이드당 1회, 쿨타임)
+            public TextMeshProUGUI Limit;
             public readonly Image[] TierFill = new Image[PerkPageModel.MaxTier];
             public readonly Image[] TierLine = new Image[PerkPageModel.MaxTier];
             public readonly TextMeshProUGUI[] TierLabel = new TextMeshProUGUI[PerkPageModel.MaxTier];
@@ -193,10 +209,11 @@ namespace PrestigePerks.UI
             public int FlashTier;
         }
 
-        /// <summary>목록 머리줄의 보기 탭 (전체 / 도감). 고른 탭은 타르코프 기본 버튼, 아닌 탭은 어두운 보조 버튼.</summary>
+        /// <summary>목록 머리줄의 탭: 종류 (패시브 / 액티브, KindTab) 또는 보기 (전체 / 도감). 고른 탭은 타르코프 기본 버튼, 아닌 탭은 어두운 보조 버튼.</summary>
         private sealed class Tab
         {
-            public bool Owned, Hover;
+            // Value: 보기 탭이면 보유만, 종류 탭이면 액티브
+            public bool KindTab, Value, Hover;
             public Button Button;
             public Image Fill, Outline;
             public TextMeshProUGUI Label;
@@ -246,7 +263,10 @@ namespace PrestigePerks.UI
             public float Width;
         }
 
-        public static PerkPage Create(PerkLocale locale, float bottomInsetPixels)
+        /// <summary>액티브 칸·종류 탭을 만든 페이지 (만들 때 정한다).</summary>
+        public bool ShowsActive => showActive;
+
+        public static PerkPage Create(PerkLocale locale, float bottomInsetPixels, bool showActive)
         {
             var go = new GameObject("PrestigePerksPage", typeof(RectTransform));
             DontDestroyOnLoad(go);
@@ -260,6 +280,7 @@ namespace PrestigePerks.UI
             go.AddComponent<GraphicRaycaster>();
             var page = go.AddComponent<PerkPage>();
             page.locale = locale;
+            page.showActive = showActive;
             page.Build(scaler.scaleFactor, bottomInsetPixels);
             return page;
         }
@@ -361,10 +382,19 @@ namespace PrestigePerks.UI
         private void BuildSlots(float x, float y, float width)
         {
             var panel = Panel("Slots", x, y, width, SlotsHeight, locale.Get("ui.slots"));
-            var cardWidth = (width - 32 - (PerkPageModel.MaxSlots - 1) * CardGap) / PerkPageModel.MaxSlots;
+            // 액티브 칸은 패시브 6칸 오른쪽 7번째 칸 (구분선 너머). 칸 번호 = reels 의 자리 (액티브 칸은 PerkPageModel.ActiveSlot = 6)
+            var count = PerkPageModel.MaxSlots + (showActive ? 1 : 0);
+            var cardWidth = (width - 32 - (count - 1) * CardGap - (showActive ? DividerGap : 0)) / count;
             for (var i = 0; i < PerkPageModel.MaxSlots; i++)
             {
                 reels.Add(BuildReel(panel, i, 16 + i * (cardWidth + CardGap), 58, cardWidth));
+            }
+
+            if (showActive)
+            {
+                var dividerX = 16 + PerkPageModel.MaxSlots * (cardWidth + CardGap) - CardGap + (CardGap + DividerGap) / 2;
+                UiKit.Image(UiKit.Rect(panel, "ActiveDivider", dividerX, 66, 1, CardHeight - 16), UiKit.Line);
+                reels.Add(BuildReel(panel, PerkPageModel.ActiveSlot, 16 + PerkPageModel.MaxSlots * (cardWidth + CardGap) + DividerGap, 58, cardWidth));
             }
         }
 
@@ -377,7 +407,8 @@ namespace PrestigePerks.UI
             {
                 Box = card,
                 Group = card.gameObject.AddComponent<CanvasGroup>(),
-                Header = UiKit.Label(card, "Header", width / 2, 12, width - 20, locale.Format("ui.slotN", index + 1), 14, UiKit.Muted, TextAlignmentOptions.Center),
+                // 액티브 칸은 머리 글자 없이 자물쇠·◆ 만 (구분선과 자리로 구별한다)
+                Header = UiKit.Label(card, "Header", width / 2, 12, width - 20, index == PerkPageModel.ActiveSlot ? "" : locale.Format("ui.slotN", index + 1), 14, UiKit.Muted, TextAlignmentOptions.Center),
                 Name = UiKit.Label(card, "Name", width / 2, 160, width - 20, "", 15, UiKit.Text, TextAlignmentOptions.Center),
                 Effect = UiKit.Label(card, "Effect", width / 2, 160, width - 20, "", 13, UiKit.Green, TextAlignmentOptions.Center),
             };
@@ -473,15 +504,30 @@ namespace PrestigePerks.UI
         private void BuildList(float x, float y, float width, float height)
         {
             listPanel = Panel("List", x, y, width, height, locale.Get("ui.list"));
-            // 머리줄 제목 오른쪽에 보기 탭 두 개: 전체 / 도감 (보유만). 보유 수는 맨 위 머리줄 "도감 n / 20" 에만 둔다
+            // 머리줄 제목 오른쪽에 보기 탭 두 개: 전체 / 도감 (보유만). 보유 수는 맨 위 머리줄 "도감 n / 20" 에만 둔다.
+            // 액티브를 쓰면 그 앞에 종류 탭 두 개 (패시브 / 액티브)와 짧은 세로선
             var title = listPanel.Find("Title").GetComponent<TextMeshProUGUI>();
             var measure = UiKit.Label(listPanel, "Measure", 0, 0, 10, "", 14, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             var tabX = 16 + UiKit.Width(title, title.text) + 22;
+            if (showActive)
+            {
+                foreach (var active in new[] { false, true })
+                {
+                    var text = locale.Get(active ? "ui.typeActive" : "ui.typePassive");
+                    var tabWidth = UiKit.Width(measure, text) + 26;
+                    tabs.Add(BuildTab(listPanel, tabX, tabWidth, text, true, active));
+                    tabX += tabWidth + 6;
+                }
+
+                UiKit.Image(UiKit.Rect(listPanel, "TabDivider", tabX + 9, 12, 1, 22), UiKit.Line);
+                tabX += 24;
+            }
+
             foreach (var owned in new[] { false, true })
             {
                 var text = locale.Get(owned ? "ui.tabCollection" : "ui.tabAll");
                 var tabWidth = UiKit.Width(measure, text) + 26;
-                tabs.Add(BuildTab(listPanel, tabX, tabWidth, text, owned));
+                tabs.Add(BuildTab(listPanel, tabX, tabWidth, text, false, owned));
                 tabX += tabWidth + 6;
             }
 
@@ -584,10 +630,13 @@ namespace PrestigePerks.UI
                 return;
             }
 
-            // 효과는 이름 칸 오른쪽에 맞춰 세운다. 영어 이름이 길어도 겹치지 않게 가장 긴 이름에 맞추고 28 띄운다
+            // 액티브 줄도 같은 사전에 만든다 (ID 가 겹치지 않는다). 보이는 줄은 종류 탭이 고른다 (RenderListView)
+            var actives = showActive ? PerkPageModel.ActivePerks(state) : new string[0];
+
+            // 효과는 이름 칸 오른쪽에 맞춰 세운다. 영어 이름이 길어도 겹치지 않게 가장 긴 이름에 맞추고 28 띄운다 (두 종류가 같은 칸)
             var measure = UiKit.Label(listPanel, "Measure", 0, 0, 10, "", 18, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
             var nameColumn = 66f;
-            foreach (var perk in perks)
+            foreach (var perk in perks.Concat(actives))
             {
                 nameColumn = Mathf.Max(nameColumn, UiKit.Width(measure, locale.PerkName(perk)) + 28);
             }
@@ -603,17 +652,26 @@ namespace PrestigePerks.UI
             // 자리는 보기마다 RenderListView 가 매긴다
             foreach (var perk in perks)
             {
-                rows[perk] = BuildRow(listContent, perk, 0, 0, rowWidth, nameColumn);
+                rows[perk] = BuildRow(listContent, perk, 0, 0, rowWidth, nameColumn, false);
+            }
+
+            foreach (var perk in actives)
+            {
+                if (!rows.ContainsKey(perk))
+                {
+                    rows[perk] = BuildRow(listContent, perk, 0, 0, rowWidth, nameColumn, true);
+                }
             }
 
             listDropOutline.transform.SetAsLastSibling();
         }
 
-        /// <summary>목록 보기 탭 하나 (머리줄 y 9, 높이 28). 누르면 그 보기로 바꾼다.</summary>
-        private Tab BuildTab(RectTransform panel, float x, float width, string text, bool owned)
+        /// <summary>목록 탭 하나 (머리줄 y 9, 높이 28). 누르면 그 보기·종류로 바꾼다. kindTab 이면 value = 액티브, 아니면 value = 보유만.</summary>
+        private Tab BuildTab(RectTransform panel, float x, float width, string text, bool kindTab, bool value)
         {
-            var (button, fill, outline, label) = SmallButton(panel, owned ? "TabOwned" : "TabAll", x, 9, width, 28, text, 14);
-            var tab = new Tab { Owned = owned, Button = button, Fill = fill, Outline = outline, Label = label };
+            var name = kindTab ? value ? "TabActive" : "TabPassive" : value ? "TabOwned" : "TabAll";
+            var (button, fill, outline, label) = SmallButton(panel, name, x, 9, width, 28, text, 14);
+            var tab = new Tab { KindTab = kindTab, Value = value, Button = button, Fill = fill, Outline = outline, Label = label };
             OnHover(fill.gameObject, on =>
             {
                 tab.Hover = on;
@@ -621,12 +679,20 @@ namespace PrestigePerks.UI
             });
             button.onClick.AddListener(() =>
             {
-                if (ownedOnly == owned || ghost != null)
+                if ((kindTab ? activeList : ownedOnly) == value || ghost != null)
                 {
                     return;
                 }
 
-                ownedOnly = owned;
+                if (kindTab)
+                {
+                    activeList = value;
+                }
+                else
+                {
+                    ownedOnly = value;
+                }
+
                 GameSounds(EUISoundType.ButtonOver);
                 Rerender();
                 // 보기를 바꾸면 맨 위부터 (Briefing RightColumnView 와 같음)
@@ -640,24 +706,44 @@ namespace PrestigePerks.UI
         // 고른 탭은 타르코프 기본 버튼 (밝은 회색, 어두운 글자), 아닌 탭은 어두운 보조 버튼 (마우스를 올리면 밝은 테두리·글자)
         private void RefreshTab(Tab tab)
         {
-            var on = tab.Owned == ownedOnly;
+            var on = tab.Value == (tab.KindTab ? activeList : ownedOnly);
             tab.Fill.sprite = on ? PerkSprites.Gradient(ButtonTop, ButtonBottom) : PerkSprites.Gradient(DarkTop, DarkBottom);
             tab.Outline.color = on ? ButtonLine : tab.Hover ? HoverLine : UiKit.Line;
             tab.Label.color = on ? UiKit.Dark : tab.Hover ? UiKit.Text : UiKit.Muted;
             SetTint(tab.Button, on ? ButtonTint : DarkTint);
         }
 
-        // 보기 탭과 줄 자리. 전체는 카탈로그 순서 그대로, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다. perks 는 카탈로그 순서의 특전.
-        // 열당 줄 수는 보이는 줄 수로 보기마다 다시 구한다 (전체 24개 = 12줄, 도감 15개 = 10줄)
-        private void RenderListView(PerkStateDto state, IReadOnlyList<string> perks)
+        // 탭과 줄 자리. 전체는 카탈로그 순서 그대로, 보유만은 보유한 줄을 위에서부터 채우고 나머지는 숨긴다. 다른 종류의 줄도 숨긴다.
+        // 열당 줄 수는 보이는 줄 수로 보기마다 다시 구한다 (전체 24개 = 12줄, 도감 15개 = 10줄, 액티브 10개 = 5줄)
+        private void RenderListView(PerkStateDto state)
         {
             foreach (var tab in tabs)
             {
                 RefreshTab(tab);
             }
 
+            var active = showActive && activeList;
+            var perks = active ? PerkPageModel.ActivePerks(state) : PerkPageModel.Perks(state);
+            foreach (var pair in rows)
+            {
+                if (perks.Contains(pair.Key))
+                {
+                    continue;
+                }
+
+                pair.Value.Rect.gameObject.SetActive(false);
+                if (pair.Value.Hover)
+                {
+                    pair.Value.Hover = false;
+                    if (hoverPerk == pair.Key)
+                    {
+                        hoverPerk = null;
+                    }
+                }
+            }
+
             // 확정 칸을 끄는 동안에는 오른쪽에 "여기에 놓으면 빠집니다"가 나온다
-            listEmpty.enabled = ownedOnly && PerkPageModel.OwnedCount(state) == 0;
+            listEmpty.enabled = ownedOnly && (active ? PerkPageModel.ActiveOwnedCount(state) : PerkPageModel.OwnedCount(state)) == 0;
 
             var visible = 0;
             foreach (var perk in perks)
@@ -668,7 +754,7 @@ namespace PrestigePerks.UI
                 }
             }
 
-            var rowsPerColumn = PerkListLayout.RowsPerColumn(visible);
+            var rowsPerColumn = active ? PerkListLayout.ActiveRowsPerColumn(visible) : PerkListLayout.RowsPerColumn(visible);
             var contentHeight = PerkListLayout.ContentHeight(rowsPerColumn) - ListScrollTop;
             if (!PerkListLayout.Overflows(visible))
             {
@@ -707,7 +793,7 @@ namespace PrestigePerks.UI
             }
         }
 
-        private Row BuildRow(RectTransform panel, string perk, float x, float y, float width, float nameColumn)
+        private Row BuildRow(RectTransform panel, string perk, float x, float y, float width, float nameColumn, bool active)
         {
             var rect = UiKit.Rect(panel, $"Perk{perk}", x, y, width, RowHeight);
             UiKit.Image(rect, RowBase, raycast: true);
@@ -728,7 +814,13 @@ namespace PrestigePerks.UI
             // 이름·효과 한 줄 (설명 줄은 뺐다, 2026-10-20). 오른쪽 끝에 단계 칸 I II III
             var middle = RowHeight / 2;
             row.Name = UiKit.Label(rect, "Name", x0, middle, nameColumn, locale.PerkName(perk), 18, UiKit.Muted, TextAlignmentOptions.Left, FontStyles.Bold);
-            row.Effect = UiKit.Label(rect, "Effect", effectX, middle, width - effectX - tiersWidth - 28, "", 15, UiKit.GreenDim, TextAlignmentOptions.Left, FontStyles.Bold);
+            // 액티브 줄은 효과와 단계 칸 사이에 사용 제한 글자
+            var limitSpace = active ? LimitWidth + 12 : 0;
+            row.Effect = UiKit.Label(rect, "Effect", effectX, middle, width - effectX - tiersWidth - 28 - limitSpace, "", 15, UiKit.GreenDim, TextAlignmentOptions.Left, FontStyles.Bold);
+            if (active)
+            {
+                row.Limit = UiKit.Label(rect, "Limit", width - 14 - tiersWidth - 14, middle, LimitWidth, "", 13, UiKit.Dim, TextAlignmentOptions.Right);
+            }
             for (var t = 0; t < PerkPageModel.MaxTier; t++)
             {
                 var cell = UiKit.Rect(rect, $"Tier{t + 1}", width - 14 - tiersWidth + t * (TierCellWidth + TierCellGap), middle - TierCellHeight / 2, TierCellWidth, TierCellHeight);
@@ -859,9 +951,12 @@ namespace PrestigePerks.UI
             picked.Status = UiKit.Label(body, "Status", w - 16, 30, 130, "", 14, UiKit.Muted, TextAlignmentOptions.Right);
             picked.StatusLock = UiKit.Sprite(UiKit.Rect(body, "StatusLock", 0, 23.5f, 13, 13), PerkSprites.Lock, Color.white);
             picked.StatusMark = Diamond(body, "StatusMark", 0, 30, 7);
-            picked.Subject = UiKit.Label(body, "Subject", 80, 54, w - 96, "", 14, UiKit.Muted);
+            // 부제는 두 줄까지 (액티브 특전 설명이 길다). 한 줄이면 가운데가 이전과 같은 54 에 온다
+            picked.Subject = UiKit.Label(UiKit.Rect(body, "Subject", 80, 45, w - 96, 40), "", 14, UiKit.Muted, TextAlignmentOptions.TopLeft);
+            picked.Subject.enableWordWrapping = true;
 
-            picked.Value = UiKit.Label(body, "Value", 16, 100, 160, "", 30, UiKit.Green, TextAlignmentOptions.Left, FontStyles.Bold);
+            // 폭은 Render 에서 단계·다음 글자를 뺀 만큼으로 맞춘다
+            picked.Value = UiKit.Label(body, "Value", 16, 100, w - 32, "", ValueSize, UiKit.Green, TextAlignmentOptions.Left, FontStyles.Bold);
             picked.Tier = UiKit.Label(body, "Tier", 16, 103, 120, "", 15, UiKit.Muted);
             picked.Next = UiKit.Label(body, "Next", w - 16, 103, 160, "", 15, UiKit.Muted, TextAlignmentOptions.Right);
             picked.Hint = UiKit.Label(UiKit.Rect(body, "Hint", 16, 124, w - 32, 40), "", 14, UiKit.Muted, TextAlignmentOptions.TopLeft);
@@ -950,7 +1045,7 @@ namespace PrestigePerks.UI
             if (dragPerk != null)
             {
                 // 놓을 수 있는 칸은 흰 테두리, 마우스가 올라간 칸은 더 밝게
-                reel.Hover.color = PerkPageModel.CanDrop(lastState, index) ? new Color(1, 1, 1, index == dropReel ? 1f : 0.45f) : Color.clear;
+                reel.Hover.color = PerkPageModel.CanDrop(lastState, index, dragPerk) ? new Color(1, 1, 1, index == dropReel ? 1f : 0.45f) : Color.clear;
                 return;
             }
 
@@ -1006,6 +1101,7 @@ namespace PrestigePerks.UI
                 {
                     selectedPerk = PerkPageModel.FirstSlotPerk(state);
                     revealSelected = true;
+                    FollowKind(state, selectedPerk);
                 }
             }
 
@@ -1014,6 +1110,11 @@ namespace PrestigePerks.UI
             var collection = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{PerkPageModel.OwnedCount(state)}</color></b>";
             var perks = PerkPageModel.Perks(state);
             levelLabel.text = locale.Format("ui.level", level, tierCap, collection, perks.Count);
+            if (showActive)
+            {
+                var activeOwned = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiKit.Text)}>{PerkPageModel.ActiveOwnedCount(state)}</color></b>";
+                levelLabel.text += locale.Format("ui.levelActive", activeOwned, PerkPageModel.ActivePerks(state).Count);
+            }
             coinsValue.text = coins.ToString();
 
             foreach (var pair in rows)
@@ -1021,7 +1122,7 @@ namespace PrestigePerks.UI
                 RenderRow(pair.Key, pair.Value, state);
             }
 
-            RenderListView(state, perks);
+            RenderListView(state);
             if (revealSelected && rows.Count > 0)
             {
                 revealSelected = false;
@@ -1037,7 +1138,7 @@ namespace PrestigePerks.UI
             }
 
             freeValue.text = $"{state.FreeRerollsLeft} / {state.FreeRerolls}";
-            lockedValue.text = $"{PerkPageModel.LockedCount(state)} / {state.Slots.Count}";
+            lockedValue.text = $"{PerkPageModel.LockedCount(state)} / {state.Slots.Count + (state.ActivePerkSlot != null ? 1 : 0)}";
             SetDots(freeDots, freeDotsStart, freeValue);
             SetDots(lockedDots, lockedDotsStart, lockedValue);
 
@@ -1109,7 +1210,19 @@ namespace PrestigePerks.UI
             RefreshOutline(row);
 
             var shown = PerkPageModel.ShownTier(state, perk);
-            row.Effect.text = locale.PerkEffect(perk, EffectValue(state, perk, shown));
+            var activeInfo = state.ActiveInfo(perk)?.Active;
+            if (activeInfo != null)
+            {
+                row.Effect.text = ActivePerkText.Fill(locale.Get($"perk.{perk}.effect"), activeInfo, shown);
+                if (row.Limit != null)
+                {
+                    row.Limit.text = LimitText(activeInfo, shown);
+                }
+            }
+            else
+            {
+                row.Effect.text = locale.PerkEffect(perk, EffectValue(state, perk, shown));
+            }
             // 단계 칸: 흐림 = 미보유, 밝음 = 보유, 초록 테두리 = 지금 적용 중
             var owned = PerkPageModel.OwnedTier(state, perk);
             var applied = equipped ? shown : 0;
@@ -1146,7 +1259,7 @@ namespace PrestigePerks.UI
                 return;
             }
 
-            var slot = state.Slots[index];
+            var slot = PerkPageModel.SlotAt(state, index);
             var blue = reel.Kind == SlotKind.Locked || reel.Kind == SlotKind.Fixed;
             reel.Header.color = UiKit.Muted;
             reel.Fill.color = Color.white;
@@ -1164,10 +1277,13 @@ namespace PrestigePerks.UI
                 row.Icon.color = reel.FaceIcon.color;
             }
 
+            // 표시는 "슬롯 n" 오른쪽. 머리 글자가 없는 액티브 칸은 육각 위 가운데
             var headerWidth = UiKit.Width(reel.Header, reel.Header.text);
-            var markX = reel.Box.rect.width / 2 + headerWidth / 2 + 6;
-            reel.LockIcon.rectTransform.anchoredPosition = new Vector2(markX, reel.LockIcon.rectTransform.anchoredPosition.y);
-            reel.FixedMark.rectTransform.anchoredPosition = new Vector2(markX + 4, reel.FixedMark.rectTransform.anchoredPosition.y);
+            var center = reel.Box.rect.width / 2;
+            var lockX = index == PerkPageModel.ActiveSlot ? center - 7 : center + headerWidth / 2 + 6;
+            var markX = index == PerkPageModel.ActiveSlot ? center : lockX + 4;
+            reel.LockIcon.rectTransform.anchoredPosition = new Vector2(lockX, reel.LockIcon.rectTransform.anchoredPosition.y);
+            reel.FixedMark.rectTransform.anchoredPosition = new Vector2(markX, reel.FixedMark.rectTransform.anchoredPosition.y);
             reel.LockButton.interactable = !busy;
             RefreshLock(reel);
 
@@ -1230,13 +1346,17 @@ namespace PrestigePerks.UI
 
             var perk = pick.Perk;
             var equipped = pick.Slot >= 0;
+            var activeInfo = pick.Active ? state.ActiveInfo(perk).Active : null;
             picked.Icon.sprite = PerkSprites.Icon(perk);
             picked.Icon.color = new Color(1, 1, 1, equipped ? 1f : 0.5f);
             picked.Name.text = locale.PerkName(perk);
-            picked.Subject.text = locale.PerkSubject(perk);
+            // 액티브 특전의 부제는 설명 한 줄 (단계 값을 넣는다)
+            picked.Subject.text = activeInfo != null ? ActivePerkText.Fill(locale.Get($"perk.{perk}.detail"), activeInfo, pick.Tier) : locale.PerkSubject(perk);
 
-            // 오른쪽 위는 슬롯 상태만: "슬롯 n" (잠금이면 자물쇠, 확정이면 ◆) 또는 장착 안 됨. 보유 여부는 아래 안내 줄
-            picked.Status.text = equipped ? locale.Format("ui.slotN", pick.Slot + 1) : locale.Get("ui.notEquipped");
+            // 오른쪽 위는 슬롯 상태만: "슬롯 n" / "액티브 칸" (잠금이면 자물쇠, 확정이면 ◆) 또는 장착 안 됨. 보유 여부는 아래 안내 줄
+            picked.Status.text = !equipped ? locale.Get("ui.notEquipped")
+                : pick.Slot == PerkPageModel.ActiveSlot ? locale.Get("ui.activeSlot")
+                : locale.Format("ui.slotN", pick.Slot + 1);
             // 표시는 슬롯 머리줄처럼 글자 오른쪽에 둔다: 표시 자리만큼 글자를 왼쪽으로 민다
             var locked = pick.Kind == SelectionKind.LockedSlot;
             var fixedSlot = pick.Kind == SelectionKind.Fixed;
@@ -1248,16 +1368,18 @@ namespace PrestigePerks.UI
             picked.StatusMark.gameObject.SetActive(fixedSlot);
             picked.StatusMark.rectTransform.anchoredPosition = new Vector2(textRight + 10, picked.StatusMark.rectTransform.anchoredPosition.y);
 
-            picked.Value.text = EffectValue(state, perk, pick.Tier);
+            picked.Value.text = ValueText(state, perk, pick.Tier);
             picked.Value.color = equipped ? UiKit.Green : UiKit.GreenDim;
             picked.Tier.text = locale.Format("ui.tier", TierName(pick.Tier));
-            picked.Tier.rectTransform.anchoredPosition = new Vector2(16 + UiKit.Width(picked.Value, picked.Value.text) + 10, picked.Tier.rectTransform.anchoredPosition.y);
             // 다음 단계 값 (II·III 구매가 남았을 때)
-            picked.Next.text = pick.NextTier > 1 ? locale.Format("ui.nextTier", EffectValue(state, perk, pick.NextTier)) : "";
+            picked.Next.text = pick.NextTier > 1 ? locale.Format("ui.nextTier", ValueText(state, perk, pick.NextTier)) : "";
+            FitValue();
 
-            // 안내 줄은 보유 여부만 보인다
+            // 안내 줄은 보유 여부만 보인다. 액티브 특전은 사용 제한을 붙인다 (보유하지 않았으면 제한만)
             var owned = pick.Kind == SelectionKind.Fixed || pick.Kind == SelectionKind.Owned;
-            picked.Hint.text = locale.Get(owned ? "ui.hintOwned" : "ui.notOwned");
+            picked.Hint.text = activeInfo == null ? locale.Get(owned ? "ui.hintOwned" : "ui.notOwned")
+                : owned ? locale.Get("ui.hintOwned") + "  ·  " + LimitText(activeInfo, pick.Tier)
+                : LimitText(activeInfo, pick.Tier);
             picked.BuyMessage.text = lastBuyMessage ?? "";
 
             picked.Buy.gameObject.SetActive(pick.NextTier > 0);
@@ -1281,6 +1403,47 @@ namespace PrestigePerks.UI
             {
                 picked.BuySub.fontStyle = FontStyles.Bold;
                 CoinLine(picked.BuySub, picked.BuyCoin, pick.Price.ToString(), true, enabled);
+            }
+        }
+
+        /// <summary>
+        /// 큰 효과 글자 한 줄에 값, 단계, 다음 단계가 함께 들어가게 한다: 값이 남은 폭보다 길면 글자를 줄이고 (최소 <see cref="ValueMinSize"/>),
+        /// 단계 글자는 값 바로 뒤에 둔다.
+        /// </summary>
+        private void FitValue()
+        {
+            var value = picked.Value;
+            var next = picked.Next.text.Length > 0 ? UiKit.Width(picked.Next, picked.Next.text) + 12 : 0;
+            var room = picked.Width - 32 - 10 - UiKit.Width(picked.Tier, picked.Tier.text) - next;
+            value.fontSize = ValueSize;
+            var width = UiKit.Width(value, value.text);
+            if (width > room)
+            {
+                value.fontSize = Mathf.Max(ValueMinSize, Mathf.Floor(ValueSize * room / width));
+                width = Mathf.Min(UiKit.Width(value, value.text), room);
+            }
+
+            value.rectTransform.sizeDelta = new Vector2(Mathf.Max(room, 0), value.rectTransform.sizeDelta.y);
+            picked.Tier.rectTransform.anchoredPosition = new Vector2(16 + width + 10, picked.Tier.rectTransform.anchoredPosition.y);
+        }
+
+        /// <summary>큰 효과 글자: 패시브는 효과 수치, 액티브는 값 문구에 단계 값을 넣은 것.</summary>
+        private string ValueText(PerkStateDto state, string perk, int tier)
+        {
+            var info = state?.ActiveInfo(perk)?.Active;
+            return info != null ? ActivePerkText.Fill(locale.Get($"perk.{perk}.value"), info, tier) : EffectValue(state, perk, tier);
+        }
+
+        /// <summary>액티브 특전 사용 제한: "레이드당 1회" 또는 "쿨타임 n초".</summary>
+        private string LimitText(ActivePerkInfoDto info, int tier) =>
+            info.IsOncePerRaid ? locale.Get("ui.oncePerRaid") : locale.Format("ui.cooldownSeconds", ActivePerkText.Number(info.CooldownAt(tier)));
+
+        /// <summary>목록 밖에서 고른 특전이 보이게 종류 탭을 그 특전 쪽으로 바꾼다.</summary>
+        private void FollowKind(PerkStateDto state, string perk)
+        {
+            if (showActive && perk != null && state != null)
+            {
+                activeList = PerkPageModel.IsActivePerk(state, perk);
             }
         }
 
@@ -1332,12 +1495,18 @@ namespace PrestigePerks.UI
                 return;
             }
 
+            // 누른 칸의 종류 탭으로 (액티브 칸 → 액티브 목록)
+            if (showActive)
+            {
+                activeList = index == PerkPageModel.ActiveSlot;
+            }
+
             switch (PerkPageModel.KindOf(lastState, index))
             {
                 case SlotKind.Fixed:
                     // 확정 칸은 잠글 필요가 없어 누르면 그 특전을 고른다 (목록에서 그 줄이 보이게)
                     revealSelected = true;
-                    Select(lastState.Slots[index].Perk);
+                    Select(PerkPageModel.PerkInSlot(lastState, index));
                     break;
                 case SlotKind.Roll:
                 case SlotKind.Locked:
@@ -1371,6 +1540,7 @@ namespace PrestigePerks.UI
             {
                 Pick(perk);
                 revealSelected = true;
+                FollowKind(lastState, perk);
             }
         }
 
@@ -1418,7 +1588,7 @@ namespace PrestigePerks.UI
             }
 
             dragSlot = index;
-            Pick(lastState.Slots[index].Perk);
+            Pick(PerkPageModel.PerkInSlot(lastState, index));
             BeginGhost(selectedPerk, data);
         }
 
@@ -1435,7 +1605,7 @@ namespace PrestigePerks.UI
             var (_, _, icon) = IconSquare(ghost, "Square", 7, 7, 38);
             icon.sprite = PerkSprites.Icon(perk);
             UiKit.Label(ghost, "Name", 54, 17, 150, locale.PerkName(perk), 15, UiKit.Text, TextAlignmentOptions.Left, FontStyles.Bold);
-            UiKit.Label(ghost, "Value", 54, 36, 150, $"{EffectValue(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
+            UiKit.Label(ghost, "Value", 54, 36, 150, $"{ValueText(lastState, perk, tier)}  ·  {locale.Format("ui.tier", TierName(tier))}", 12, UiKit.Green);
             GameSounds(EUISoundType.MenuInstallModFunc);
             // 끄는 동안 휠·끌기로 목록이 움직이지 않게 한다 (CancelDrag 에서 되돌림)
             listScroll.StopMovement();
@@ -1482,7 +1652,7 @@ namespace PrestigePerks.UI
             dragEndFrame = Time.frameCount;
 
             // 잠긴 칸·닫힌 칸에는 놓을 수 없다. 확정 칸은 목록 어디에 놓아도 빠진다. 확인 창은 없다
-            if (perk != null && target >= 0 && PerkPageModel.CanDrop(lastState, target))
+            if (perk != null && target >= 0 && PerkPageModel.CanDrop(lastState, target, perk))
             {
                 EquipDropped?.Invoke(perk, target);
             }
@@ -1536,7 +1706,7 @@ namespace PrestigePerks.UI
             for (var i = 0; i < reels.Count; i++)
             {
                 var reel = reels[i];
-                var dim = (dragPerk != null && reel.Open && !PerkPageModel.CanDrop(lastState, i)) || i == dragSlot;
+                var dim = (dragPerk != null && reel.Open && !PerkPageModel.CanDrop(lastState, i, dragPerk)) || i == dragSlot;
                 reel.Group.alpha = dim ? 0.35f : 1f;
                 RefreshLock(reel);
             }
@@ -1567,10 +1737,19 @@ namespace PrestigePerks.UI
             CancelDrag();
             var now = Time.unscaledTime;
             var pool = PerkPageModel.RollPool(lastState);
-            IReadOnlyList<string> strip = pool.Count >= 3 ? pool : all;
+            IReadOnlyList<string> passiveStrip = pool.Count >= 3 ? pool : all;
+            // 액티브 칸 띠에는 액티브 특전만 흐른다
+            var activePool = PerkPageModel.ActiveRollPool(lastState);
+            IReadOnlyList<string> activeStrip = activePool.Count >= 3 ? activePool : PerkPageModel.ActivePerks(lastState);
             foreach (var slot in slots)
             {
+                if (slot < 0 || slot >= reels.Count)
+                {
+                    continue;
+                }
+
                 var reel = reels[slot];
+                var strip = slot == PerkPageModel.ActiveSlot && activeStrip.Count > 0 ? activeStrip : passiveStrip;
                 var spin = new Spin { Started = now, Pool = strip };
                 ReelSchedule.Fill(spin.Strip, 2, random, strip, reel.CurrentPerk);
                 spin.Strip.Add(reel.CurrentPerk);
