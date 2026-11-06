@@ -91,6 +91,8 @@ namespace PrestigePerks.Active
                     return new FieldRepair();
                 case "emergencysurgery":
                     return new EmergencySurgery();
+                case "firstaid":
+                    return new FirstAid();
                 default:
                     return null;
             }
