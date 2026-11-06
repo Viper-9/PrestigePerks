@@ -27,8 +27,11 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Compile Include="..\..\client\PrestigePerks.Client\Model\*.cs" Link="ClientModel\%(Filename)%(Extension)" />
+    <Compile Include="..\..\client\PrestigePerks.Client\Active\Model\*.cs" Link="ClientActiveModel\%(Filename)%(Extension)" />
     <None Include="..\..\client\PrestigePerks.Client\Locales\*.json" Link="ClientLocales\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\client\PrestigePerks.Client\Assets\Icons\*.png" Link="ClientIcons\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- F12 설정 문구 키(ConfigText.Tag)가 언어 파일에 다 있는지 본다 -->
+    <None Include="..\..\client\PrestigePerks.Client\Plugin.cs" Link="ClientSource\Plugin.cs.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- 예제 add-on 데이터 (examples/ExampleAddon/perks) 가 서버 검사를 통과하는지 본다 -->
