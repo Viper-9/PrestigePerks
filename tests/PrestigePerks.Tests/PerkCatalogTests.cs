@@ -186,11 +186,11 @@ public class PerkCatalogTests
         Assert.Equal([60, 80, 100], Spec("focus").Duration);
         Assert.Equal([30, 50, 70], Spec("emergencysurgery").Values["restore"]);
         Assert.Equal([300, 300, 300], Spec("composure").Cooldown);
-        Assert.Equal([15, 15, 15], Spec("composure").Duration);
-        Assert.Equal([30, 45, 60], Spec("composure").Values["reduction"]);
-        Assert.Equal([15, 22.5, 30], Spec("composure").Values["inertia"]);
-        Assert.Equal([10, 10, 10], Spec("grit").Duration);
-        Assert.Equal([30, 40, 50], Spec("grit").Values["reduction"]);
+        Assert.Equal([15, 25, 40], Spec("composure").Duration);
+        Assert.Equal([10, 15, 20], Spec("composure").Values["reduction"]);
+        Assert.Equal([5, 10, 15], Spec("composure").Values["inertia"]);
+        Assert.Equal([10, 15, 20], Spec("grit").Duration);
+        Assert.Equal([10, 15, 20], Spec("grit").Values["reduction"]);
         Assert.Equal([30, 45, 60], Spec("resupply").Values["fill"]);
         Assert.Equal([15, 25, 35], Spec("fieldrepair").Values["repair"]);
     }
