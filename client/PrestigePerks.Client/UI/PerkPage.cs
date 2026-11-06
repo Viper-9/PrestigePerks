@@ -950,7 +950,7 @@ namespace PrestigePerks.UI
             if (dragPerk != null)
             {
                 // 놓을 수 있는 칸은 흰 테두리, 마우스가 올라간 칸은 더 밝게
-                reel.Hover.color = PerkPageModel.CanDrop(lastState, index) ? new Color(1, 1, 1, index == dropReel ? 1f : 0.45f) : Color.clear;
+                reel.Hover.color = PerkPageModel.CanDrop(lastState, index, dragPerk) ? new Color(1, 1, 1, index == dropReel ? 1f : 0.45f) : Color.clear;
                 return;
             }
 
@@ -1482,7 +1482,7 @@ namespace PrestigePerks.UI
             dragEndFrame = Time.frameCount;
 
             // 잠긴 칸·닫힌 칸에는 놓을 수 없다. 확정 칸은 목록 어디에 놓아도 빠진다. 확인 창은 없다
-            if (perk != null && target >= 0 && PerkPageModel.CanDrop(lastState, target))
+            if (perk != null && target >= 0 && PerkPageModel.CanDrop(lastState, target, perk))
             {
                 EquipDropped?.Invoke(perk, target);
             }
@@ -1536,7 +1536,7 @@ namespace PrestigePerks.UI
             for (var i = 0; i < reels.Count; i++)
             {
                 var reel = reels[i];
-                var dim = (dragPerk != null && reel.Open && !PerkPageModel.CanDrop(lastState, i)) || i == dragSlot;
+                var dim = (dragPerk != null && reel.Open && !PerkPageModel.CanDrop(lastState, i, dragPerk)) || i == dragSlot;
                 reel.Group.alpha = dim ? 0.35f : 1f;
                 RefreshLock(reel);
             }
