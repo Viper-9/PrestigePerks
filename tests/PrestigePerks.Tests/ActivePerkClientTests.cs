@@ -171,7 +171,7 @@ public class ActivePerkClientTests
     {
         Assert.Equal("22.5", ActivePerkText.Number(22.5));
         Assert.Equal("300", ActivePerkText.Number(300));
-        Assert.Equal("−30%", ActivePerkText.Fill("−{reduction}%", State().ActiveInfo("composure")!.Active, 1));
+        Assert.Equal("−10%", ActivePerkText.Fill("−{reduction}%", State().ActiveInfo("composure")!.Active, 1));
     }
 
     [Theory]
