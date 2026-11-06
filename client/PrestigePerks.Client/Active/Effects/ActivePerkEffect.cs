@@ -81,6 +81,8 @@ namespace PrestigePerks.Active
         {
             switch (perk)
             {
+                case "secondwind":
+                    return new SecondWind();
                 default:
                     return null;
             }
