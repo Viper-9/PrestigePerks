@@ -87,6 +87,8 @@ namespace PrestigePerks.Active
                     return new Steadfast();
                 case "resupply":
                     return new Resupply();
+                case "fieldrepair":
+                    return new FieldRepair();
                 default:
                     return null;
             }

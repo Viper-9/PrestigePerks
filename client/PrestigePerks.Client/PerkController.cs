@@ -146,6 +146,16 @@ namespace PrestigePerks
         public void OnMainMenuShown()
         {
             PerkEffects.FlushDevLog();
+            try
+            {
+                // 현장 수선(액티브)이 올린 방어구 내구도가 레이드 뒤 프로필에 남았는지 (개발자 모드 CHECK)
+                Active.FieldRepair.CheckSaved();
+            }
+            catch (Exception e)
+            {
+                Log.Warn($"field repair save check failed: {e.Message}");
+            }
+
             _ = RefreshFromMainMenu();
         }
 
