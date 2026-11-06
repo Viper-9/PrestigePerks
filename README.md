@@ -185,8 +185,8 @@ multiplied.
 | Steadfast | Overweight no longer slows you or drains stamina (inertia stays). Cooldown 600 s | Cooldown | 60 s | 80 s | 100 s |
 | Focus | Painkiller effect (pain, tremor and limb injury penalties) and no tunnel vision | Once per raid | 60 s | 80 s | 100 s |
 | Emergency Surgery | Restores one blacked-out part, head and chest included, like a CMS kit (max HP share, 1 HP now) | Once per raid | 30% | 50% | 70% |
-| Composure | Recoil and aim sway down, weapon inertia down by half as much, unlimited breath hold, for 15 s. Cooldown 300 s | Cooldown | −30% | −45% | −60% |
-| Grit | Damage from enemies, bleeding and falls down on every body part for 10 s | Once per raid | −30% | −40% | −50% |
+| Composure | Recoil and aim sway down, weapon inertia down 5 / 10 / 15%, unlimited breath hold, for 15 / 25 / 40 s. Cooldown 300 s | Cooldown | −10% | −15% | −20% |
+| Grit | Damage from enemies, bleeding and falls down on every body part for 10 / 15 / 20 s | Once per raid | −10% | −15% | −20% |
 | Resupply | Fills energy and hydration by a share of the maximum | Once per raid | +30% | +45% | +60% |
 | Field Repair | Restores worn body armor (plates included), armored rigs and helmets by a share of their max durability | Once per raid | +15% | +25% | +35% |
 
