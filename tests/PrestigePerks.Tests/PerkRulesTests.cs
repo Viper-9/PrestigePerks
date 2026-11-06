@@ -67,8 +67,9 @@ public class PerkRulesTests
         Assert.Equal(Id(1), data.Slots[0].Perk);
         Assert.Equal(Id(24), data.Slots[1].Perk);
         Assert.DoesNotContain(data.Slots[2].Perk, Ids(1, 24));
-        Assert.Equal([data.Slots[2].Perk!], newPerks);
-        Assert.Equal([data.Slots[2].Perk!], data.UnseenNewPerks);
+        // P3 에서 액티브 칸도 열려 새 액티브가 뒤에 붙는다
+        Assert.Equal([data.Slots[2].Perk!, data.ActivePerkSlot!.Perk!], newPerks);
+        Assert.Equal([data.Slots[2].Perk!, data.ActivePerkSlot.Perk!], data.UnseenNewPerks);
         Assert.Equal(3, data.Rerolls.Level);
         Assert.Equal(3, data.Rerolls.FreeLeft);
         Assert.Equal(0, data.Rerolls.Paid);
@@ -98,7 +99,9 @@ public class PerkRulesTests
 
         Assert.Equal(4, data.Slots.Count);
         Assert.Equal(4, data.Slots.Select(slot => slot.Perk).Distinct().Count());
-        Assert.Equal(4, newPerks.Count);
+        // 패시브 4개 + 액티브 1개 (P3 이상)
+        Assert.Equal(5, newPerks.Count);
+        Assert.True(PerkCatalog.IsActive(newPerks[^1]));
         Assert.Equal(3, data.Rerolls.FreeLeft);
     }
 
@@ -396,8 +399,8 @@ public class PerkRulesTests
         var (_, newPerks) = PerkRules.EnterLevel(data, 3, Config, new Random(1));
 
         Assert.Equal(SlotPerks(1, 3, 0), data.Slots.Select(slot => slot.Perk));
-        Assert.Equal(Ids(3), newPerks);
-        Assert.Equal(Ids(3), data.UnseenNewPerks);
+        Assert.Equal([Id(3), data.ActivePerkSlot!.Perk!], newPerks);
+        Assert.Equal([Id(3), data.ActivePerkSlot.Perk!], data.UnseenNewPerks);
     }
 
     [Fact]
@@ -653,6 +656,25 @@ public class PerkRulesTests
         Assert.Equal([1, 1, 1, 2, 2, 3, 3], config.TierCapByPrestige);
         Assert.Equal([40, 100, 200], config.TierPrices);
         Assert.DoesNotContain("shake", json, StringComparison.OrdinalIgnoreCase);
+        Assert.True(PerkConfigLoader.ParseModConfig(json).ActivePerks.Enabled);
+    }
+
+    [Fact]
+    public void Active_perks_are_on_by_default_and_can_be_turned_off()
+    {
+        Assert.True(PerkConfigLoader.ParseModConfig("{}").ActivePerks.Enabled);
+        Assert.False(PerkConfigLoader.ParseModConfig("""{ "activePerks": { "enabled": false } }""").ActivePerks.Enabled);
+        Assert.True(PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig("""{ "activePerks": null }"""), _ => { }).ActivePerks.Enabled);
+    }
+
+    [Fact]
+    public void State_carries_the_active_catalog_and_prices_by_default()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(new PerkState());
+        Assert.Contains("\"activeCatalog\":[{\"id\":\"firstaid\"", json);
+        Assert.Contains("\"activePerkPrices\":[80,200,350]", json);
+        Assert.Contains("\"activePerkSlot\":null", json);
+        Assert.Contains("\"activePerkOpensAt\":null", json);
     }
 
     [Fact]
