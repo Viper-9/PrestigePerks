@@ -99,6 +99,8 @@ namespace PrestigePerks.Active
                     return new Composure();
                 case "grit":
                     return new Grit();
+                case "sonarpulse":
+                    return new SonarPulse();
                 default:
                     return null;
             }

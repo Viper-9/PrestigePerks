@@ -16,6 +16,7 @@
     <Reference Include="UnityEngine.UIModule"><HintPath>$(Managed)\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(Managed)\UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Managed)\UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AssetBundleModule"><HintPath>$(Managed)\UnityEngine.AssetBundleModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.ScreenCaptureModule"><HintPath>$(Managed)\UnityEngine.ScreenCaptureModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Managed)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Sirenix.Serialization"><HintPath>$(Managed)\Sirenix.Serialization.dll</HintPath><Private>false</Private></Reference>
@@ -30,6 +31,8 @@
     <!-- 특전 페이지 그림 (특전 아이콘 128px, 5.0 시즌 특전·프레스티지 화면 스프라이트). 같은 이유로 DLL 에 넣는다 -->
     <EmbeddedResource Include="Assets\Icons\*.png" LogicalName="PrestigePerks.Icons.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\Sprites\*.png" LogicalName="PrestigePerks.Sprites.%(Filename)%(Extension)" />
+    <!-- 음파 탐지 셰이더 번들 (원본 tools/shaders, 빌드 방법은 그 폴더 README) -->
+    <EmbeddedResource Include="Assets\Shaders\*.bundle" LogicalName="PrestigePerks.Shaders.%(Filename)%(Extension)" />
   </ItemGroup>
   <!-- BepInPlugin 버전을 Directory.Build.props 의 <Version> 하나로 맞추려고 빌드 때 상수 파일을 만든다. -->
   <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">

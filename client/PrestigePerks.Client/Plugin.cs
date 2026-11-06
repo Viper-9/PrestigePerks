@@ -20,6 +20,12 @@ public class Plugin : BaseUnityPlugin
     /// <summary>액티브 특전 키 (dev-docs 94). 서버 activePerks.enabled 가 false 면 레이드에서 쓰이지 않는다.</summary>
     internal static ConfigEntry<KeyboardShortcut> ActiveKey;
 
+    /// <summary>음파 탐지 잔상 밝기: 맨눈, 야간 투시경, 열화상.</summary>
+    internal static ConfigEntry<float> SonarBrightness, SonarBrightnessNight, SonarBrightnessThermal;
+
+    /// <summary>음파 탐지 파동 고리 (발 높이). 끄면 잔상만.</summary>
+    internal static ConfigEntry<bool> SonarWaveRing;
+
     /// <summary>개발자 모드 시험: 슬롯과 상관없이 이 액티브 특전·단계로 레이드 시작 (slot = 액티브 칸 그대로, 단계 0 = 적용 단계).</summary>
     internal static ConfigEntry<string> ActiveTestPerk;
     internal static ConfigEntry<int> ActiveTestTier;
@@ -92,6 +98,18 @@ public class Plugin : BaseUnityPlugin
         ActiveKey = Config.Bind(section, "Use key", new KeyboardShortcut(UnityEngine.KeyCode.V),
             new ConfigDescription("Key that uses the active perk in a raid. Active perks are off when the server config activePerks.enabled is false.",
                 null, ConfigText.Tag("active", "activeKey", 100)));
+        SonarBrightness = Config.Bind(section, "Sonar brightness (naked eye)", 1.2f,
+            new ConfigDescription("Sonar Pulse echo brightness without night vision or thermal.", new AcceptableValueRange<float>(0f, 3f),
+                ConfigText.Tag("active", "sonarBrightness", 90)));
+        SonarBrightnessNight = Config.Bind(section, "Sonar brightness (night vision)", 0.35f,
+            new ConfigDescription("Sonar Pulse echo brightness with night vision on.", new AcceptableValueRange<float>(0f, 3f),
+                ConfigText.Tag("active", "sonarBrightnessNight", 80)));
+        SonarBrightnessThermal = Config.Bind(section, "Sonar brightness (thermal)", 0.5f,
+            new ConfigDescription("Sonar Pulse echo brightness with a thermal sight or goggles on.", new AcceptableValueRange<float>(0f, 3f),
+                ConfigText.Tag("active", "sonarBrightnessThermal", 70)));
+        SonarWaveRing = Config.Bind(section, "Sonar wave ring", true,
+            new ConfigDescription("Shows the Sonar Pulse wave as a ring at foot height. Off = echoes only.",
+                null, ConfigText.Tag("active", "sonarWaveRing", 60)));
 
         var perks = new[] { ActiveTestSlot }.Concat(PrestigePerks.Model.ActivePerkIds.All).ToArray();
         ActiveTestPerk = Config.Bind("Developer", "Active perk test", ActiveTestSlot,
