@@ -21,7 +21,8 @@ public class Plugin : BaseUnityPlugin
         Instance = this;
         Log.Source = Logger;
         DevMode = Config.Bind("Developer", "Developer mode", false,
-            "Testing only. Enables the prestige chat commands (coins, perks, tiers) and [dev] diagnostic logs. Takes effect on the server right away.");
+            new ConfigDescription("Testing only. Enables the prestige chat commands (coins, perks, tiers) and [dev] diagnostic logs. Takes effect on the server right away.",
+                null, ConfigText.Tag("developer", "devMode", 100)));
         Game.PerkEffects.DevMode = DevMode.Value;
         DevMode.SettingChanged += (_, _) =>
         {

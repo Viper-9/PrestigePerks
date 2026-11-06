@@ -56,6 +56,9 @@
   "hud.noTarget": "대상 없음",
   "hud.running": "{0} · {1}초",
 
+  "config.section.developer": "개발자",
+  "config.devMode.name": "개발자 모드",
+  "config.devMode.desc": "시험용입니다. 프레스티지 채팅 명령(코인, 특전, 단계)과 [dev] 진단 로그를 켭니다. 서버에 바로 적용됩니다.",
 
   "perk.experience.name": "경험",
   "perk.experience.effect": "레이드 경험치 {0}",

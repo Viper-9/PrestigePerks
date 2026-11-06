@@ -56,6 +56,9 @@
   "hud.noTarget": "No target",
   "hud.running": "{0} · {1} s",
 
+  "config.section.developer": "Developer",
+  "config.devMode.name": "Developer mode",
+  "config.devMode.desc": "Testing only. Enables the prestige chat commands (coins, perks, tiers) and [dev] diagnostic logs. Takes effect on the server right away.",
 
   "perk.experience.name": "Experience",
   "perk.experience.effect": "Raid experience {0}",

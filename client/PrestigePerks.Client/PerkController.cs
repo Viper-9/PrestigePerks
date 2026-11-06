@@ -72,7 +72,7 @@ namespace PrestigePerks
 
         internal PerkLocale Locale => locale ?? (locale = LoadLocale());
 
-        /// <summary>게임 언어 문구. 이미 받은 state 가 있으면 그 catalog 의 add-on 문구도 쓴다. 맞춘다.</summary>
+        /// <summary>게임 언어 문구. 이미 받은 state 가 있으면 그 catalog 의 add-on 문구도 쓴다. F12 설정 창 문구도 같은 언어로 맞춘다.</summary>
         private PerkLocale LoadLocale()
         {
             var loaded = PerkGame.LoadLocale();
@@ -81,6 +81,7 @@ namespace PrestigePerks
                 loaded.UseCatalog(state.Catalog);
             }
 
+            ConfigText.Apply(loaded);
             return loaded;
         }
 
