@@ -39,7 +39,7 @@ public class Plugin : BaseUnityPlugin
         Instance = this;
         Log.Source = Logger;
         DevMode = Config.Bind("Developer", "Developer mode", false,
-            new ConfigDescription("Testing only. Enables the prestige chat commands (coins, perks, tiers) and [dev] diagnostic logs. Takes effect on the server right away.",
+            new ConfigDescription("Testing only. Enables the prestige chat commands (coins, perks, tiers) and [dev] diagnostic logs. Takes effect on the server right away. Turn on Show advanced for the test settings.",
                 null, new ConfigurationManagerAttributes { Order = 100 }));
         Game.PerkEffects.DevMode = DevMode.Value;
         DevMode.SettingChanged += (_, _) =>
@@ -114,19 +114,19 @@ public class Plugin : BaseUnityPlugin
         var perks = new[] { ActiveTestSlot }.Concat(PrestigePerks.Model.ActivePerkIds.All).ToArray();
         ActiveTestPerk = Config.Bind("Developer", "Active perk test", ActiveTestSlot,
             new ConfigDescription("Developer mode only. Starts the next raid with this active perk instead of the one in the active slot (slot = the active slot). In a raid, press the reset key to switch.",
-                new AcceptableValueList<string>(perks), new ConfigurationManagerAttributes { Order = 90 }));
+                new AcceptableValueList<string>(perks), new ConfigurationManagerAttributes { Order = 90, IsAdvanced = true }));
         ActiveTestTier = Config.Bind("Developer", "Active perk test tier", 0,
             new ConfigDescription("Developer mode only. Tier of the active perk in the next raid (0 = the tier the server applies). In a raid, press the reset key to switch.", new AcceptableValueRange<int>(0, 3),
-                new ConfigurationManagerAttributes { Order = 80 }));
+                new ConfigurationManagerAttributes { Order = 80, IsAdvanced = true }));
         ActiveResetKey = Config.Bind("Developer", "Active perk reset key", new KeyboardShortcut(UnityEngine.KeyCode.H, UnityEngine.KeyCode.LeftAlt),
             new ConfigDescription("Developer mode only. In a raid: ends a running effect, switches to the test perk and tier if they changed, otherwise clears the use and cooldown.",
-                null, new ConfigurationManagerAttributes { Order = 70 }));
+                null, new ConfigurationManagerAttributes { Order = 70, IsAdvanced = true }));
         MarkKey = Config.Bind("Developer", "Mark key", new KeyboardShortcut(UnityEngine.KeyCode.F10),
             new ConfigDescription("Developer mode only. Takes a screenshot and logs the active perk state in one line ([active][MARK]).",
-                null, new ConfigurationManagerAttributes { Order = 60 }));
+                null, new ConfigurationManagerAttributes { Order = 60, IsAdvanced = true }));
         BleedKey = Config.Bind("Developer", "Bleed key", new KeyboardShortcut(UnityEngine.KeyCode.J, UnityEngine.KeyCode.LeftAlt),
             new ConfigDescription("Developer mode only. In a raid: gives you a light bleeding, pressing again swaps it for a heavy one and back. Does nothing while a blood loss blocker is on.",
-                null, new ConfigurationManagerAttributes { Order = 50 }));
+                null, new ConfigurationManagerAttributes { Order = 50, IsAdvanced = true }));
     }
 
     // 하나가 실패해도 나머지는 걸리도록 패치 클래스마다 따로 등록한다.
