@@ -17,7 +17,7 @@ own copy of the game. PrestigePerks is a fan-made mod and is not affiliated with
 `perk_tough.png`, `perk_temperance.png`, `perk_artisan.png`, `perk_surgeon.png`, `perk_agility.png`
 
 `perk_maintenance.png` is drawn for this project on top of the body armor icon from the same set (its left half,
-mirrored).
+mirrored). `perk_fieldrepair.png` adds a plus sign to `perk_maintenance.png`, so it contains the same artwork.
 
 **Perk page sprites** (`client/PrestigePerks.Client/Assets/Sprites`), extracted from the game client:
 
@@ -27,7 +27,9 @@ mirrored).
 `Sesons_PerkTemplate_Background-Shadow.png`, `Spectator_ShadingVignette.png`
 
 The other perk icons (`perk_scav`, `perk_porter`, `perk_control`, `perk_mastery`, `perk_loading`, `perk_search`,
-`perk_handling`, `perk_reliability`, `perk_reload`) and the sprites `Hex_Fill.png`, `Hex_Frame.png`, `Hex_Glow.png`
+`perk_handling`, `perk_reliability`, `perk_reload`, and the active perk icons `perk_firstaid`, `perk_secondwind`,
+`perk_sonarpulse`, `perk_steadfast`, `perk_focus`, `perk_emergencysurgery`, `perk_composure`, `perk_grit`,
+`perk_resupply`) and the sprites `Hex_Fill.png`, `Hex_Frame.png`, `Hex_Glow.png`
 (drawn by `tools/draw-hex-badge.py`) and `Taskbar_Perk.png` were made for this project and are under the MIT License.
 
 If Battlestate Games asks for any of this artwork to be removed, it will be removed.
