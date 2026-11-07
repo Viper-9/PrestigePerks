@@ -1,6 +1,6 @@
 # PrestigePerks add-ons
 
-You can add your own perks to PrestigePerks without changing PrestigePerks. Add-on perks show up in the perk list after the 20 built-in perks. They work like built-in perks everywhere: rerolls, buying tiers with coins, fixed slots, the collection count, and tier scaling.
+You can add your own perks to PrestigePerks without changing PrestigePerks. Add-on perks show up in the perk list after the 20 built-in perks. They work like built-in perks everywhere: rerolls, buying tiers with coins, fixed slots, the collection count, and tier scaling. Add-ons can only add these regular perks, not active perks for the active slot.
 
 This guide is for mod authors. A complete working add-on is in [`ExampleAddon/`](ExampleAddon).
 
