@@ -252,7 +252,8 @@ The prestige screen tells you about the coins, and lists your perk collection un
 - **Bosses**: each boss has a 70% chance of 25–35 coins. That covers the 13 SPT bosses, plus the ISB bosses
   (Commander, Firefly) and the Black Division boss (Wedge) when those mods are installed. Followers and other squad
   members don't carry coins. Mods that add GP coins or Lega medals to bosses don't change this chance.
-- Coins go into the boss's pockets, vest or backpack. If all three are full, that boss has none.
+- Coins go into the boss's pockets, vest or backpack. If all three are full, that boss has none. Reshala has no vest or
+  backpack and usually has full pockets, so coins are rare there.
 - Coins don't appear in airdrops or on PMC bots.
 
 ## Settings
