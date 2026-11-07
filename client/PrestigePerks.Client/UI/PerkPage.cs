@@ -951,8 +951,9 @@ namespace PrestigePerks.UI
             picked.Status = UiKit.Label(body, "Status", w - 16, 30, 130, "", 14, UiKit.Muted, TextAlignmentOptions.Right);
             picked.StatusLock = UiKit.Sprite(UiKit.Rect(body, "StatusLock", 0, 23.5f, 13, 13), PerkSprites.Lock, Color.white);
             picked.StatusMark = Diamond(body, "StatusMark", 0, 30, 7);
-            // 부제는 두 줄까지 (액티브 특전 설명이 길다). 한 줄이면 가운데가 이전과 같은 54 에 온다
-            picked.Subject = UiKit.Label(UiKit.Rect(body, "Subject", 80, 45, w - 96, 40), "", 14, UiKit.Muted, TextAlignmentOptions.TopLeft);
+            // 부제는 두 줄까지 (액티브 특전 설명이 길다). 한 줄이면 가운데가 이전과 같은 54 에 온다.
+            // 칸 높이는 한글 두 줄 (글자 크기 × 1.6 × 2) 이상이어야 한다: 낮으면 Ellipsis 가 둘째 줄을 지우고 첫 줄 끝을 자른다
+            picked.Subject = UiKit.Label(UiKit.Rect(body, "Subject", 80, 45, w - 96, 48), "", 14, UiKit.Muted, TextAlignmentOptions.TopLeft);
             picked.Subject.enableWordWrapping = true;
 
             // 폭은 Render 에서 단계·다음 글자를 뺀 만큼으로 맞춘다
