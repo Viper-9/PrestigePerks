@@ -12,8 +12,7 @@ client build does not need Unity. Rebuild the bundle only after changing a shade
 
 ## Build
 
-Needs Unity 2022.3.43f1 (the game's version) and any empty Unity project (the shader test project
-`F:\PrestigePerksLab\ShaderBundle` was used).
+Needs Unity 2022.3.43f1 (the game's version) and any empty Unity project (3D, built-in render pipeline).
 
 1. Copy `SonarEcho.shader` and `SonarRing.shader` to `<project>\Assets\PrestigePerksShaders\`.
 2. Copy `PrestigePerksBundles.cs` to `<project>\Assets\Editor\`.
