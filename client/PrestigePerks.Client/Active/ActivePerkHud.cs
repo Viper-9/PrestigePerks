@@ -194,7 +194,7 @@ namespace PrestigePerks.Active
 
         private static Color Faded(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
 
-        /// <summary>"V", "Alt+G" 꼴. 왼쪽·오른쪽 수식 키는 하나로 줄인다.</summary>
+        /// <summary>"J", "Alt+G" 꼴. 왼쪽·오른쪽 수식 키는 하나로 줄인다.</summary>
         internal static string KeyText(KeyboardShortcut shortcut)
         {
             var parts = shortcut.Modifiers.Select(ModifierName).Distinct().ToList();

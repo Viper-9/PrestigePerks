@@ -172,7 +172,7 @@ multiplied.
 ![Active perks on the perk page](media/active-page.png)
 
 - At **P1** an **active slot** opens to the right of the six perk slots. It holds one of 10 active perks that you
-  use in raid with a key: **V** by default (F12 menu, `Active perk` > `Use key`).
+  use in raid with a key: **J** by default (F12 menu, `Active perk` > `Use key`).
 - Rerolls, locks, keeping, tiers and dragging work as in the other slots, but the active slot only rolls active
   perks and active perks only fit the active slot. Prices: tier I **80**, II **200**, III **350** coins. The tier
   cap is the same. The **PASSIVE** / **ACTIVE** tabs switch the list.

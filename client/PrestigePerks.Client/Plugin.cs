@@ -95,7 +95,7 @@ public class Plugin : BaseUnityPlugin
     private void BindActive()
     {
         const string section = "Active perk";
-        ActiveKey = Config.Bind(section, "Use key", new KeyboardShortcut(UnityEngine.KeyCode.V),
+        ActiveKey = Config.Bind(section, "Use key", new KeyboardShortcut(UnityEngine.KeyCode.J),
             new ConfigDescription("Key that uses the active perk in a raid. Active perks are off when the server config activePerks.enabled is false.",
                 null, new ConfigurationManagerAttributes { Order = 100 }));
         SonarBrightness = Config.Bind(section, "Sonar brightness (naked eye)", 1.2f,
