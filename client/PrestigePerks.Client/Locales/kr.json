@@ -153,7 +153,7 @@
   "perk.composure.running": "냉정",
   "perk.grit.name": "투혼",
   "perk.grit.effect": "받는 피해 −{reduction}% · {duration}초",
-  "perk.grit.detail": "모든 부위에서 적 공격, 출혈, 낙하 피해가 줄어든다",
+  "perk.grit.detail": "적 공격, 출혈, 낙하 피해가 줄어든다. 머리는 절반인 −{head}%",
   "perk.grit.value": "−{reduction}%",
   "perk.grit.running": "투혼",
   "perk.resupply.name": "전장 보급",

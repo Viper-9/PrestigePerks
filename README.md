@@ -190,15 +190,15 @@ While you drag an active perk the other slots dim, because it only fits the acti
 
 | Perk | Effect | Use | I | II | III |
 |---|---|---|---|---|---|
-| First Aid | Stops all bleeding, blocks new bleeding and restores health per second for a while | Once per raid | 3/s · 30 s | 4/s · 45 s | 5/s · 60 s |
+| First Aid | Stops all bleeding, blocks new bleeding and restores health per second for a while | Once per raid | 3/s · 30 s | 3.5/s · 45 s | 4/s · 60 s |
 | Second Wind | Refills stamina, arm stamina and oxygen and clears fatigue | Cooldown | 300 s | 240 s | 180 s |
-| Sonar Pulse | A pulse every 4 s leaves echoes of the enemies it reaches, visible through walls | Once per raid | 50 m · 20 s | 75 m · 30 s | 100 m · 40 s |
+| Sonar Pulse | A pulse every 4 s leaves echoes of the enemies it reaches, visible through walls | Once per raid | 50 m · 20 s | 65 m · 30 s | 80 m · 40 s |
 | Steadfast | Overweight no longer slows you or drains stamina (inertia stays). Cooldown 600 s | Cooldown | 60 s | 80 s | 100 s |
-| Focus | Painkiller effect (pain, tremor and limb injury penalties) and no tunnel vision | Once per raid | 60 s | 80 s | 100 s |
+| Focus | Painkiller effect (pain, tremor and limb injury penalties) and no tunnel vision | Once per raid | 80 s | 140 s | 200 s |
 | Emergency Surgery | Restores one blacked-out part, head and chest included, like a CMS kit (max HP share, 1 HP now) | Once per raid | 30% | 50% | 70% |
-| Composure | Recoil and aim sway down, weapon inertia down 5 / 10 / 15%, unlimited breath hold, for 15 / 25 / 40 s. Cooldown 300 s | Cooldown | −10% | −15% | −20% |
-| Grit | Damage from enemies, bleeding and falls down on every body part for 10 / 15 / 20 s | Once per raid | −10% | −15% | −20% |
-| Resupply | Fills energy and hydration by a share of the maximum | Once per raid | +30% | +45% | +60% |
+| Composure | Recoil and aim sway down, weapon inertia down 5 / 8 / 10%, unlimited breath hold, for 30 / 45 / 60 s. Cooldown 300 s | Cooldown | −10% | −12% | −15% |
+| Grit | Damage from enemies, bleeding and falls down for 20 / 30 / 40 s. The head gets half (−5 / 6 / 7.5%) | Once per raid | −10% | −12% | −15% |
+| Resupply | Fills energy and hydration by a share of the maximum | Once per raid | +30% | +55% | +70% |
 | Field Repair | Restores worn body armor (plates included), armored rigs and helmets by a share of their max durability | Once per raid | +15% | +25% | +35% |
 
 - Emergency Surgery picks the head, then the chest, stomach, legs and arms. Like a CMS kit, the restored part keeps a

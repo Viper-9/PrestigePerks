@@ -97,15 +97,16 @@ public static class PerkCatalog
     /// <summary>내장 액티브 특전 10개 (dev-docs 94 2절). 번호 41~50. 바뀌지 않는다.</summary>
     public static IReadOnlyList<PerkDefinition> BuiltinActive { get; } =
     [
-        ActivePerk(41, "firstaid", ActiveLimit.OncePerRaid, null, T(30, 45, 60), ("regen", T(3, 4, 5)), ("bloodstop", T(30, 45, 60))),
+        ActivePerk(41, "firstaid", ActiveLimit.OncePerRaid, null, T(30, 45, 60), ("regen", T(3, 3.5, 4)), ("bloodstop", T(30, 45, 60))),
         ActivePerk(42, "secondwind", ActiveLimit.Cooldown, T(300, 240, 180), null),
-        ActivePerk(43, "sonarpulse", ActiveLimit.OncePerRaid, null, T(20, 30, 40), ("radius", T(50, 75, 100))),
+        ActivePerk(43, "sonarpulse", ActiveLimit.OncePerRaid, null, T(20, 30, 40), ("radius", T(50, 65, 80))),
         ActivePerk(44, "steadfast", ActiveLimit.Cooldown, T(600, 600, 600), T(60, 80, 100)),
-        ActivePerk(45, "focus", ActiveLimit.OncePerRaid, null, T(60, 80, 100)),
+        ActivePerk(45, "focus", ActiveLimit.OncePerRaid, null, T(80, 140, 200)),
         ActivePerk(46, "emergencysurgery", ActiveLimit.OncePerRaid, null, null, ("restore", T(30, 50, 70))),
-        ActivePerk(47, "composure", ActiveLimit.Cooldown, T(300, 300, 300), T(15, 25, 40), ("reduction", T(10, 15, 20)), ("inertia", T(5, 10, 15))),
-        ActivePerk(48, "grit", ActiveLimit.OncePerRaid, null, T(10, 15, 20), ("reduction", T(10, 15, 20))),
-        ActivePerk(49, "resupply", ActiveLimit.OncePerRaid, null, null, ("fill", T(30, 45, 60))),
+        ActivePerk(47, "composure", ActiveLimit.Cooldown, T(300, 300, 300), T(30, 45, 60), ("reduction", T(10, 12, 15)), ("inertia", T(5, 8, 10))),
+        // 머리는 몸통의 절반 (헬멧 없이 한 방을 버티는 구간을 좁힌다, 2026-11-08)
+        ActivePerk(48, "grit", ActiveLimit.OncePerRaid, null, T(20, 30, 40), ("reduction", T(10, 12, 15)), ("head", T(5, 6, 7.5))),
+        ActivePerk(49, "resupply", ActiveLimit.OncePerRaid, null, null, ("fill", T(30, 55, 70))),
         ActivePerk(50, "fieldrepair", ActiveLimit.OncePerRaid, null, null, ("repair", T(15, 25, 35))),
     ];
 

@@ -8,23 +8,33 @@ using HarmonyLib;
 
 namespace PrestigePerks.Active
 {
-    /// <summary>투혼 패치가 보는 값. 피해 종류별 횟수·합은 배열에 더한다 (할당 없음).</summary>
+    /// <summary>투혼 패치가 보는 값. 몸통 피해는 종류별 배열에, 머리 피해는 따로 더한다 (할당 없음).</summary>
     internal static class GritState
     {
         public const int Enemy = 0, Bleeding = 1, Fall = 2;
 
         public static bool Active, Broken;
         public static ActiveHealthController Health;
-        public static float Factor = 1f;
+        public static float Factor = 1f, HeadFactor = 1f;
         public static readonly int[] Count = new int[3];
         public static readonly float[] Before = new float[3], After = new float[3];
+        public static int HeadCount;
+        public static float HeadBefore, HeadAfter;
 
         // 개발자 모드 grit.health: 실제로 줄어든 체력. Pending = 지금 ApplyDamage 의 예상 피해 (재지 않으면 -1)
         public static int RealHits, NotMeasured;
         public static float RealLost, RealWant, HealthBefore, Pending = -1;
 
-        public static void Record(int kind, float before, float after)
+        public static void Record(int kind, bool head, float before, float after)
         {
+            if (head)
+            {
+                HeadCount++;
+                HeadBefore += before;
+                HeadAfter += after;
+                return;
+            }
+
             Count[kind]++;
             Before[kind] += before;
             After[kind] += after;
@@ -35,6 +45,8 @@ namespace PrestigePerks.Active
             Array.Clear(Count, 0, Count.Length);
             Array.Clear(Before, 0, Before.Length);
             Array.Clear(After, 0, After.Length);
+            HeadCount = 0;
+            HeadBefore = HeadAfter = 0;
             RealHits = NotMeasured = 0;
             RealLost = RealWant = 0;
             Pending = -1;
@@ -81,7 +93,7 @@ namespace PrestigePerks.Active
     }
 
     /// <summary>
-    /// 투혼 (실현성조사 3.8 최종 결정): 지속 동안 모든 부위에서 적 공격(저격 제외)·출혈·낙하 피해를 −reduction%. 강인(11) ApplyDamageScopePatch 와 같은 메서드지만
+    /// 투혼 (실현성조사 3.8 최종 결정): 지속 동안 적 공격(저격 제외)·출혈·낙하 피해를 몸통(머리 밖 모든 부위) −reduction%, 머리 −head% (2026-11-08: 헬멧 없이 한 방을 버티는 구간을 좁히려고 머리는 절반). 강인(11) ApplyDamageScopePatch 와 같은 메서드지만
     /// 서로 값을 건드리지 않아 순서는 상관없다. grit.reduced 는 패치가 계산한 비율, grit.health 는 실제로 줄어든 체력을 본다.
     /// </summary>
     internal sealed class Grit : ActivePerkEffect
@@ -96,6 +108,7 @@ namespace PrestigePerks.Active
             GritState.Reset();
             GritState.Health = use.Health;
             GritState.Factor = 1f - use.Value("reduction") / 100f;
+            GritState.HeadFactor = 1f - use.Value("head") / 100f;
             GritState.Active = true;
         }
 
@@ -107,15 +120,33 @@ namespace PrestigePerks.Active
             var before = GritState.Before[GritState.Enemy] + GritState.Before[GritState.Bleeding] + GritState.Before[GritState.Fall];
             var after = GritState.After[GritState.Enemy] + GritState.After[GritState.Bleeding] + GritState.After[GritState.Fall];
             var ratio = before > 0 ? after / before : 0f;
-            if (total == 0)
+            if (total == 0 && GritState.HeadCount == 0)
             {
                 ActivePerkLog.Skip("grit.reduced", "no enemy, bleeding or fall damage while running");
                 return;
             }
 
-            ActivePerkLog.Check("grit.reduced", Math.Abs(ratio - GritState.Factor) < 0.001f,
-                $"hits enemy {GritState.Count[GritState.Enemy]}, bleeding {GritState.Count[GritState.Bleeding]}, fall {GritState.Count[GritState.Fall]}; "
-                + $"damage {before:F1} -> {after:F1} (x{ratio:F3}, want x{GritState.Factor:F3})");
+            if (total == 0)
+            {
+                ActivePerkLog.Skip("grit.reduced", "no damage below the head while running");
+            }
+            else
+            {
+                ActivePerkLog.Check("grit.reduced", Math.Abs(ratio - GritState.Factor) < 0.001f,
+                    $"hits enemy {GritState.Count[GritState.Enemy]}, bleeding {GritState.Count[GritState.Bleeding]}, fall {GritState.Count[GritState.Fall]}; "
+                    + $"damage {before:F1} -> {after:F1} (x{ratio:F3}, want x{GritState.Factor:F3})");
+            }
+
+            if (GritState.HeadCount == 0)
+            {
+                ActivePerkLog.Skip("grit.head", "no head damage while running");
+            }
+            else
+            {
+                var headRatio = GritState.HeadAfter / GritState.HeadBefore;
+                ActivePerkLog.Check("grit.head", Math.Abs(headRatio - GritState.HeadFactor) < 0.001f,
+                    $"head hits {GritState.HeadCount}; damage {GritState.HeadBefore:F1} -> {GritState.HeadAfter:F1} (x{headRatio:F3}, want x{GritState.HeadFactor:F3})");
+            }
             if (GritState.RealHits == 0)
             {
                 ActivePerkLog.Skip("grit.health", $"all {GritState.NotMeasured} hits took more than the body part had left");
@@ -127,7 +158,8 @@ namespace PrestigePerks.Active
         }
 
         public override string Describe(ActivePerkUse use) =>
-            $"hits {GritState.Count[GritState.Enemy]} / {GritState.Count[GritState.Bleeding]} / {GritState.Count[GritState.Fall]}, damage {GritState.Before[0] + GritState.Before[1] + GritState.Before[2]:F1} -> {GritState.After[0] + GritState.After[1] + GritState.After[2]:F1}";
+            $"hits {GritState.Count[GritState.Enemy]} / {GritState.Count[GritState.Bleeding]} / {GritState.Count[GritState.Fall]}, damage {GritState.Before[0] + GritState.Before[1] + GritState.Before[2]:F1} -> {GritState.After[0] + GritState.After[1] + GritState.After[2]:F1}, "
+            + $"head {GritState.HeadCount} hits {GritState.HeadBefore:F1} -> {GritState.HeadAfter:F1}";
     }
 
     [HarmonyPatch]
@@ -155,9 +187,10 @@ namespace PrestigePerks.Active
                     return;
                 }
 
+                var head = bodyPart == EBodyPart.Head;
                 var before = damage;
-                damage *= GritState.Factor;
-                GritState.Record(kind, before, damage);
+                damage *= head ? GritState.HeadFactor : GritState.Factor;
+                GritState.Record(kind, head, before, damage);
             }
             catch (Exception e)
             {

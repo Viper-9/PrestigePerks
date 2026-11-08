@@ -153,7 +153,7 @@
   "perk.composure.running": "Composed",
   "perk.grit.name": "Grit",
   "perk.grit.effect": "Damage taken −{reduction}% · {duration} s",
-  "perk.grit.detail": "Less damage from enemies, bleeding and falls on every body part",
+  "perk.grit.detail": "Less damage from enemies, bleeding and falls. The head gets half: −{head}%",
   "perk.grit.value": "−{reduction}%",
   "perk.grit.running": "Grit",
   "perk.resupply.name": "Resupply",
