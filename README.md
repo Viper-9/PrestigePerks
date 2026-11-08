@@ -201,6 +201,9 @@ While you drag an active perk the other slots dim, because it only fits the acti
 | Resupply | Fills energy and hydration by a share of the maximum | Once per raid | +30% | +55% | +70% |
 | Field Repair | Restores worn body armor (plates included), armored rigs and helmets by a share of their max durability | Once per raid | +15% | +25% | +35% |
 
+- First Aid's regeneration is per second for the whole body, not per body part: it heals one damaged part at a time.
+- Field Repair repairs every damaged armor piece you wear at once (each plate, the helmet and its attachments), each
+  by the share of its own max durability.
 - Emergency Surgery picks the head, then the chest, stomach, legs and arms. Like a CMS kit, the restored part keeps a
   lower max HP for the rest of the raid.
 - Sonar Pulse echo brightness (naked eye, night vision, thermal) and the wave ring are in the F12 menu under
