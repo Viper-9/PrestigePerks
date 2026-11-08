@@ -251,7 +251,7 @@ public class ActivePerkRulesTests
         Assert.Equal(["PrestigePerks_FirstAid_1", "PrestigePerks_FirstAid_2", "PrestigePerks_FirstAid_3"], buffs.Keys.Order());
         Assert.Equal("PrestigePerks_FirstAid_2", ActivePerkBuffs.FirstAidBuffName(2));
         var tier2 = buffs["PrestigePerks_FirstAid_2"];
-        Assert.Equal(new ActiveBuffLine("HealthRate", 4, true, 45), tier2[0]);
+        Assert.Equal(new ActiveBuffLine("HealthRate", 3.5, true, 45), tier2[0]);
         Assert.Equal(new ActiveBuffLine("RemoveAllBloodLosses", 0, true, 45), tier2[1]);
         Assert.Equal(new ActiveBuffLine("HealthRate", 3, true, 30), buffs["PrestigePerks_FirstAid_1"][0]);
         Assert.Equal(new ActiveBuffLine("RemoveAllBloodLosses", 0, true, 60), buffs["PrestigePerks_FirstAid_3"][1]);

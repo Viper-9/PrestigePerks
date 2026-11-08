@@ -174,24 +174,25 @@ public class PerkCatalogTests
 
         Assert.Equal(ActiveLimit.OncePerRaid, Spec("firstaid").Limit);
         Assert.Equal([30, 45, 60], Spec("firstaid").Duration);
-        Assert.Equal([3, 4, 5], Spec("firstaid").Values["regen"]);
+        Assert.Equal([3, 3.5, 4], Spec("firstaid").Values["regen"]);
         Assert.Equal([30, 45, 60], Spec("firstaid").Values["bloodstop"]);
         Assert.Equal(ActiveLimit.Cooldown, Spec("secondwind").Limit);
         Assert.Equal([300, 240, 180], Spec("secondwind").Cooldown);
         Assert.Equal([0, 0, 0], Spec("secondwind").Duration);
         Assert.Equal([20, 30, 40], Spec("sonarpulse").Duration);
-        Assert.Equal([50, 75, 100], Spec("sonarpulse").Values["radius"]);
+        Assert.Equal([50, 65, 80], Spec("sonarpulse").Values["radius"]);
         Assert.Equal([600, 600, 600], Spec("steadfast").Cooldown);
         Assert.Equal([60, 80, 100], Spec("steadfast").Duration);
-        Assert.Equal([60, 80, 100], Spec("focus").Duration);
+        Assert.Equal([80, 140, 200], Spec("focus").Duration);
         Assert.Equal([30, 50, 70], Spec("emergencysurgery").Values["restore"]);
         Assert.Equal([300, 300, 300], Spec("composure").Cooldown);
-        Assert.Equal([15, 25, 40], Spec("composure").Duration);
-        Assert.Equal([10, 15, 20], Spec("composure").Values["reduction"]);
-        Assert.Equal([5, 10, 15], Spec("composure").Values["inertia"]);
-        Assert.Equal([10, 15, 20], Spec("grit").Duration);
-        Assert.Equal([10, 15, 20], Spec("grit").Values["reduction"]);
-        Assert.Equal([30, 45, 60], Spec("resupply").Values["fill"]);
+        Assert.Equal([30, 45, 60], Spec("composure").Duration);
+        Assert.Equal([10, 12, 15], Spec("composure").Values["reduction"]);
+        Assert.Equal([5, 8, 10], Spec("composure").Values["inertia"]);
+        Assert.Equal([20, 30, 40], Spec("grit").Duration);
+        Assert.Equal([10, 12, 15], Spec("grit").Values["reduction"]);
+        Assert.Equal([5, 6, 7.5], Spec("grit").Values["head"]);
+        Assert.Equal([30, 55, 70], Spec("resupply").Values["fill"]);
         Assert.Equal([15, 25, 35], Spec("fieldrepair").Values["repair"]);
     }
 
@@ -222,7 +223,7 @@ public class PerkCatalogTests
         Assert.Contains("\"limit\":\"cooldown\"", json);
         Assert.Contains("\"cooldown\":[300,240,180]", json);
         Assert.Contains("\"limit\":\"raid\"", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.ActiveEntries[0]));
-        Assert.Contains("\"regen\":[3,4,5]", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.ActiveEntries[0]));
+        Assert.Contains("\"regen\":[3,3.5,4]", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.ActiveEntries[0]));
         Assert.DoesNotContain("\"active\"", System.Text.Json.JsonSerializer.Serialize(PerkCatalog.Entries[0]));
         Assert.Equal(PerkCatalog.ActiveIds, PerkCatalog.ActiveEntries.Select(entry => entry.Id));
     }

@@ -35,7 +35,7 @@ public class ActivePerkClientTests
         Assert.True(state.ActiveInfo("grit")!.Active.IsOncePerRaid);
         Assert.Equal(240, info.CooldownAt(2));
         Assert.Equal(0, info.DurationAt(2));
-        Assert.Equal(75, state.ActiveInfo("sonarpulse")!.Active.Value("radius", 2));
+        Assert.Equal(65, state.ActiveInfo("sonarpulse")!.Active.Value("radius", 2));
         Assert.Equal(0, state.ActiveInfo("sonarpulse")!.Active.Value("missing", 2));
         Assert.Null(state.Info("grit"));
         Assert.NotNull(state.AnyInfo("grit"));
@@ -157,7 +157,7 @@ public class ActivePerkClientTests
     }
 
     [Theory]
-    [InlineData("Stop bleeding, regen {regen}/s · {duration} s", 2, "Stop bleeding, regen 4/s · 45 s")]
+    [InlineData("Stop bleeding, regen {regen}/s · {duration} s", 2, "Stop bleeding, regen 3.5/s · 45 s")]
     [InlineData("Cooldown {cooldown} s", 3, "Cooldown 0 s")]
     [InlineData("{missing} stays", 1, "{missing} stays")]
     [InlineData("", 1, "")]
