@@ -7,7 +7,7 @@ using HarmonyLib;
 
 namespace PrestigePerks.Patches
 {
-    /// <summary>작업 표시줄이 만들어지면 "특전" 버튼을 붙인다.</summary>
+    /// <summary>작업 표시줄이 만들어지면 게임 글꼴을 잡는다 (특전 페이지는 캐릭터 화면 프레스티지 탭 드롭다운에서 연다).</summary>
     [HarmonyPatch]
     internal static class MenuTaskBarAwakePatch
     {

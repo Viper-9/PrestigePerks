@@ -53,6 +53,9 @@ public class Plugin : BaseUnityPlugin
         PatchOne(harmony, typeof(Patches.LocaleFilePatch));
         PatchOne(harmony, typeof(Patches.MenuTaskBarAwakePatch));
         PatchOne(harmony, typeof(Patches.MenuScreenShowPatch));
+        // 특전 페이지는 캐릭터 화면 프레스티지 탭 드롭다운에서 연다
+        PatchOne(harmony, typeof(Patches.InventoryScreenShowPatch));
+        PatchOne(harmony, typeof(Patches.PerkTabClickPatch));
         PatchOne(harmony, typeof(Patches.PrestigeStatusRecheckPatch));
         PatchOne(harmony, typeof(Patches.PrestigeClaimDiagnosticPatch));
         PatchOne(harmony, typeof(Patches.PrestigeTransferHeaderPatch));
