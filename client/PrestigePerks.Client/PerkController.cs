@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using EFT.Communications;
 using EFT.UI;
-using EFT.UI.Screens;
 using PrestigePerks.Game;
 using PrestigePerks.Model;
 using PrestigePerks.UI;
@@ -13,7 +12,7 @@ using UnityEngine;
 namespace PrestigePerks
 {
     /// <summary>
-    /// 특전 페이지 흐름: 작업 표시줄 버튼 → 페이지, 잠금·리롤·구매·넣기/빼기 → 서버 → 다시 그리기, 메인 메뉴 진입 때 Bonus 반영과 새 특전·단계 상한 알림.
+    /// 특전 페이지 흐름: 캐릭터 화면 프레스티지 탭 드롭다운 → 특전 패널 (<see cref="PerkTabHost"/>) → 페이지, 잠금·리롤·구매·넣기/빼기 → 서버 → 다시 그리기, 메인 메뉴 진입 때 Bonus 반영과 새 특전·단계 상한 알림.
     /// 규칙은 서버가 정하고 여기서는 응답을 그대로 보여 준다 (dev-docs 2_특전.md 2절, 6절).
     /// </summary>
     internal sealed class PerkController : MonoBehaviour
@@ -32,10 +31,11 @@ namespace PrestigePerks
         /// <summary>마지막으로 받은 서버 state (레이드 액티브 특전이 읽는다). 아직 없으면 null.</summary>
         internal PerkStateDto State => state;
         private PerkPage page;
-        private AnimatedToggle taskbarButton;
-        private float bottomInset;
+
+        // 페이지를 넣은 특전 패널. 언어나 서버 설정이 바뀌어 페이지를 다시 만들 때 쓴다
+        private RectTransform pageParent;
         private bool busy;
-        private static bool screenHooked;
+        private static bool localeHooked;
 
         // add-on 아이콘은 실행마다 한 번만 묻는다 (실패해도 다시 묻지 않고 기본 아이콘)
         private static bool iconsRequested;
@@ -84,38 +84,29 @@ namespace PrestigePerks
             return loaded;
         }
 
-        /// <summary>MenuTaskBar.Awake 뒤. 다음 프레임에 버튼을 붙인다 (다른 모드가 같은 줄에 버튼을 넣는 것과 순서를 피한다).</summary>
-        public void OnTaskBarAwake(MenuTaskBar taskBar) => StartCoroutine(InjectNextFrame(taskBar));
-
-        private IEnumerator InjectNextFrame(MenuTaskBar taskBar)
+        /// <summary>
+        /// MenuTaskBar.Awake 뒤. 게임 글꼴을 작업 표시줄 은신처 버튼 글자에서 가져온다 (특전 페이지와 레이드 액티브 HUD 가 쓴다.
+        /// 캐릭터 화면을 열기 전에 레이드에 들어가도 글꼴이 있게 메인 메뉴에서 잡는다).
+        /// </summary>
+        public void OnTaskBarAwake(MenuTaskBar taskBar)
         {
-            yield return null;
             try
             {
-                if (taskBar == null)
+                if (taskBar != null && taskBar._toggleButtons != null && taskBar._toggleButtons.TryGetValue(EMenuType.Hideout, out var hideout) && hideout != null)
                 {
-                    yield break;
+                    UiKit.Font = hideout.GetComponentInChildren<TMPro.TextMeshProUGUI>(true)?.font ?? UiKit.Font;
                 }
 
-                locale = LoadLocale();
-                taskbarButton = PerkTaskbarButton.Inject(taskBar, Locale.Get("taskbar"), OnTaskbarToggle);
-                if (taskbarButton != null)
+                if (!localeHooked)
                 {
-                    UiKit.Font = PerkTaskbarButton.FontOf(taskbarButton) ?? UiKit.Font;
-                }
-
-                if (!screenHooked)
-                {
-                    // 다른 화면(은신처, 상인 등)으로 가면 페이지를 닫는다
-                    EftScreenManager.Instance.OnScreenChanged += _ => { if (instance != null) instance.ClosePage(); };
-                    // 게임 언어를 바꾸면 버튼 이름과 열린 페이지 문구를 다시 고른다
+                    // 게임 언어를 바꾸면 열린 페이지 문구를 다시 고른다 (드롭다운 글자는 캐릭터 화면을 다시 열 때)
                     EFT.LocalizationManager.Instance.AddLocaleUpdateListener(() => { if (instance != null) instance.OnLocaleChanged(); });
-                    screenHooked = true;
+                    localeHooked = true;
                 }
             }
             catch (Exception e)
             {
-                Log.Error($"taskbar inject failed: {e}");
+                Log.Error($"taskbar font failed: {e}");
             }
         }
 
@@ -124,15 +115,9 @@ namespace PrestigePerks
             try
             {
                 locale = LoadLocale();
-                if (taskbarButton != null)
+                if (page != null && pageParent != null)
                 {
-                    PerkTaskbarButton.SetLabel(taskbarButton, Locale.Get("taskbar"));
-                    UiKit.Font = PerkTaskbarButton.FontOf(taskbarButton) ?? UiKit.Font;
-                }
-
-                if (page != null)
-                {
-                    OpenPage();
+                    OpenPage(pageParent);
                 }
             }
             catch (Exception e)
@@ -218,9 +203,9 @@ namespace PrestigePerks
             PerkBonusSync.Apply(state);
             PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio);
             // 첫 state 가 페이지보다 늦게 왔거나 서버 설정을 바꿨으면 액티브 칸·탭이 맞게 페이지를 다시 만든다 (리롤 중에는 두지 않는다)
-            if (page != null && !busy && page.ShowsActive != state.ActivePerksEnabled)
+            if (page != null && pageParent != null && !busy && page.ShowsActive != state.ActivePerksEnabled)
             {
-                OpenPage();
+                OpenPage(pageParent);
             }
 
             if (state.NewPerks.Count == 0 && state.NewTierCap == null)
@@ -317,20 +302,8 @@ namespace PrestigePerks
             }
         }
 
-        private void OnTaskbarToggle(bool on)
-        {
-            PerkGame.Sound(EUISoundType.ButtonBottomBarClick);
-            if (on)
-            {
-                OpenPage();
-            }
-            else
-            {
-                ClosePage();
-            }
-        }
-
-        private void OpenPage()
+        /// <summary>특전 패널(parent) 안에 페이지를 새로 만들고 서버 state 를 다시 받는다. 특전 탭을 고를 때 (<see cref="PerkTabHost"/>).</summary>
+        public void OpenPage(RectTransform parent)
         {
             try
             {
@@ -339,15 +312,14 @@ namespace PrestigePerks
                     Destroy(page.gameObject);
                 }
 
+                pageParent = parent;
                 locale = LoadLocale();
-                bottomInset = taskbarButton != null ? PerkTaskbarButton.TopPixels(taskbarButton) : 0;
-                page = PerkPage.Create(Locale, bottomInset, state?.ActivePerksEnabled ?? false);
+                page = PerkPage.Create(Locale, parent, state?.ActivePerksEnabled ?? false);
                 page.LockClicked += slot => _ = ToggleLock(slot);
                 page.RollClicked += () => _ = Roll();
                 page.BuyClicked += (perk, tier, price) => _ = Buy(perk, tier, price);
                 page.EquipDropped += (perk, slot) => _ = Change(() => PerkApi.Equip(perk, slot), "equip", perk);
                 page.UnequipDropped += slot => _ = Change(() => PerkApi.Unequip(slot), "unequip");
-                page.CloseClicked += ClosePage;
                 RenderPage(null);
                 _ = Reload();
             }
@@ -358,7 +330,8 @@ namespace PrestigePerks
             }
         }
 
-        private void ClosePage()
+        /// <summary>특전 탭을 내리거나 캐릭터 화면을 닫을 때.</summary>
+        public void ClosePage()
         {
             if (page != null)
             {
@@ -366,11 +339,8 @@ namespace PrestigePerks
                 page = null;
             }
 
+            pageParent = null;
             busy = false;
-            if (taskbarButton != null && taskbarButton.isOn)
-            {
-                taskbarButton.ToggleSilent(false);
-            }
         }
 
         private async Task Reload()

@@ -45,8 +45,9 @@ When you update, the zip overwrites `config/config.json`. Back it up first if yo
 
 ## Opening it
 
-Press the **PERKS** button in the bottom taskbar of the main menu, next to Hideout. The page opens any time outside
-a raid.
+Open the character screen and click the **PRESTIGE** tab. It drops down two entries, **PRESTIGE** and **PERKS**. Pick
+**PERKS** to open the page in the tab area. It opens any time outside a raid. Click the tab again and pick **PRESTIGE**,
+or any other tab, to leave.
 
 ![Taskbar button](media/taskbar.png)
 

@@ -14,14 +14,17 @@ namespace PrestigePerks.UI
     /// <summary>
     /// 특전 페이지 (dev-docs 2_특전.md 2절, 목업 2안 + 개편 3안): 왼쪽 위 장착 슬롯 6칸, 왼쪽 아래 특전 목록 (두 열, 20개를 넘으면 세로 스크롤), 오른쪽 코인·리롤·선택한 특전.
     /// 줄과 카드는 5.0 시즌 특전 줄과 프레스티지 보상 카드 스프라이트를 겹쳐 그린다 (<see cref="PerkSprites"/>).
-    /// 그리기와 선택·드래그만 하고 서버 호출은 <see cref="PerkController"/> 가 한다. 열 때마다 화면 크기에 맞춰 다시 만든다.
+    /// 그리기와 선택·드래그만 하고 서버 호출은 <see cref="PerkController"/> 가 한다. 캐릭터 화면 프레스티지 탭 드롭다운의 특전 패널(<see cref="PerkTabHost"/>) 안에
+    /// 열 때마다 그 크기에 맞춰 다시 만든다.
     /// </summary>
     internal sealed class PerkPage : MonoBehaviour
     {
-        private const float ReferenceHeight = 1080f;
+        // 줄 20개가 스크롤 없이 들어가는 높이 (1080 화면에서 작업 표시줄 위까지였던 크기). 패널이 이보다 낮으면 페이지 전체를 그만큼 줄인다
+        private const float DesignHeight = 1044f;
 
-        // 내용 폭 상한 (16:9 의 1920). 21:9 처럼 더 넓으면 가운데에 두고 배경만 화면 전체에 깐다
-        private const float MaxContentWidth = 1920f;
+        // 내용 폭 상한 = 페이지 높이 x 2.0 (1044 기준 2088). 16:9 와 조금 더 넓은 화면(2560x1400 등)은 꽉 채우고,
+        // 21:9 처럼 더 넓으면 가운데에 두고 배경만 패널 전체에 깐다. 고정 1920 이었을 때는 높이 맞춤 축소와 겹쳐 16:9 보다 조금 넓은 화면에서도 양옆이 비었다
+        private const float MaxContentAspect = 2.0f;
         private const float Margin = 16, PanelGap = 12, HeaderTop = 12, PanelHead = 46, SideWidth = 452;
         private const float SlotsTop = 68, SlotsHeight = 238, ListTop = 318;
         private const float CardHeight = 168, CardGap = 12;
@@ -83,7 +86,6 @@ namespace PrestigePerks.UI
 
         public event Action<int> LockClicked;
         public event Action RollClicked;
-        public event Action CloseClicked;
 
         /// <summary>보유하기(단계 1)·단계 구매. 특전, 단계, 화면에서 본 가격.</summary>
         public event Action<string, int, int> BuyClicked;
@@ -95,8 +97,11 @@ namespace PrestigePerks.UI
         public event Action<int> UnequipDropped;
 
         private PerkLocale locale;
-        // root 는 화면 전체 (배경, 드래그 카드), content 는 폭 상한을 둔 내용 (머리줄과 패널)
+        // root 는 패널 전체 (배경, 드래그 카드), content 는 폭 상한을 둔 내용 (머리줄과 패널)
         private RectTransform root, content;
+
+        // 마우스 화면 좌표를 바꿀 때 쓰는 카메라 (캐릭터 화면 Canvas 가 Screen Space - Camera 면 그 카메라, Overlay 면 null)
+        private Camera eventCamera;
         private TextMeshProUGUI levelLabel, coinsValue, freeValue, lockedValue, rollLabel, rollSub, messageLabel;
         private RectTransform freeDots, lockedDots;
         private float freeDotsStart, lockedDotsStart, sideWidth;
@@ -266,36 +271,40 @@ namespace PrestigePerks.UI
         /// <summary>액티브 칸·종류 탭을 만든 페이지 (만들 때 정한다).</summary>
         public bool ShowsActive => showActive;
 
-        public static PerkPage Create(PerkLocale locale, float bottomInsetPixels, bool showActive)
+        /// <summary>parent (특전 패널)를 꽉 채우는 페이지를 만든다. parent 는 이미 켜져 있고 크기가 정해져 있어야 한다.</summary>
+        public static PerkPage Create(PerkLocale locale, RectTransform parent, bool showActive)
         {
             var go = new GameObject("PrestigePerksPage", typeof(RectTransform));
-            DontDestroyOnLoad(go);
-            var canvas = go.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // LootNet 의 기록 창(490)과 같은 층. 작업 표시줄 위 영역만 덮어 아래 버튼은 그대로 눌린다
-            canvas.sortingOrder = 490;
-            var scaler = go.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-            scaler.scaleFactor = UnityEngine.Screen.height / ReferenceHeight;
-            go.AddComponent<GraphicRaycaster>();
+            go.layer = parent.gameObject.layer;
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
             var page = go.AddComponent<PerkPage>();
             page.locale = locale;
             page.showActive = showActive;
-            page.Build(scaler.scaleFactor, bottomInsetPixels);
+            var canvas = parent.GetComponentInParent<Canvas>();
+            var rootCanvas = canvas != null ? canvas.rootCanvas : null;
+            page.eventCamera = rootCanvas == null || rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : rootCanvas.worldCamera;
+            page.Build(parent.rect.size);
             return page;
         }
 
-        private void Build(float scale, float bottomInsetPixels)
+        private void Build(Vector2 area)
         {
-            // 16:9 보다 좁으면 (16:10, 4:3) 화면 너비에 맞춘다. 늘어난 너비는 목록 줄과 슬롯 카드가 나눠 쓴다.
-            // 21:9 처럼 넓으면 내용 폭은 1920 에서 멈추고 가운데에 둔다 (줄 가운데가 비지 않게, 16:9 와 같은 모양)
-            var width = UnityEngine.Screen.width / scale;
-            var height = ReferenceHeight - bottomInsetPixels / scale;
-            var contentWidth = Mathf.Min(width, MaxContentWidth);
+            // 패널이 DesignHeight 보다 낮으면 (탭 줄과 작업 표시줄을 빼면 1080 기준 약 1000) 그 비율로 페이지 전체를 줄인다.
+            // 16:9 보다 좁으면 (16:10, 4:3) 패널 너비에 맞춘다. 늘어난 너비는 목록 줄과 슬롯 카드가 나눠 쓴다.
+            // 21:9 처럼 넓으면 내용 폭은 높이 x 2.0 에서 멈추고 가운데에 둔다 (줄 가운데가 비지 않게)
+            var scale = area.y > 0f && area.y < DesignHeight ? area.y / DesignHeight : 1f;
+            var width = area.x / scale;
+            var height = area.y / scale;
+            var contentWidth = Mathf.Min(width, height * MaxContentAspect);
             var left = (width - contentWidth) / 2;
+            Log.Info($"perk page: panel {area.x:0}x{area.y:0}, scale {scale:0.###}, content {contentWidth:0} of {width:0}");
 
-            root = UiKit.Fill(transform, "Root");
-            root.offsetMin = new Vector2(0, bottomInsetPixels / scale);
+            root = UiKit.Rect(transform, "Root", 0, 0, width, height);
+            root.localScale = new Vector3(scale, scale, 1f);
             BuildBackground(left);
             content = UiKit.Rect(root, "Content", left, 0, contentWidth, height);
             BuildHeader(contentWidth);
@@ -326,18 +335,12 @@ namespace PrestigePerks.UI
             var title = UiKit.Label(header, "Title", 16, 23, 300, locale.Get("ui.title"), 26, TitleText);
             var titleWidth = UiKit.Width(title, title.text);
             levelLabel = UiKit.Label(header, "Level", 16 + titleWidth + 24, 24, 900, "", 16, UiKit.Muted);
-            // 프레스티지 숫자를 크게 넣으므로 칸을 넘어도 지우지 않는다
+            // 프레스티지 숫자를 크게 넣으므로 칸을 넘어도 지우지 않는다. 닫기는 탭으로 하므로 뒤로 버튼은 없다
             levelLabel.overflowMode = TextOverflowModes.Overflow;
-
-            // 작은 BACK 버튼. 제목과 같은 크기 글자였을 때는 두 번째 제목처럼 보였다
-            var close = SmallButton(header, "Close", barWidth - 8 - 104, 8, 104, 30, locale.Get("ui.close"), 16);
-            close.Label.color = UiKit.Text;
-            OnHover(close.Fill.gameObject, on => close.Outline.color = on ? HoverLine : UiKit.Line);
-            close.Button.onClick.AddListener(() => CloseClicked?.Invoke());
         }
 
         /// <summary>
-        /// 작은 버튼 (BACK, 목록 탭): 어두운 보조 버튼 모양으로 만든다. 마우스를 올리면 색 틴트로 바탕이 밝아진다 (테두리는 부르는 쪽이 OnHover 로).
+        /// 작은 버튼 (목록 탭): 어두운 보조 버튼 모양으로 만든다. 마우스를 올리면 색 틴트로 바탕이 밝아진다 (테두리는 부르는 쪽이 OnHover 로).
         /// 눌러도 선택 상태로 남지 않게 내비게이션을 끈다 (선택 상태면 마우스를 올려도 밝아지지 않는다).
         /// </summary>
         private static (Button Button, Image Fill, Image Outline, TextMeshProUGUI Label) SmallButton(RectTransform parent, string name, float x, float y,
@@ -1598,7 +1601,8 @@ namespace PrestigePerks.UI
         {
             var tier = PerkPageModel.ShownTier(lastState, perk);
             ghost = UiKit.Rect(root, "Ghost", 0, 0, 210, 52);
-            ghost.anchorMin = ghost.anchorMax = new Vector2(0.5f, 0.5f);
+            // MoveDrag 의 마우스 좌표는 root pivot(왼쪽 위) 기준이므로 같은 점에 고정한다 (가운데에 두면 root 크기의 반만큼 밀린다)
+            ghost.anchorMin = ghost.anchorMax = root.pivot;
             var group = ghost.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
             UiKit.Image(ghost, new Color32(17, 21, 23, 240));
@@ -1623,13 +1627,13 @@ namespace PrestigePerks.UI
                 return;
             }
 
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(root, data.position, null, out var local))
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(root, data.position, eventCamera, out var local))
             {
                 ghost.anchoredPosition = local + new Vector2(14, -14);
             }
 
             var reel = dragPerk != null ? ReelAt(data.position) : -1;
-            var list = dragSlot >= 0 && RectTransformUtility.RectangleContainsScreenPoint(listPanel, data.position, null);
+            var list = dragSlot >= 0 && RectTransformUtility.RectangleContainsScreenPoint(listPanel, data.position, eventCamera);
             if (reel != dropReel || list != overList)
             {
                 dropReel = reel;
@@ -1648,7 +1652,7 @@ namespace PrestigePerks.UI
             var perk = dragPerk;
             var slot = dragSlot;
             var target = data != null && perk != null ? ReelAt(data.position) : -1;
-            var toList = data != null && slot >= 0 && RectTransformUtility.RectangleContainsScreenPoint(listPanel, data.position, null);
+            var toList = data != null && slot >= 0 && RectTransformUtility.RectangleContainsScreenPoint(listPanel, data.position, eventCamera);
             CancelDrag();
             dragEndFrame = Time.frameCount;
 
@@ -1687,7 +1691,7 @@ namespace PrestigePerks.UI
         {
             for (var i = 0; i < reels.Count; i++)
             {
-                if (reels[i].Open && RectTransformUtility.RectangleContainsScreenPoint(reels[i].Box, screen, null))
+                if (reels[i].Open && RectTransformUtility.RectangleContainsScreenPoint(reels[i].Box, screen, eventCamera))
                 {
                     return i;
                 }
@@ -1877,17 +1881,11 @@ namespace PrestigePerks.UI
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            // Esc 로 화면을 닫는 것은 게임이 한다. 끄는 중이면 끌기만 취소한다
+            if (Input.GetKeyDown(KeyCode.Escape) && ghost != null)
             {
-                if (ghost != null)
-                {
-                    CancelDrag();
-                    Rerender();
-                }
-                else
-                {
-                    CloseClicked?.Invoke();
-                }
+                CancelDrag();
+                Rerender();
             }
         }
 

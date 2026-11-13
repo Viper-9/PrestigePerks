@@ -1,5 +1,4 @@
 {
-  "taskbar": "특전",
   "ui.title": "특전",
   "ui.level": "프레스티지 {0}  ·  단계 상한 {1}  ·  도감 {2} / {3}",
   "ui.list": "특전 목록",
@@ -16,7 +15,6 @@
   "ui.roll": "리롤",
   "ui.rollButton": "리롤",
   "ui.rolling": "추첨 중…",
-  "ui.close": "뒤로",
   "ui.loading": "불러오는 중…",
   "ui.noSlots": "열린 특전 슬롯이 없습니다",
   "ui.costChanged": "비용이 바뀌었습니다. 다시 눌러 주세요",

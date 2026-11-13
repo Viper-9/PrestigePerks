@@ -72,8 +72,11 @@ namespace PrestigePerks.UI
 
         public static Sprite Lock => Load("Sprites.Seasons_PerkTemplate_Icon-lock", true);
 
-        /// <summary>작업 표시줄 "특전" 버튼 아이콘: 슬롯 배지 육각 + 별 (흰색, 색은 버튼 애니메이션이 입힌다).</summary>
+        /// <summary>특전 아이콘: 슬롯 배지 육각 + 별 (흰색). 그림이 없는 특전과 프레스티지 탭 드롭다운의 특전(평소 모양)에 쓴다.</summary>
         public static Sprite TaskbarIcon => Load("Sprites.Taskbar_Perk", true);
+
+        /// <summary>같은 아이콘의 어두운 색 (28, 55, 62). 고른 탭(밝은 바탕) 모양에 쓴다. 게임 탭의 고른 아이콘 색에 맞췄다.</summary>
+        public static Sprite TaskbarIconDark => Load("Sprites.Taskbar_Perk_Dark", true);
 
         /// <summary>풀린 자물쇠: Icon-lock 에서 고리를 올리고 오른쪽 다리를 끊어 그렸다.</summary>
         public static Sprite Unlock => Load("Sprites.Seasons_PerkTemplate_Icon-unlock", true);
