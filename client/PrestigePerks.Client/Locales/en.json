@@ -1,5 +1,4 @@
 {
-  "taskbar": "PERKS",
   "ui.title": "PERKS",
   "ui.level": "Prestige {0}  ·  Tier cap {1}  ·  Collection {2} / {3}",
   "ui.list": "Perk list",
@@ -16,7 +15,6 @@
   "ui.roll": "Reroll",
   "ui.rollButton": "REROLL",
   "ui.rolling": "ROLLING…",
-  "ui.close": "BACK",
   "ui.loading": "Loading…",
   "ui.noSlots": "No perk slots are open",
   "ui.costChanged": "The cost changed. Press again",
