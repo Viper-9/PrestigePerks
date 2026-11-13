@@ -694,7 +694,7 @@ namespace PrestigePerks.Patches
     }
 
     /// <summary>
-    /// 27 군의관 (안쪽): 파괴된 부위에 수술 키트를 쓸 때(바닐라 조건과 같음) 효과 시간에 <c>(1 + s) ÷ (1 + s + 0.2)</c>.
+    /// 27 군의관 (안쪽): 파괴된 부위에 수술 키트를 쓸 때(바닐라 조건과 같음) 효과 시간에 <c>(1 + s) ÷ (1 + s + 0.25 × 단계 비율)</c>.
     /// bodyPart 인자는 DoMedEffect 가 고른 실제 부위다.
     /// </summary>
     [HarmonyPatch]
