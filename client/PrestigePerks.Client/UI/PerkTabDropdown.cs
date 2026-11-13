@@ -54,10 +54,24 @@ namespace PrestigePerks.UI
         // 올려야 하는 동안 (메뉴가 열려 있거나 특전을 보는 동안) 이미 한 번 올렸는지
         private bool raised;
 
+        // 프레스티지 탭 아이콘 (평소 모양, 고른 모양). 특전을 보는 동안 특전 아이콘으로 바꾸고 돌아오면 원래 그림으로 되돌린다
+        private readonly List<TabIcon> prestigeIcons = new List<TabIcon>();
+        private bool iconsPerks;
+
         // 게임 TabSizeController 는 탭 줄의 모든 탭 폭을 가장 긴 탭 글자 폭(TabElement._sizeDefiners)에 맞춘다. 특전을 보는 동안 "특전 ▼"가
         // "프레스티지 ▼"보다 짧아 탭 줄 전체가 줄어들지 않게, 프레스티지 글자일 때의 폭을 기억하는 보이지 않는 칸을 폭 기준에 하나 더 넣는다
         private RectTransform widthKeeper;
         private List<RectTransform> sizeDefiners;
+
+        private sealed class TabIcon
+        {
+            public Image Image;
+            public Sprite Original;
+            public bool PreserveAspect;
+
+            // 고른 모양(밝은 바탕) 쪽이면 어두운 그림을 쓴다
+            public bool Selected;
+        }
 
         public Transform Root => root;
 
@@ -101,6 +115,10 @@ namespace PrestigePerks.UI
             }
 
             prestigeFallback = prestigeLabels.Count > 0 ? prestigeLabels[0].text : "";
+            FindIcons(tab, newLevelIcon, prestigeIcons);
+            Log.Info(prestigeIcons.Count > 0
+                ? $"prestige tab icons: {string.Join(", ", prestigeIcons.ConvertAll(icon => $"{(icon.Selected ? "selected" : "normal")} {icon.Image.name} ({icon.Original?.name})"))}"
+                : "prestige tab icons not found; perk icon not used on the tab");
 
             canvas = gameObject.AddComponent<Canvas>();
             gameObject.AddComponent<GraphicRaycaster>();
@@ -122,8 +140,8 @@ namespace PrestigePerks.UI
             var backing = slide.gameObject.AddComponent<Image>();
             backing.color = BackingColor;
 
-            AddItem("PrestigePerksMenuPrestige", () => Pick(pickPrestige));
-            AddItem("PrestigePerksMenuPerks", () => Pick(pickPerks));
+            AddItem("PrestigePerksMenuPrestige", () => Pick(pickPrestige), false);
+            AddItem("PrestigePerksMenuPerks", () => Pick(pickPerks), true);
 
             PerkTabClickPatch.Register(prestige, Toggle);
             // 항목과 숨긴 특전 탭에 따라가지 않게 복제를 끝낸 뒤에 넣는다 (숨긴 탭은 PerkTabHost 가 나중에 복제하지만 꺼져 있어 폭에 쓰이지 않는다)
@@ -171,7 +189,7 @@ namespace PrestigePerks.UI
             }
         }
 
-        private void AddItem(string name, Action onClick)
+        private void AddItem(string name, Action onClick, bool perksIcon)
         {
             var labels = new List<TMP_Text>();
             var tab = PerkTabClone.Make(prestige, slide, name, labels);
@@ -189,6 +207,14 @@ namespace PrestigePerks.UI
                 labels.RemoveAll(label => Under(label.transform, copiedIcon));
             }
 
+            // 특전 항목은 프레스티지 아이콘 대신 특전 아이콘 (예전 작업 표시줄 버튼 아이콘)
+            if (perksIcon)
+            {
+                var icons = new List<TabIcon>();
+                FindIcons(tab, copiedIcon, icons);
+                ApplyIcons(icons, true);
+            }
+
             tab.SetInteractable(true);
             tab.UpdateVisual(false);
             tab.gameObject.SetActive(true);
@@ -198,6 +224,75 @@ namespace PrestigePerks.UI
         }
 
         private static bool Under(Transform node, Transform parent) => parent != null && node.IsChildOf(parent);
+
+        /// <summary>
+        /// 탭의 평소 모양(_normalVersion)과 고른 모양(_selectedVersion)에서 아이콘 Image 를 하나씩 찾는다.
+        /// 그림이 있는 작은 정사각형 Image 중 가장 왼쪽 것 (바탕은 탭만큼 넓다). exclude ("새 단계" 표시) 밑은 뺀다.
+        /// </summary>
+        private static void FindIcons(global::Tab tab, Transform exclude, List<TabIcon> icons)
+        {
+            foreach (var (version, selected) in new[] { (tab._normalVersion, false), (tab._selectedVersion, true) })
+            {
+                if (version != null)
+                {
+                    AddIcon(version.transform, exclude, selected, icons);
+                }
+            }
+
+            // 두 모양 밖에 아이콘이 하나만 있는 구조면 (색은 게임이 입힌다고 보고) 흰 그림을 쓴다
+            if (icons.Count == 0)
+            {
+                AddIcon(tab.transform, exclude, false, icons);
+            }
+        }
+
+        private static void AddIcon(Transform within, Transform exclude, bool selected, List<TabIcon> icons)
+        {
+            Image best = null;
+            var bestX = float.MaxValue;
+            foreach (var image in within.GetComponentsInChildren<Image>(true))
+            {
+                var size = image.rectTransform.rect.size;
+                if (image.sprite == null || Under(image.transform, exclude) || size.x <= 0f || size.x > 64f || Mathf.Abs(size.x - size.y) > size.x * 0.4f)
+                {
+                    continue;
+                }
+
+                var x = within.InverseTransformPoint(image.rectTransform.position).x;
+                if (x < bestX)
+                {
+                    bestX = x;
+                    best = image;
+                }
+            }
+
+            if (best != null)
+            {
+                icons.Add(new TabIcon { Image = best, Original = best.sprite, PreserveAspect = best.preserveAspect, Selected = selected });
+            }
+        }
+
+        // perks 면 특전 아이콘 (고른 모양은 어두운 그림), 아니면 원래 그림. 크기·색은 그대로 둔다
+        private static void ApplyIcons(List<TabIcon> icons, bool perks)
+        {
+            foreach (var icon in icons)
+            {
+                if (icon.Image == null)
+                {
+                    continue;
+                }
+
+                var sprite = perks ? (icon.Selected ? PerkSprites.TaskbarIconDark : PerkSprites.TaskbarIcon) : icon.Original;
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                icon.Image.sprite = sprite;
+                icon.Image.overrideSprite = null;
+                icon.Image.preserveAspect = perks || icon.PreserveAspect;
+            }
+        }
 
         // 원본 탭 안의 node 를 복제본에서 같은 경로로 찾는다
         private Transform CopyOf(Transform node, Transform clone)
@@ -528,6 +623,11 @@ namespace PrestigePerks.UI
             var perks = perksShown();
             KeepWidth(perks);
             SetLabels(prestigeLabels, (perks ? perksTitle : PrestigeTitle()) + arrow);
+            if (perks != iconsPerks)
+            {
+                ApplyIcons(prestigeIcons, perks);
+                iconsPerks = perks;
+            }
             if (perks)
             {
                 if (prestige._selectedVersion != null && !prestige._selectedVersion.activeSelf)
@@ -602,6 +702,7 @@ namespace PrestigePerks.UI
             {
                 RaisePrestige(false);
                 SetLabels(prestigeLabels, PrestigeTitle());
+                ApplyIcons(prestigeIcons, false);
                 prestige.UpdateVersion();
             }
             catch (Exception e)
