@@ -1,3 +1,4 @@
+using PrestigePerks.Model;
 using PrestigePerks.Perks;
 
 namespace PrestigePerks.Tests;
@@ -31,6 +32,15 @@ public class PerkArtisanTests
 
     [Fact]
     public void Bitcoin_keeps_missing_elapsed() => Assert.Null(PerkArtisan.BitcoinElapsed(null));
+
+    // 화면 수치(카탈로그), 서버 생산 시간, 클라이언트 타이머가 같은 배율을 쓴다. 수치를 바꿀 때 한 곳을 빠뜨리지 않게
+    [Fact]
+    public void Server_and_client_time_factors_follow_the_catalog_amount()
+    {
+        var amount = PerkCatalog.Builtin.Single(perk => perk.Id == PerkArtisan.Perk).Amount;
+        Assert.Equal(1 + amount / 100, PerkArtisan.TimeFactor, 9);
+        Assert.Equal(PerkArtisan.TimeFactor, PerkPatchMath.CraftTimeFactor, 6);
+    }
 
     [Theory]
     [InlineData(0.5, 900.0, 111L)]   // I: ×0.9, 100 ÷ 0.9 = 111.1
