@@ -9,8 +9,12 @@ namespace PrestigePerks.Perks;
 public static class PerkArtisan
 {
     public const string Perk = "artisan";
-    /// <summary>단계 III 의 시간 배율.</summary>
-    public const double TimeFactor = 0.8;
+
+    /// <summary>
+    /// 단계 III 의 시간 배율 (지금 0.8). 카탈로그 효과량(−20%)에서 계산해 값의 출처를 <see cref="PerkCatalog"/> 하나로 둔다.
+    /// 수치를 바꿀 때 서버 값을 따로 고치지 않아도 화면 수치와 서버 생산 시간이 어긋나지 않는다 (클라이언트 계수는 테스트가 같은 값인지 본다).
+    /// </summary>
+    public static double TimeFactor { get; } = 1 + PerkCatalog.Builtin.Single(perk => perk.Id == Perk).Amount / 100;
 
     /// <summary>바닐라 서버의 최소 생산 시간 (HideoutHelper.GetAdjustedCraftTimeWithSkills).</summary>
     public const double MinSeconds = 5;
