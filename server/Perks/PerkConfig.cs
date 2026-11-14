@@ -198,6 +198,9 @@ public sealed record ModConfig
     [JsonPropertyName("prestige")]
     public PrestigeConfig Prestige { get; init; } = new();
 
+    [JsonPropertyName("coin")]
+    public CoinConfig Coin { get; init; } = new();
+
     [JsonPropertyName("safeCoins")]
     public SafeCoinConfig SafeCoins { get; init; } = new();
 

@@ -15,7 +15,7 @@ public sealed record BossCoinConfig
     [JsonPropertyName("chance")]
     public double Chance { get; init; } = 0.7;
 
-    /// <summary>코인 스택 최소·최대 (1~100). 같은 확률로 고른다.</summary>
+    /// <summary>코인 스택 최소·최대 (1~coin.stackSize). 같은 확률로 고른다.</summary>
     [JsonPropertyName("minStack")]
     public int MinStack { get; init; } = 25;
 
@@ -30,17 +30,17 @@ public sealed record BossCoinConfig
         init => roles = value?.Select(role => role?.ToLowerInvariant() ?? "").ToList();
     }
 
-    /// <summary>값이 잘못됐으면 이유를 돌려준다. null 이면 정상.</summary>
-    public string? Validate()
+    /// <summary>값이 잘못됐으면 이유를 돌려준다. null 이면 정상. <paramref name="stackSize"/> 는 coin.stackSize.</summary>
+    public string? Validate(int stackSize = 100)
     {
         if (Chance is < 0 or > 1 || double.IsNaN(Chance))
         {
             return "bossCoins.chance 는 0~1 이어야 합니다";
         }
 
-        if (MinStack < 1 || MaxStack > 100 || MinStack > MaxStack)
+        if (MinStack < 1 || MaxStack > stackSize || MinStack > MaxStack)
         {
-            return "bossCoins.minStack, maxStack 은 1~100 이고 최소 <= 최대 여야 합니다";
+            return $"bossCoins.minStack, maxStack 은 1~{stackSize}(coin.stackSize) 이고 최소 <= 최대 여야 합니다";
         }
 
         return Roles is null || Roles.Any(string.IsNullOrWhiteSpace) ? "bossCoins.roles 는 역할 이름 목록이어야 합니다" : null;

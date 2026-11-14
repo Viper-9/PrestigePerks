@@ -71,9 +71,9 @@ public class PrestigeCoinService(
         }
 
         var message = Message(result);
-        if (coinMailer.TrySend(sessionId, result.Total, message, PrestigeCoinMailer.OneYearSeconds))
+        if (coinMailer.TrySend(sessionId, result.Total, message, PrestigeCoinMailer.OneYearSeconds, out var stacks))
         {
-            logger.Info($"[PrestigePerks] prestige coin mail for {sessionId}: {result.Total} coins in {(result.Total + 99) / 100} stacks, kept {PrestigeCoinMailer.OneYearSeconds / 86400} days, text \"{message}\"");
+            logger.Info($"[PrestigePerks] prestige coin mail for {sessionId}: {result.Total} coins in {stacks} stacks, kept {PrestigeCoinMailer.OneYearSeconds / 86400} days, text \"{message}\"");
         }
         else
         {

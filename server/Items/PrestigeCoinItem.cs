@@ -42,7 +42,7 @@ public class PrestigeCoinItem(
         var bundlePath = System.IO.Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PrestigeCoinItem).Assembly), "bundles", BundleKey);
         var bundleAvailable = File.Exists(bundlePath);
 
-        var result = customItemService.CreateItemFromClone(BuildDetails(bundleAvailable, configLoader.SafeCoins));
+        var result = customItemService.CreateItemFromClone(BuildDetails(bundleAvailable, configLoader.SafeCoins, configLoader.Coin));
         if (result.Success != true)
         {
             logger.Error($"[PrestigePerks] 프레스티지 코인 생성 실패: {string.Join(", ", result.Errors ?? [])}");
@@ -51,17 +51,17 @@ public class PrestigeCoinItem(
 
         if (bundleAvailable)
         {
-            logger.Info($"[PrestigePerks] 프레스티지 코인 등록 ({TemplateId}, 전용 모델)");
+            logger.Info($"[PrestigePerks] 프레스티지 코인 등록 ({TemplateId}, 전용 모델, 스택 {configLoader.Coin.StackSize})");
         }
         else
         {
-            logger.Warning($"[PrestigePerks] 프레스티지 코인 등록 ({TemplateId}). bundles/{BundleKey} 가 없어 TarCoin 모델로 표시합니다");
+            logger.Warning($"[PrestigePerks] 프레스티지 코인 등록 ({TemplateId}, 스택 {configLoader.Coin.StackSize}). bundles/{BundleKey} 가 없어 TarCoin 모델로 표시합니다");
         }
 
         return Task.CompletedTask;
     }
 
-    internal static NewItemFromCloneDetails BuildDetails(bool bundleAvailable, SafeCoinConfig? safeCoins = null) =>
+    internal static NewItemFromCloneDetails BuildDetails(bool bundleAvailable, SafeCoinConfig? safeCoins = null, CoinConfig? coin = null) =>
         new()
         {
             ItemTplToClone = TarCoinTemplateId,
@@ -73,8 +73,8 @@ public class PrestigeCoinItem(
                 // null 이면 복제 원본(TarCoin)의 Prefab 이 그대로 남는다
                 Prefab = bundleAvailable ? new Prefab { Path = BundleKey, Rcid = "" } : null,
                 BackgroundColor = "green",
-                // 기획서 3장: 쌓이고, 보험·판매로 루블이 되지 않게 한다
-                StackMaxSize = 100,
+                // 기획서 3장: 쌓이고(한 칸 최대 coin.stackSize), 보험·판매로 루블이 되지 않게 한다
+                StackMaxSize = (coin ?? new CoinConfig()).StackSize,
                 InsuranceDisabled = true,
                 IsUnsaleable = true,
                 CanSellOnRagfair = false,
