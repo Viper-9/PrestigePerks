@@ -20,6 +20,9 @@
     "enabled": true,
     "opensAt": 1
   },
+  "coin": {
+    "stackSize": 100
+  },
   "safeCoins": {
     "chance": 0.3,
     "minStack": 5,

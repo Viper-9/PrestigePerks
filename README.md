@@ -283,6 +283,7 @@ defaults.
 Lowering a slot count keeps the perks of the closed slots in your data; they just stop working until the slot opens
 again.
 
+**`coin`**: `stackSize` (coins per inventory cell, 1–1000, default 100). Safe and boss `maxStack` cannot go above it.
 **`safeCoins`**: `chance` (0–1, 0 turns it off), `minStack`, `maxStack`.
 **`bossCoins`**: `enabled`, `chance` (0–1), `minStack`, `maxStack`, `roles` (bot roles that get coins; add other
 mods' bosses here).

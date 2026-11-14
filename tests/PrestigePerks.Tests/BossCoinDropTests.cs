@@ -151,7 +151,6 @@ public class BossCoinDropTests
     [InlineData("""{ "bossCoins": { "chance": 1.5 } }""")]
     [InlineData("""{ "bossCoins": { "minStack": 0 } }""")]
     [InlineData("""{ "bossCoins": { "minStack": 40, "maxStack": 30 } }""")]
-    [InlineData("""{ "bossCoins": { "maxStack": 101 } }""")]
     [InlineData("""{ "bossCoins": { "roles": null } }""")]
     public void Invalid_boss_coins_fall_back_to_defaults(string json)
     {
@@ -162,6 +161,18 @@ public class BossCoinDropTests
         Assert.Equal((0.7, 25, 35), (config.Chance, config.MinStack, config.MaxStack));
         Assert.Equal(BossCoinDrop.DefaultRoles, config.Roles);
         Assert.Contains(warnings, warning => warning.Contains("bossCoins"));
+    }
+
+    [Theory]
+    [InlineData("""{ "bossCoins": { "maxStack": 101 } }""", 25, 100)]
+    [InlineData("""{ "coin": { "stackSize": 30 } }""", 25, 30)]
+    [InlineData("""{ "coin": { "stackSize": 20 } }""", 20, 20)]
+    [InlineData("""{ "coin": { "stackSize": 250 }, "bossCoins": { "minStack": 150, "maxStack": 200 } }""", 150, 200)]
+    public void Boss_coin_stacks_follow_coin_stack_size(string json, int min, int max)
+    {
+        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json), _ => { }).BossCoins;
+
+        Assert.Equal((min, max), (config.MinStack, config.MaxStack));
     }
 
     [Fact]

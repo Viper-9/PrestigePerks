@@ -18,8 +18,13 @@ public class PrestigeCoinMailer(TemplateTable templateTable, ItemHelper itemHelp
     public bool IsAvailable => templateTable.Items.ContainsKey(PrestigeCoinItem.TemplateId);
 
     /// <summary>코인 아이템이 등록돼 있지 않으면 false.</summary>
-    public bool TrySend(MongoId sessionId, int amount, string message, long maxStorageSeconds)
+    public bool TrySend(MongoId sessionId, int amount, string message, long maxStorageSeconds) =>
+        TrySend(sessionId, amount, message, maxStorageSeconds, out _);
+
+    /// <summary>코인 아이템이 등록돼 있지 않으면 false. <paramref name="stacks"/> 는 coin.stackSize 로 나눈 스택 수.</summary>
+    public bool TrySend(MongoId sessionId, int amount, string message, long maxStorageSeconds, out int stacks)
     {
+        stacks = 0;
         if (amount <= 0 || !templateTable.Items.TryGetValue(PrestigeCoinItem.TemplateId, out var template))
         {
             return false;
@@ -34,6 +39,7 @@ public class PrestigeCoinMailer(TemplateTable templateTable, ItemHelper itemHelp
         coin.Upd.StackObjectsCount = amount;
 
         var items = itemHelper.SplitStack(coin);
+        stacks = items.Count;
         itemHelper.SetFoundInRaid(items);
         mailSendService.SendSystemMessageToPlayer(sessionId, message, items, maxStorageSeconds);
         return true;

@@ -117,7 +117,6 @@ public class SafeCoinDropTests
     [InlineData("""{ "safeCoins": { "chance": 1.5 } }""")]
     [InlineData("""{ "safeCoins": { "minStack": 0 } }""")]
     [InlineData("""{ "safeCoins": { "minStack": 20, "maxStack": 10 } }""")]
-    [InlineData("""{ "safeCoins": { "maxStack": 101 } }""")]
     public void Invalid_safe_coins_fall_back_to_defaults(string json)
     {
         var warnings = new List<string>();
@@ -126,6 +125,20 @@ public class SafeCoinDropTests
 
         Assert.Equal(new SafeCoinConfig(), config.SafeCoins);
         Assert.Contains(warnings, warning => warning.Contains("safeCoins"));
+    }
+
+    [Theory]
+    [InlineData("""{ "safeCoins": { "maxStack": 101 } }""", 5, 100)]
+    [InlineData("""{ "coin": { "stackSize": 10 } }""", 5, 10)]
+    [InlineData("""{ "coin": { "stackSize": 3 }, "safeCoins": { "minStack": 5, "maxStack": 15 } }""", 3, 3)]
+    public void Safe_coin_stacks_are_clamped_to_coin_stack_size(string json, int min, int max)
+    {
+        var warnings = new List<string>();
+
+        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json), warnings.Add).SafeCoins;
+
+        Assert.Equal((min, max), (config.MinStack, config.MaxStack));
+        Assert.Contains(warnings, warning => warning.Contains("safeCoins.maxStack"));
     }
 
     [Fact]

@@ -269,6 +269,7 @@ P5에서 도감을 다 모은 모습입니다. 모든 슬롯에 보유 특전이
 
 슬롯 수를 줄여도 닫힌 슬롯의 특전은 데이터에 남습니다. 그 슬롯이 다시 열릴 때까지 효과만 꺼집니다.
 
+**`coin`**: `stackSize`(한 칸에 쌓이는 코인 수, 1~1000, 기본 100). 금고·보스의 `maxStack`은 이 값을 넘을 수 없습니다.
 **`safeCoins`**: `chance`(0~1, 0이면 끔), `minStack`, `maxStack`.
 **`bossCoins`**: `enabled`, `chance`(0~1), `minStack`, `maxStack`, `roles`(코인을 받는 봇 역할. 다른 모드의 보스는
 여기에 더합니다).

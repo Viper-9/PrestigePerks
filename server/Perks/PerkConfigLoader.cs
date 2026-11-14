@@ -28,6 +28,8 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
 
     public PrestigeConfig Prestige => config.Value.Prestige;
 
+    public CoinConfig Coin => config.Value.Coin;
+
     public SafeCoinConfig SafeCoins => config.Value.SafeCoins;
 
     public BossCoinConfig BossCoins => config.Value.BossCoins;
@@ -53,7 +55,7 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
         return new ModConfig();
     }
 
-    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige, safeCoins, bossCoins)마다 검사해 잘못된 항목만 기본값으로 바꾼다. activePerks 가 null 이면 기본값(켬).</summary>
+    /// <summary>범위를 벗어난 슬롯 수·무료 리롤은 끝값으로 맞추고, 항목(perks, prestige, coin, safeCoins, bossCoins)마다 검사해 잘못된 항목만 기본값으로 바꾼다. activePerks 가 null 이면 기본값(켬).</summary>
     internal static ModConfig Validated(ModConfig config, Action<string> warn)
     {
         var perks = (config.Perks ?? new PerkConfig()).Clamped(warn);
@@ -70,21 +72,44 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
             prestige = new PrestigeConfig();
         }
 
+        var coin = config.Coin ?? new CoinConfig();
+        if (coin.Validate() is { } coinError)
+        {
+            warn($"{coinError}. coin 항목은 기본값을 씁니다");
+            coin = new CoinConfig();
+        }
+
+        // 금고·보스 스택은 코인 한 칸(coin.stackSize)을 넘을 수 없다. 넘으면 stackSize 로 맞춘다
+        var stackSize = coin.StackSize;
         var safeCoins = config.SafeCoins ?? new SafeCoinConfig();
-        if (safeCoins.Validate() is { } safeCoinError)
+        if (safeCoins.MaxStack > stackSize)
+        {
+            warn($"safeCoins.maxStack({safeCoins.MaxStack}) 이 coin.stackSize({stackSize}) 보다 커서 {stackSize} 로 맞춥니다");
+            safeCoins = safeCoins with { MinStack = Math.Min(safeCoins.MinStack, stackSize), MaxStack = stackSize };
+        }
+
+        if (safeCoins.Validate(stackSize) is { } safeCoinError)
         {
             warn($"{safeCoinError}. safeCoins 항목은 기본값을 씁니다");
-            safeCoins = new SafeCoinConfig();
+            var fallback = new SafeCoinConfig();
+            safeCoins = fallback with { MinStack = Math.Min(fallback.MinStack, stackSize), MaxStack = Math.Min(fallback.MaxStack, stackSize) };
         }
 
         var bossCoins = config.BossCoins ?? new BossCoinConfig();
-        if (bossCoins.Validate() is { } bossCoinError)
+        if (bossCoins.MaxStack > stackSize)
         {
-            warn($"{bossCoinError}. bossCoins 항목은 기본값을 씁니다");
-            bossCoins = new BossCoinConfig();
+            warn($"bossCoins.maxStack({bossCoins.MaxStack}) 이 coin.stackSize({stackSize}) 보다 커서 {stackSize} 로 맞춥니다");
+            bossCoins = bossCoins with { MinStack = Math.Min(bossCoins.MinStack, stackSize), MaxStack = stackSize };
         }
 
-        return config with { Perks = perks, ActivePerks = (config.ActivePerks ?? new ActivePerkConfig()).Clamped(warn), Prestige = prestige, SafeCoins = safeCoins, BossCoins = bossCoins };
+        if (bossCoins.Validate(stackSize) is { } bossCoinError)
+        {
+            warn($"{bossCoinError}. bossCoins 항목은 기본값을 씁니다");
+            var fallback = new BossCoinConfig();
+            bossCoins = fallback with { MinStack = Math.Min(fallback.MinStack, stackSize), MaxStack = Math.Min(fallback.MaxStack, stackSize) };
+        }
+
+        return config with { Perks = perks, ActivePerks = (config.ActivePerks ?? new ActivePerkConfig()).Clamped(warn), Prestige = prestige, Coin = coin, SafeCoins = safeCoins, BossCoins = bossCoins };
     }
 
     internal static ModConfig ParseModConfig(string json) => JsonSerializer.Deserialize<ModConfig>(json, Options) ?? new ModConfig();
