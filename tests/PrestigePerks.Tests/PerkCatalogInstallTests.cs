@@ -59,9 +59,9 @@ public sealed class PerkCatalogInstallTests : IDisposable
         Assert.Equal(("code", false), (sprint.Kind, sprint.Icon));
         Assert.Null(sprint.Texts);
 
-        // 내장 특전 JSON 은 지금과 같다 (새 필드 없음)
+        // 내장 특전 JSON 은 add-on 필드 없이 단계별 수치(tiers)만 더한다
         var json = System.Text.Json.JsonSerializer.Serialize(PerkCatalog.Entries[0]);
-        Assert.Equal("""{"id":"experience","amount":30,"unit":"points"}""", json);
+        Assert.Equal("""{"id":"experience","amount":30,"tiers":[15,22.5,30],"unit":"points"}""", json);
     }
 
     [Fact]

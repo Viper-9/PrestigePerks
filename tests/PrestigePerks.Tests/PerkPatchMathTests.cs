@@ -18,14 +18,30 @@ public class PerkPatchMathTests
             ["porter"] = 1, ["stamina"] = 3, ["mastery"] = 2, ["agility"] = 3, ["experience"] = 1, ["someone.sprint"] = 1, ["search"] = 0, ["control"] = 4,
         };
 
-        var scales = PerkPatchMath.BuildScales(tiers, [0.5, 0.75, 1.0], disabled);
+        var scales = PerkPatchMath.BuildScales(tiers, null!, disabled);
 
         Assert.Equal(["porter", "mastery", "agility"], Enumerable.Range(0, scales.Length).Where(slot => scales[slot] > 0).Select(slot => PerkPatchSlots.Ids[slot]));
         Assert.Equal([0.5f, 0.75f, 1f], new[] { scales[PerkPatchSlots.Index("porter")], scales[PerkPatchSlots.Index("mastery")], scales[PerkPatchSlots.Index("agility")] });
         Assert.All(PerkPatchMath.BuildScales(null!, null!, disabled), scale => Assert.Equal(0f, scale));
         Assert.Equal(PerkPatchSlots.Count, PerkPatchMath.BuildScales(new Dictionary<string, int>(), null!, null!).Length);
-        // 비율을 받지 못하면 기본값 (0.5, 0.75, 1)
+        // 단계별 수치를 받지 못하면 기본 비율 (0.5, 0.75, 1)
         Assert.Equal(0.75f, PerkPatchMath.BuildScales(new Dictionary<string, int> { ["porter"] = 2 }, null!, null!)[PerkPatchSlots.Index("porter")]);
+    }
+
+    // 비율은 특전마다 catalog tiers 의 그 단계 ÷ III
+    [Fact]
+    public void Scales_follow_each_perks_tier_amounts()
+    {
+        var catalog = new List<PerkCatalogEntryDto>
+        {
+            new() { Id = "porter", Amount = 20, Tiers = [4, 10, 20] },
+            new() { Id = "agility", Amount = 5, Tiers = [5, 5, 5] },
+        };
+        var scales = PerkPatchMath.BuildScales(new Dictionary<string, int> { ["porter"] = 1, ["agility"] = 1, ["mastery"] = 2 }, catalog, null!);
+
+        Assert.Equal(0.2f, scales[PerkPatchSlots.Porter], Tolerance);
+        Assert.Equal(1f, scales[PerkPatchSlots.Agility], Tolerance);
+        Assert.Equal(0.75f, scales[PerkPatchSlots.Mastery], Tolerance); // catalog 에 없으면 기본 비율
     }
 
     // 클라이언트 패치가 있는 특전 = 서버 카탈로그의 Patch 특전. add-on 이 없는 지금은 정확히 같아야 한다
@@ -313,7 +329,7 @@ public sealed class PerkPatchSlotRegistrationTests : IDisposable
     public void Registered_slots_take_their_scale_from_the_applied_tier()
     {
         var sprint = PerkPatchSlots.Register("viper.sprint");
-        var scales = PerkPatchMath.BuildScales(new Dictionary<string, int> { ["viper.sprint"] = 2, ["porter"] = 1 }, [0.5, 0.75, 1.0], new bool[PerkPatchSlots.Count]);
+        var scales = PerkPatchMath.BuildScales(new Dictionary<string, int> { ["viper.sprint"] = 2, ["porter"] = 1 }, null!, new bool[PerkPatchSlots.Count]);
 
         Assert.Equal(PerkPatchSlots.Count, scales.Length);
         Assert.Equal(0.75f, scales[sprint]);
