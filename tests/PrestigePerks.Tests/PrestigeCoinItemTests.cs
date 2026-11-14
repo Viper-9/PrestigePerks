@@ -1,4 +1,5 @@
 using PrestigePerks.Items;
+using PrestigePerks.Perks;
 
 namespace PrestigePerks.Tests;
 
@@ -39,6 +40,27 @@ public class PrestigeCoinItemTests
         Assert.True(props.InsuranceDisabled);
         Assert.False(props.CanSellOnRagfair);
         Assert.Equal(100, props.StackMaxSize);
+    }
+
+    [Fact]
+    public void Stack_size_follows_config()
+    {
+        var props = PrestigeCoinItem.BuildDetails(bundleAvailable: false, coin: new CoinConfig { StackSize = 500 }).OverrideProperties!;
+
+        Assert.Equal(500, props.StackMaxSize);
+    }
+
+    [Theory]
+    [InlineData("""{ "coin": { "stackSize": 0 } }""")]
+    [InlineData("""{ "coin": { "stackSize": 1001 } }""")]
+    public void Invalid_stack_size_falls_back_to_default(string json)
+    {
+        var warnings = new List<string>();
+
+        var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json), warnings.Add);
+
+        Assert.Equal(100, config.Coin.StackSize);
+        Assert.Contains(warnings, warning => warning.Contains("coin.stackSize"));
     }
 
     [Fact]
