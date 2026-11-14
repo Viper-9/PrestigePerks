@@ -12,13 +12,45 @@
     "prestigeLevel4Slots": 4,
     "prestigeLevel5Slots": 5,
     "prestigeLevel6Slots": 6,
-    "tierEffectRatio": [0.5, 0.75, 1.0],
     "tierCapByPrestige": [1, 1, 1, 2, 2, 3, 3],
     "tierPrices": [40, 100, 200]
   },
   "activePerks": {
     "enabled": true,
     "opensAt": 1
+  },
+  "perkAmounts": {
+    "experience": [15, 22.5, 30],
+    "conditioning": [15, 22.5, 30],
+    "combat": [15, 22.5, 30],
+    "learning": [15, 22.5, 30],
+    "scav": [-15, -22.5, -30],
+    "porter": [10, 15, 20],
+    "stamina": [7.5, 11.25, 15],
+    "tough": [-10, -15, -20],
+    "control": [-5, -7.5, -10],
+    "maintenance": [-10, -15, -20],
+    "temperance": [-7.5, -11.25, -15],
+    "artisan": [-10, -15, -20],
+    "mastery": [15, 22.5, 30],
+    "loading": [-10, -15, -20],
+    "search": [15, 22.5, 30],
+    "surgeon": [12.5, 18.75, 25],
+    "reload": [7.5, 11.25, 15],
+    "handling": [5, 7.5, 10],
+    "reliability": [-10, -15, -20],
+    "agility": [2.5, 3.75, 5],
+
+    "firstaid": { "duration": [30, 45, 60], "regen": [3, 3.5, 4], "bloodstop": [30, 45, 60] },
+    "secondwind": { "cooldown": [300, 240, 180] },
+    "sonarpulse": { "duration": [20, 30, 40], "radius": [50, 65, 80] },
+    "steadfast": { "cooldown": [600, 600, 600], "duration": [60, 80, 100] },
+    "focus": { "duration": [80, 140, 200] },
+    "emergencysurgery": { "restore": [30, 50, 70] },
+    "composure": { "cooldown": [300, 300, 300], "duration": [30, 45, 60], "reduction": [10, 12, 15], "inertia": [5, 8, 10] },
+    "grit": { "duration": [20, 30, 40], "reduction": [10, 12, 15], "head": [5, 6, 7.5] },
+    "resupply": { "fill": [30, 55, 70] },
+    "fieldrepair": { "repair": [15, 25, 35] }
   },
   "coin": {
     "stackSize": 100

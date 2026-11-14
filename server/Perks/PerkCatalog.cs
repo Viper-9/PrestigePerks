@@ -53,19 +53,34 @@ public sealed record PerkAddonInfo(string Source, IReadOnlyDictionary<string, Pe
 /// Amount 는 단계 III 효과량(문구 방향의 부호 포함, % 는 숫자만)이다. 화면 수치이고, Bonus 특전은 Bonus 값과 같다.
 /// add-on 특전(dev-docs 95)은 Number 0 이고 Addon 에 출처·문구·아이콘 경로가 있다.
 /// 액티브 특전(dev-docs 94)은 Active 에 사용 제한과 단계별 값이 있고 Amount 0, Unit Flat 이다.
+/// Tiers 는 단계 I·II·III 효과량 (config perkAmounts, add-on perks.json 배열). 마지막 값이 Amount 다. null 이면 Amount × <see cref="DefaultRatios"/>.
 /// </summary>
-public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, double Amount, PerkUnit Unit, IReadOnlyList<PerkBonus> Bonuses, PerkAddonInfo? Addon = null, ActivePerkSpec? Active = null);
+public sealed record PerkDefinition(int Number, string Id, PerkKind Kind, double Amount, PerkUnit Unit, IReadOnlyList<PerkBonus> Bonuses, PerkAddonInfo? Addon = null, ActivePerkSpec? Active = null, IReadOnlyList<double>? Tiers = null)
+{
+    /// <summary>단계별 수치가 없을 때(add-on 의 숫자 하나 형식) 쓰는 비율 I, II, III.</summary>
+    public static IReadOnlyList<double> DefaultRatios { get; } = [0.5, 0.75, 1.0];
+
+    /// <summary>단계 I·II·III 효과량 (화면 수치).</summary>
+    public IReadOnlyList<double> TierAmounts => Tiers ?? DefaultRatios.Select(ratio => Amount * ratio).ToList();
+
+    /// <summary>
+    /// tier 단계(1~3)의 효과 비율: 그 단계 효과량 ÷ III 효과량. 효과가 선형이라 III 효과량에 곱하면 그 단계 효과가 된다.
+    /// 범위 밖 단계와 효과량 0(액티브)은 0.
+    /// </summary>
+    public double Ratio(int tier) => tier is >= 1 and <= PerkConfig.MaxTier && Amount != 0 ? TierAmounts[tier - 1] / Amount : 0;
+}
 
 /// <summary>
 /// 특전 정의: 내장 패시브 20개 (dev-docs 2_특전.md 3절, 6절) + 서버 시작 때 설치한 add-on 특전 (dev-docs 95, <see cref="Install"/>) + 내장 액티브 10개 (dev-docs 94, <see cref="BuiltinActive"/>).
 /// 번호·ID·Bonus ID 는 한 번 정하면 바꾸거나 재사용하지 않는다. 테스트가 값을 고정한다.
+/// 내장 특전의 수치는 서버 시작 때 config perkAmounts 로 바꾼다 (<see cref="Configure"/>). 코드의 값(<see cref="DefaultBuiltin"/>)은 기본값이다.
 /// 번호(<see cref="TryGet(int, out PerkDefinition)"/>, <see cref="IdOf"/>)는 내장(패시브 + 액티브)만 본다. ID 로 찾는 것은 설치한 add-on 과 액티브까지 본다.
 /// 목록(<see cref="All"/>, <see cref="Ids"/>, <see cref="Entries"/>, <see cref="Numbers"/>)은 패시브만이다. 액티브는 <see cref="ActiveIds"/>, <see cref="ActiveEntries"/>.
 /// </summary>
 public static class PerkCatalog
 {
-    /// <summary>내장 특전 20개. 바뀌지 않는다.</summary>
-    public static IReadOnlyList<PerkDefinition> Builtin { get; } =
+    /// <summary>내장 특전 20개의 기본 수치 (config perkAmounts 가 없을 때). 단계 I·II 는 III 의 0.5·0.75 배다.</summary>
+    public static IReadOnlyList<PerkDefinition> DefaultBuiltin { get; } =
     [
         Bonus(1, "experience", PerkUnit.Points, new PerkBonus("8bcbeb65b78be907af6ee2b0", BonusType.ExperienceRate, 30)),
         Bonus(2, "conditioning", PerkUnit.Points, new PerkBonus("5dad7e290a1ca8cc07e58bb7", BonusType.SkillGroupLevelingBoost, 30, BonusSkillType.Physical)),
@@ -94,8 +109,8 @@ public static class PerkCatalog
     // ActivePerk() 가 쓰므로 BuiltinActive 보다 앞에 둔다 (정적 초기화 순서)
     private static readonly double[] NoTiers = [0, 0, 0];
 
-    /// <summary>내장 액티브 특전 10개 (dev-docs 94 2절). 번호 41~50. 바뀌지 않는다.</summary>
-    public static IReadOnlyList<PerkDefinition> BuiltinActive { get; } =
+    /// <summary>내장 액티브 특전 10개의 기본 수치 (dev-docs 94 2절). 번호 41~50.</summary>
+    public static IReadOnlyList<PerkDefinition> DefaultBuiltinActive { get; } =
     [
         ActivePerk(41, "firstaid", ActiveLimit.OncePerRaid, null, T(30, 45, 60), ("regen", T(3, 3.5, 4)), ("bloodstop", T(30, 45, 60))),
         ActivePerk(42, "secondwind", ActiveLimit.Cooldown, T(300, 240, 180), null),
@@ -110,10 +125,7 @@ public static class PerkCatalog
         ActivePerk(50, "fieldrepair", ActiveLimit.OncePerRaid, null, null, ("repair", T(15, 25, 35))),
     ];
 
-    public static IReadOnlyList<string> ActiveIds { get; } = BuiltinActive.Select(perk => perk.Id).ToList();
-
-    /// <summary>state 의 activeCatalog (목록 순서). 서버 설정과 상관없이 늘 같다.</summary>
-    public static IReadOnlyList<PerkCatalogEntry> ActiveEntries { get; } = BuiltinActive.Select(ActiveEntry).ToList();
+    public static IReadOnlyList<string> ActiveIds { get; } = DefaultBuiltinActive.Select(perk => perk.Id).ToList();
 
     /// <summary>제외·통합한 번호. 다시 쓰지 않는다.</summary>
     public static IReadOnlyList<int> RetiredNumbers { get; } = [5, 6, 7, 12, 13, 18, 19, 20, 21, 22, 23, 28];
@@ -121,12 +133,14 @@ public static class PerkCatalog
     /// <summary>삭제한 Bonus 특전의 ID. 예전 파일에 남아 있을 수 있어 저장·로드 때 계속 걸러 낸다.</summary>
     public static IReadOnlyList<string> RetiredBonusIds { get; } = [];
 
-    public static IReadOnlyList<int> Numbers { get; } = Builtin.Select(perk => perk.Number).ToList();
+    public static IReadOnlyList<int> Numbers { get; } = DefaultBuiltin.Select(perk => perk.Number).ToList();
 
-    private static readonly Dictionary<int, PerkDefinition> ByNumber = Builtin.Concat(BuiltinActive).ToDictionary(perk => perk.Number);
-
-    // 설치 때 한 번에 바꾼다 (읽는 쪽이 반쯤 바뀐 표를 보지 않게). 서버 시작(Preload + 10)에 한 번이고, 그 뒤로는 읽기만 한다
+    // 설치·설정 때 한 번에 바꾼다 (읽는 쪽이 반쯤 바뀐 표를 보지 않게). 서버 시작(Preload + 10)에 한 번씩이고, 그 뒤로는 읽기만 한다
     private sealed record Tables(
+        IReadOnlyList<PerkDefinition> Builtin,
+        IReadOnlyList<PerkDefinition> BuiltinActive,
+        IReadOnlyList<PerkCatalogEntry> ActiveEntries,
+        IReadOnlyDictionary<int, PerkDefinition> ByNumber,
         IReadOnlyList<PerkDefinition> All,
         IReadOnlyList<PerkDefinition> Addons,
         IReadOnlyList<string> Ids,
@@ -135,8 +149,32 @@ public static class PerkCatalog
         IReadOnlySet<MongoId> FilteredBonusIds,
         IReadOnlyDictionary<string, byte[]> Icons);
 
-    // Builtin·RetiredBonusIds 뒤에 둔다 (정적 초기화 순서)
-    private static Tables tables = Build([], new Dictionary<string, byte[]>());
+    // 기본 수치·RetiredBonusIds 뒤에 둔다 (정적 초기화 순서)
+    private static Tables tables = Build(DefaultBuiltin, DefaultBuiltinActive, [], new Dictionary<string, byte[]>());
+
+    /// <summary>내장 특전 20개 (config 수치 적용, <see cref="Configure"/>).</summary>
+    public static IReadOnlyList<PerkDefinition> Builtin => tables.Builtin;
+
+    /// <summary>내장 액티브 특전 10개 (config 수치 적용, <see cref="Configure"/>).</summary>
+    public static IReadOnlyList<PerkDefinition> BuiltinActive => tables.BuiltinActive;
+
+    /// <summary>state 의 activeCatalog (목록 순서).</summary>
+    public static IReadOnlyList<PerkCatalogEntry> ActiveEntries => tables.ActiveEntries;
+
+    /// <summary>
+    /// 내장 특전 수치를 바꾼다 (config perkAmounts, <see cref="PerkAmountConfig"/>). ID·번호·순서는 기본값과 같아야 한다. 설치한 add-on 과 아이콘은 그대로 둔다.
+    /// 기본값으로 되돌리려면 <see cref="DefaultBuiltin"/>, <see cref="DefaultBuiltinActive"/> 를 넣는다.
+    /// </summary>
+    public static void Configure(IReadOnlyList<PerkDefinition> builtin, IReadOnlyList<PerkDefinition> builtinActive)
+    {
+        if (!builtin.Select(perk => perk.Id).SequenceEqual(DefaultBuiltin.Select(perk => perk.Id))
+            || !builtinActive.Select(perk => perk.Id).SequenceEqual(DefaultBuiltinActive.Select(perk => perk.Id)))
+        {
+            throw new ArgumentException("built-in perks must keep their ids and order");
+        }
+
+        tables = Build(builtin, builtinActive, tables.Addons, tables.Icons);
+    }
 
     /// <summary>내장 + 설치한 add-on 특전 (목록 순서).</summary>
     public static IReadOnlyList<PerkDefinition> All => tables.All;
@@ -186,24 +224,28 @@ public static class PerkCatalog
             accepted.Add(perk);
         }
 
-        tables = Build(accepted, new Dictionary<string, byte[]>());
+        tables = Build(Builtin, BuiltinActive, accepted, new Dictionary<string, byte[]>());
         return warnings;
     }
 
     /// <summary>add-on 아이콘을 넣는다. 설치한 add-on 특전의 것만 남긴다 (catalog 의 icon 도 따라 바뀐다).</summary>
-    public static void InstallIcons(IReadOnlyDictionary<string, byte[]> icons) => tables = Build(tables.Addons, icons);
+    public static void InstallIcons(IReadOnlyDictionary<string, byte[]> icons) => tables = Build(Builtin, BuiltinActive, tables.Addons, icons);
 
-    private static Tables Build(IReadOnlyList<PerkDefinition> addons, IReadOnlyDictionary<string, byte[]> icons)
+    private static Tables Build(IReadOnlyList<PerkDefinition> builtin, IReadOnlyList<PerkDefinition> builtinActive, IReadOnlyList<PerkDefinition> addons, IReadOnlyDictionary<string, byte[]> icons)
     {
-        var all = Builtin.Concat(addons).ToList();
+        var all = builtin.Concat(addons).ToList();
         var addonIds = addons.Select(perk => perk.Id).ToHashSet(StringComparer.Ordinal);
         var kept = icons.Where(pair => addonIds.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         return new Tables(
+            builtin.ToList(),
+            builtinActive.ToList(),
+            builtinActive.Select(ActiveEntry).ToList(),
+            builtin.Concat(builtinActive).ToDictionary(perk => perk.Number),
             all,
             addons.ToList(),
             all.Select(perk => perk.Id).ToList(),
             all.Select(perk => Entry(perk, kept)).ToList(),
-            all.Concat(BuiltinActive).ToDictionary(perk => perk.Id),
+            all.Concat(builtinActive).ToDictionary(perk => perk.Id),
             all.SelectMany(perk => perk.Bonuses).Select(bonus => bonus.Id)
                 .Concat(RetiredBonusIds)
                 .Select(id => new MongoId(id))
@@ -220,6 +262,7 @@ public static class PerkCatalog
         {
             Id = perk.Id,
             Amount = perk.Amount,
+            Tiers = perk.TierAmounts,
             Unit = perk.Unit switch
             {
                 PerkUnit.Points => PerkCatalogEntry.Points,
@@ -233,7 +276,7 @@ public static class PerkCatalog
         };
     }
 
-    public static bool TryGet(int number, out PerkDefinition perk) => ByNumber.TryGetValue(number, out perk!);
+    public static bool TryGet(int number, out PerkDefinition perk) => tables.ByNumber.TryGetValue(number, out perk!);
 
     public static bool TryGet(string? id, out PerkDefinition perk)
     {
@@ -241,7 +284,7 @@ public static class PerkCatalog
         return id is not null && tables.ById.TryGetValue(id, out perk!);
     }
 
-    public static bool IsKnown(int number) => ByNumber.ContainsKey(number);
+    public static bool IsKnown(int number) => tables.ByNumber.ContainsKey(number);
 
     /// <summary>액티브 특전인지 (모르는 ID·빈 칸은 false).</summary>
     public static bool IsActive(string? id) => TryGet(id, out var perk) && perk.Kind == PerkKind.Active;

@@ -10,7 +10,7 @@ namespace PrestigePerks.Api;
 /// </summary>
 public static class PerkAddons
 {
-    /// <summary>효과 비율 (단계 I 0.5, II 0.75, III 1, config tierEffectRatio 따름). 꺼져 있거나 모르는 특전이면 0. III 효과량에 곱한다.</summary>
+    /// <summary>효과 비율: 그 단계 수치 ÷ III 수치 (perks.json 의 [I, II, III], 숫자 하나면 I 0.5, II 0.75, III 1). 꺼져 있거나 모르는 특전이면 0. III 효과량에 곱한다.</summary>
     public static double Scale(PmcData? pmc, string id) => PerkScales.Of(pmc, id);
 
     /// <summary>이 PMC 에 그 특전 효과가 켜져 있는가 (열린 슬롯에 있고 단계 비율 &gt; 0). 모르는 특전이면 false.</summary>

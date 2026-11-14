@@ -201,7 +201,7 @@ namespace PrestigePerks
             RequestIcons();
             WarnUnregisteredCodePerks();
             PerkBonusSync.Apply(state);
-            PerkEffects.Set(state.ActiveTiers, state.TierEffectRatio);
+            PerkEffects.Set(state.ActiveTiers, state.Catalog);
             // 첫 state 가 페이지보다 늦게 왔거나 서버 설정을 바꿨으면 액티브 칸·탭이 맞게 페이지를 다시 만든다 (리롤 중에는 두지 않는다)
             if (page != null && pageParent != null && !busy && page.ShowsActive != state.ActivePerksEnabled)
             {

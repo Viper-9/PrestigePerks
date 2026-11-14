@@ -145,9 +145,10 @@ public static class PerkAddonFile
         var hasAmount = item.TryGetProperty("amount", out var amountValue);
         IReadOnlyList<PerkBonus> bonuses;
         double amount;
+        IReadOnlyList<double>? tiers;
         if (kind == PerkKind.Bonus)
         {
-            var parsed = ParseBonuses(id!, hasBonuses ? bonusList : default, out reason);
+            var parsed = ParseBonuses(id!, hasBonuses ? bonusList : default, out tiers, out reason);
             if (parsed is null)
             {
                 return null;
@@ -169,9 +170,12 @@ public static class PerkAddonFile
                 return null;
             }
 
-            if (!hasAmount || !TryValue(amountValue, out amount))
+            amount = 0;
+            tiers = null;
+            var amountError = MissingAmount;
+            if (!hasAmount || !TryAmount(amountValue, out amount, out tiers, out amountError))
             {
-                reason = $"code perk amount must be a non-zero number of at most {MaxValue} either way";
+                reason = $"code perk amount {amountError}";
                 return null;
             }
 
@@ -180,12 +184,13 @@ public static class PerkAddonFile
 
         var icon = String(item, "icon");
         return new PerkDefinition(0, id!, kind.Value, amount, unit.Value, bonuses,
-            new PerkAddonInfo(source, ParseTexts(item, note), string.IsNullOrWhiteSpace(icon) ? null : icon));
+            new PerkAddonInfo(source, ParseTexts(item, note), string.IsNullOrWhiteSpace(icon) ? null : icon), Tiers: tiers);
     }
 
-    private static List<PerkBonus>? ParseBonuses(string id, JsonElement list, out string reason)
+    private static List<PerkBonus>? ParseBonuses(string id, JsonElement list, out IReadOnlyList<double>? tiers, out string reason)
     {
         reason = "";
+        tiers = null;
         if (list.ValueKind != JsonValueKind.Array || list.GetArrayLength() is 0 or > MaxBonuses)
         {
             reason = $"bonus perks need 1 to {MaxBonuses} bonuses";
@@ -219,18 +224,23 @@ public static class PerkAddonFile
                 return null;
             }
 
-            if (!entry.TryGetProperty("value", out var valueElement) || !TryValue(valueElement, out var value))
+            double value = 0;
+            IReadOnlyList<double>? valueTiers = null;
+            var valueError = MissingAmount;
+            if (!entry.TryGetProperty("value", out var valueElement) || !TryAmount(valueElement, out value, out valueTiers, out valueError))
             {
-                reason = $"bonus value must be a non-zero number of at most {MaxValue} either way";
+                reason = $"bonus value {valueError}";
                 return null;
             }
 
             // 화면 수치는 첫 값 하나라 값이 다르면 보이는 것과 실제가 달라진다
-            if (result.Count > 0 && value != result[0].Value)
+            if (result.Count > 0 && (value != result[0].Value || !SameTiers(valueTiers, tiers)))
             {
                 reason = "bonus values differ (they must all be the same)";
                 return null;
             }
+
+            tiers = valueTiers;
 
             result.Add(new PerkBonus(BonusId(id, result.Count), type, value, skill));
         }
@@ -271,6 +281,66 @@ public static class PerkAddonFile
         item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     private static string? Text(JsonElement item, string name) => String(item, name) is { } text && !string.IsNullOrWhiteSpace(text) ? text : null;
+
+    private const string MissingAmount = "is missing (a number, or [I, II, III] with one number per tier)";
+
+    /// <summary>
+    /// amount·bonus value: 숫자 하나(단계 III, I·II 는 0.5·0.75 배)나 단계별 [I, II, III]. 값마다 0 이 아니고 절댓값 100 이하,
+    /// 배열은 부호가 같고 단계가 오를수록 약해지지 않아야 한다. 숫자 하나면 tiers 는 null.
+    /// </summary>
+    private static bool TryAmount(JsonElement element, out double amount, out IReadOnlyList<double>? tiers, out string reason)
+    {
+        tiers = null;
+        reason = "";
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            if (TryValue(element, out amount))
+            {
+                return true;
+            }
+
+            reason = $"must be a non-zero number of at most {MaxValue} either way, or [I, II, III]";
+            return false;
+        }
+
+        amount = 0;
+        var values = new List<double>();
+        foreach (var item in element.EnumerateArray())
+        {
+            if (!TryValue(item, out var value))
+            {
+                values = null;
+                break;
+            }
+
+            values.Add(value);
+        }
+
+        if (values is not { Count: PerkConfig.MaxTier })
+        {
+            reason = $"[I, II, III] must be 3 non-zero numbers of at most {MaxValue} either way";
+            return false;
+        }
+
+        if (values.Any(value => Math.Sign(value) != Math.Sign(values[0])))
+        {
+            reason = "[I, II, III] must all have the same sign";
+            return false;
+        }
+
+        if (PerkAmountConfig.TierOrderError(values) is not null)
+        {
+            reason = "[I, II, III] cannot get weaker at a higher tier";
+            return false;
+        }
+
+        amount = values[^1];
+        tiers = values;
+        return true;
+    }
+
+    private static bool SameTiers(IReadOnlyList<double>? a, IReadOnlyList<double>? b) =>
+        a is null ? b is null : b is not null && a.SequenceEqual(b);
 
     private static bool TryValue(JsonElement element, out double value)
     {

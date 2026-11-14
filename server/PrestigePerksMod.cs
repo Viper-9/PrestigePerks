@@ -30,6 +30,8 @@ public class PrestigePerksMod(
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         CheckProfileConverters();
+        // 내장 특전 수치를 add-on 설치·프로필 로드보다 먼저 넣는다
+        perkConfigLoader.ApplyPerkAmounts();
         LoadAddons();
         PerkScales.Store = perkDataStore;
         PerkScales.Config = perkConfigLoader.Config;

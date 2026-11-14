@@ -61,7 +61,7 @@ public sealed record PerkState
     [JsonPropertyName("slotOpensAt")]
     public IReadOnlyList<int?> SlotOpensAt { get; init; } = [];
 
-    /// <summary>효과를 적용하는 특전 ID 와 단계 (1~3). 클라이언트 패치가 tierEffectRatio 로 효과량을 정한다.</summary>
+    /// <summary>효과를 적용하는 특전 ID 와 단계 (1~3). 클라이언트 패치가 catalog 의 tiers 로 효과량을 정한다.</summary>
     [JsonPropertyName("activeTiers")]
     public IReadOnlyDictionary<string, int> ActiveTiers { get; init; } = new Dictionary<string, int>();
 
@@ -80,10 +80,6 @@ public sealed record PerkState
     /// <summary>단계 I·II·III 가격 (config tierPrices).</summary>
     [JsonPropertyName("tierPrices")]
     public IReadOnlyList<int> TierPrices { get; init; } = [];
-
-    /// <summary>단계 I·II·III 효과 비율 (config tierEffectRatio).</summary>
-    [JsonPropertyName("tierEffectRatio")]
-    public IReadOnlyList<double> TierEffectRatio { get; init; } = [];
 
     /// <summary>프레스티지로 올라 아직 알리지 않은 단계 상한. 클라이언트가 새 특전 알림에 붙인다.</summary>
     [JsonPropertyName("newTierCap")]
@@ -141,6 +137,11 @@ public sealed record PerkCatalogEntry
     /// <summary>단계 III 효과량 (부호 포함, % 는 숫자만).</summary>
     [JsonPropertyName("amount")]
     public double Amount { get; init; }
+
+    /// <summary>단계 I·II·III 효과량 (마지막 값이 amount). 클라이언트가 화면 수치와 패치 효과 비율(그 단계 ÷ III)을 이것으로 정한다. 액티브는 null.</summary>
+    [JsonPropertyName("tiers")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public IReadOnlyList<double>? Tiers { get; init; }
 
     [JsonPropertyName("unit")]
     public string Unit { get; init; } = Percent;

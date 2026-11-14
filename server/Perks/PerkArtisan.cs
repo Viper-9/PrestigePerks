@@ -11,10 +11,10 @@ public static class PerkArtisan
     public const string Perk = "artisan";
 
     /// <summary>
-    /// 단계 III 의 시간 배율 (지금 0.8). 카탈로그 효과량(−20%)에서 계산해 값의 출처를 <see cref="PerkCatalog"/> 하나로 둔다.
-    /// 수치를 바꿀 때 서버 값을 따로 고치지 않아도 화면 수치와 서버 생산 시간이 어긋나지 않는다 (클라이언트 계수는 테스트가 같은 값인지 본다).
+    /// 단계 III 의 시간 배율 (기본 0.8). 카탈로그 효과량(config perkAmounts, 기본 −20%)에서 계산해 값의 출처를 <see cref="PerkCatalog"/> 하나로 둔다.
+    /// 서버 시작 때 config 수치가 들어오므로 캐시하지 않고 읽을 때마다 계산한다 (클라이언트도 같은 catalog 값으로 계수를 정한다).
     /// </summary>
-    public static double TimeFactor { get; } = 1 + PerkCatalog.Builtin.Single(perk => perk.Id == Perk).Amount / 100;
+    public static double TimeFactor => PerkCatalog.TryGet(Perk, out var perk) ? 1 + perk.Amount / 100 : 1;
 
     /// <summary>바닐라 서버의 최소 생산 시간 (HideoutHelper.GetAdjustedCraftTimeWithSkills).</summary>
     public const double MinSeconds = 5;

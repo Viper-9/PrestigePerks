@@ -371,7 +371,6 @@ public class PerkService(
             TierCap = Config.TierCap(level),
             TierOpensAt = [Config.TierOpensAt(level, 2), Config.TierOpensAt(level, 3)],
             TierPrices = Config.TierPrices,
-            TierEffectRatio = Config.TierEffectRatio,
             FreeRerollsLeft = data.Rerolls.FreeLeft,
             FreeRerolls = Config.FreeRerolls,
             PaidRerolls = data.Rerolls.Paid,

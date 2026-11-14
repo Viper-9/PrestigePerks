@@ -15,7 +15,7 @@ public sealed record ActiveBuffLine(string BuffType, double Value, bool Absolute
 /// 체력 재생(HealthRate)과 새 출혈 막기(RemoveAllBloodLosses, Zagustin 과 같은 동작)가 같은 시간 동안 걸린다.
 /// </summary>
 [Injectable(TypePriority = OnLoadOrder.Preload + 10)]
-public class ActivePerkBuffs(ISptLogger<PerksFileLogger> logger, GlobalTable globalTable) : IOnLoad
+public class ActivePerkBuffs(ISptLogger<PerksFileLogger> logger, GlobalTable globalTable, PerkConfigLoader configLoader) : IOnLoad
 {
     /// <summary>클라이언트 응급 처치 효과가 같은 이름을 쓴다.</summary>
     public static string FirstAidBuffName(int tier) => $"PrestigePerks_FirstAid_{tier}";
@@ -38,6 +38,8 @@ public class ActivePerkBuffs(ISptLogger<PerksFileLogger> logger, GlobalTable glo
 
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
+        // 응급 처치 수치(config perkAmounts)를 읽기 전에 넣는다. PrestigePerksMod 와 같은 순서라 먼저 돌 수 있다
+        configLoader.ApplyPerkAmounts();
         var table = globalTable.Configuration.Health?.Effects?.Stimulator?.Buffs;
         if (table is null)
         {

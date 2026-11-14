@@ -38,7 +38,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.CarryingWeight(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Add);
                 }
             }
             catch (Exception e)
@@ -119,7 +119,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.StaminaCapacity(__result, baseValue, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.AddBase, baseValue);
                 }
             }
             catch (Exception e)
@@ -154,7 +154,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.Consumption(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -220,7 +220,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = val;
                     val = PerkPatchMath.Mastering(val, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, val);
+                    PerkEffects.Record(Perk, before, val, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -254,7 +254,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.AttentionLootSpeed(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Search);
                 }
             }
             catch (Exception e)
@@ -376,7 +376,7 @@ namespace PrestigePerks.Patches
             {
                 var before = cap;
                 cap = PerkPatchMath.ChanceCap(cap, PerkEffects.Scale(PerkPatchSlots.Tough));
-                PerkEffects.Record(PerkPatchSlots.Tough, before, cap);
+                PerkEffects.Record(PerkPatchSlots.Tough, before, cap, PerkCheckForm.Inverse);
             }
         }
     }
@@ -402,7 +402,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result.RecoilSupression.x;
                     __result.RecoilSupression.x = PerkPatchMath.RecoilSuppression(__result.RecoilSupression.x, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result.RecoilSupression.x);
+                    PerkEffects.Record(Perk, before, __result.RecoilSupression.x, PerkCheckForm.AddCapped);
                 }
             }
             catch (Exception e)
@@ -436,7 +436,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result.ReloadSpeed;
                     __result.ReloadSpeed = PerkPatchMath.ReloadSpeed(__result.ReloadSpeed, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result.ReloadSpeed);
+                    PerkEffects.Record(Perk, before, __result.ReloadSpeed, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -473,7 +473,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.Ergonomics(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Flat);
                 }
             }
             catch (Exception e)
@@ -511,7 +511,7 @@ namespace PrestigePerks.Patches
                     ammoMalfChance = PerkPatchMath.Malfunction(ammoMalfChance, PerkEffects.Scale(Perk));
                     overheatMalfChance = PerkPatchMath.Malfunction(overheatMalfChance, PerkEffects.Scale(Perk));
                     __result = PerkPatchMath.Malfunction(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -542,7 +542,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.ShotOverheat(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -573,7 +573,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = skillWeaponTreatmentFactor;
                     skillWeaponTreatmentFactor = PerkPatchMath.WeaponTreatmentFactor(skillWeaponTreatmentFactor, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, skillWeaponTreatmentFactor);
+                    PerkEffects.Record(Perk, before, skillWeaponTreatmentFactor, PerkCheckForm.Treatment);
                 }
             }
             catch (Exception e)
@@ -607,7 +607,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = armorDamage;
                     armorDamage = PerkPatchMath.ArmorDamage(armorDamage, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, armorDamage);
+                    PerkEffects.Record(Perk, before, armorDamage, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -645,7 +645,7 @@ namespace PrestigePerks.Patches
                     var before = motion.x;
                     motion.x = PerkPatchMath.MoveDistance(motion.x, PerkEffects.Scale(Perk));
                     motion.z = PerkPatchMath.MoveDistance(motion.z, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, motion.x);
+                    PerkEffects.Record(Perk, before, motion.x, PerkCheckForm.FactorSigned);
                 }
             }
             catch (Exception e)
@@ -721,7 +721,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.SurgeryTime(__result, health._skills.SurgerySpeed.Value, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Surgery, health._skills.SurgerySpeed.Value);
                 }
             }
             catch (Exception e)
@@ -761,7 +761,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = loadOneAmmoSpeed;
                     loadOneAmmoSpeed = PerkPatchMath.LoadOneAmmoSpeed(loadOneAmmoSpeed, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, loadOneAmmoSpeed);
+                    PerkEffects.Record(Perk, before, loadOneAmmoSpeed, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -800,7 +800,7 @@ namespace PrestigePerks.Patches
                 {
                     var before = __result;
                     __result = PerkPatchMath.CraftReduction(__result, PerkEffects.Scale(Perk));
-                    PerkEffects.Record(Perk, before, __result);
+                    PerkEffects.Record(Perk, before, __result, PerkCheckForm.Factor);
                 }
             }
             catch (Exception e)
@@ -829,7 +829,7 @@ namespace PrestigePerks.Patches
             {
                 var before = __result;
                 __result = PerkPatchMath.CraftReduction(__result, PerkEffects.Scale(Perk));
-                PerkEffects.Record(Perk, before, __result);
+                PerkEffects.Record(Perk, before, __result, PerkCheckForm.Factor);
             }
             catch (Exception e)
             {
@@ -857,7 +857,7 @@ namespace PrestigePerks.Patches
             {
                 var before = __result;
                 __result = PerkPatchMath.BitcoinSpeed(__result, PerkEffects.Scale(Perk));
-                PerkEffects.Record(Perk, before, __result);
+                PerkEffects.Record(Perk, before, __result, PerkCheckForm.Inverse);
             }
             catch (Exception e)
             {

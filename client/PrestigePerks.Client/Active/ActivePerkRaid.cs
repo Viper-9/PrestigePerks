@@ -180,6 +180,8 @@ namespace PrestigePerks.Active
             ActivePerkLog.Event($"press {use.Perk} T{use.Tier}: {result}");
             if (result == PressResult.Started)
             {
+                // 이번 사용에 쓰는 서버 수치 (config perkAmounts). CHECK 의 want 값과 같다
+                ActivePerkLog.Event($"{use.Perk} T{use.Tier} config: {use.Info.Describe(use.Tier)}");
                 effect.Start(use);
                 if (clock.Phase == ActivePhase.Running)
                 {

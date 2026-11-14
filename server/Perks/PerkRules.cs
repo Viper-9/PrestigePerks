@@ -106,9 +106,9 @@ public static class PerkRules
         return ActivePerks(data, config.Slots(prestigeLevel)).ToDictionary(perk => perk, perk => AppliedTier(data, perk, cap));
     }
 
-    /// <summary>효과를 적용할 특전과 효과 비율 (<see cref="PerkConfig.TierEffectRatio"/>). Bonus 와 17번 장인이 쓴다.</summary>
+    /// <summary>효과를 적용할 특전과 효과 비율 (그 단계 효과량 ÷ III, <see cref="PerkDefinition.Ratio"/>). Bonus 와 17번 장인이 쓴다.</summary>
     public static IReadOnlyDictionary<string, double> ActiveScales(PerkData data, int prestigeLevel, PerkConfig config) =>
-        ActiveTiers(data, prestigeLevel, config).ToDictionary(pair => pair.Key, pair => config.TierRatio(pair.Value));
+        ActiveTiers(data, prestigeLevel, config).ToDictionary(pair => pair.Key, pair => PerkCatalog.TryGet(pair.Key, out var perk) ? perk.Ratio(pair.Value) : 0);
 
     /// <summary>
     /// 새 단계 진입 처리. 단계가 기록보다 높으면 무료 횟수를 다시 채우고 유료 회차를 0 으로 되돌린다. 단계 상한이 올랐으면 알림으로 남긴다.
