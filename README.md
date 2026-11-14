@@ -49,7 +49,7 @@ Open the character screen and click the **PRESTIGE** tab. It drops down two entr
 **PERKS** to open the page in the tab area. It opens any time outside a raid. Click the tab again and pick **PRESTIGE**,
 or any other tab, to leave.
 
-![Taskbar button](media/taskbar.png)
+![Prestige tab menu](media/prestige-tab.png)
 
 The page follows the game language: Korean, English for everything else. The F12 settings are always in English.
 
