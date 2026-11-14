@@ -554,12 +554,8 @@ public class PerkRulesTests
     public void Tier_config_is_validated()
     {
         Assert.Null(Config.Validate());
-        Assert.NotNull((Config with { TierEffectRatio = [0.5, 1] }).Validate());
-        Assert.NotNull((Config with { TierEffectRatio = [0.5, 0.75, 1.5] }).Validate());
         Assert.NotNull((Config with { TierPrices = [40, -1, 200] }).Validate());
         Assert.NotNull((Config with { TierCapByPrestige = [] }).Validate());
-        Assert.Equal(0.75, Config.TierRatio(2));
-        Assert.Equal(0, Config.TierRatio(0));
         Assert.Equal(200, Config.TierPrice(3));
     }
     [Fact]
@@ -653,7 +649,6 @@ public class PerkRulesTests
         var config = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json), warning => Assert.Fail(warning)).Perks;
         Assert.Equal([0, 1, 2, 3, 4, 5, 6], Enumerable.Range(0, 7).Select(config.Slots));
         Assert.Equal(3, config.FreeRerolls);
-        Assert.Equal([0.5, 0.75, 1.0], config.TierEffectRatio);
         Assert.Equal([1, 1, 1, 2, 2, 3, 3], config.TierCapByPrestige);
         Assert.Equal([40, 100, 200], config.TierPrices);
         Assert.DoesNotContain("shake", json, StringComparison.OrdinalIgnoreCase);

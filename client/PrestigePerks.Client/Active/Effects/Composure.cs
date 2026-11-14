@@ -60,7 +60,7 @@ namespace PrestigePerks.Active
             ComposureState.Active = true;
             weapon.OnAimOrPoseChanged();
             ActivePerkLog.Check("composure.sway", Mathf.Abs(weapon.Breath.Intensity - Vanilla(weapon) * ComposureState.Sway) < 0.001f,
-                $"breath intensity {swayBefore:F3} -> {weapon.Breath.Intensity:F3} (x{ComposureState.Sway:F2})");
+                $"breath intensity {swayBefore:F3} -> {weapon.Breath.Intensity:F3} (want x{ComposureState.Sway:F2} of vanilla {Vanilla(weapon):F3}, config reduction {use.Value("reduction"):0.#}%)");
             ActivePerkLog.Check("composure.inertia", weapon.MotionReact.SwayFactors.x <= inertiaBefore.x + 0.0001f,
                 $"sway factors {inertiaBefore} -> {weapon.MotionReact.SwayFactors} (x{ComposureState.Inertia:F3})");
 
@@ -131,7 +131,7 @@ namespace PrestigePerks.Active
                 if (!ComposureState.RecoilChecked)
                 {
                     ComposureState.RecoilChecked = true;
-                    ActivePerkLog.Check("composure.recoil", str < before, $"first shot recoil strength {before:F3} -> {str:F3}");
+                    ActivePerkLog.Check("composure.recoil", str < before, $"first shot recoil strength {before:F3} -> {str:F3} (x{(before != 0f ? str / before : 0f):F2}, want x{ComposureState.Recoil:F2} = config reduction {(1f - ComposureState.Recoil) * 100f:0.#}%)");
                 }
             }
             catch (Exception e)

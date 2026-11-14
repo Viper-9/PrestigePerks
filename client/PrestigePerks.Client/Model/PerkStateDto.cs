@@ -42,9 +42,6 @@ namespace PrestigePerks.Model
         /// <summary>단계 I·II·III 가격.</summary>
         [JsonProperty("tierPrices")] public List<int> TierPrices = new List<int>();
 
-        /// <summary>단계 I·II·III 효과 비율.</summary>
-        [JsonProperty("tierEffectRatio")] public List<double> TierEffectRatio = new List<double>();
-
         /// <summary>프레스티지로 오른 단계 상한 (알림용). 없으면 null.</summary>
         [JsonProperty("newTierCap")] public int? NewTierCap;
 
@@ -142,7 +139,6 @@ namespace PrestigePerks.Model
                 state.Owned = state.Owned ?? new Dictionary<string, int>();
                 state.TierOpensAt = state.TierOpensAt ?? new List<int?>();
                 state.TierPrices = state.TierPrices ?? new List<int>();
-                state.TierEffectRatio = state.TierEffectRatio ?? new List<double>();
                 state.Catalog = (state.Catalog ?? new List<PerkCatalogEntryDto>()).Where(entry => !string.IsNullOrEmpty(entry?.Id)).ToList();
                 state.ActivePerkPrices = state.ActivePerkPrices ?? new List<int>();
                 state.ActiveCatalog = (state.ActiveCatalog ?? new List<PerkCatalogEntryDto>()).Where(entry => !string.IsNullOrEmpty(entry?.Id) && entry.Active != null).ToList();
@@ -235,6 +231,9 @@ namespace PrestigePerks.Model
         [JsonProperty("amount")] public double Amount;
         [JsonProperty("unit")] public string Unit;
 
+        /// <summary>단계 I·II·III 효과량 (마지막 값이 amount, 서버 config perkAmounts). 액티브와 예전 서버는 null (<see cref="PerkAmounts.Ratio"/> 가 기본 비율을 쓴다).</summary>
+        [JsonProperty("tiers")] public List<double> Tiers;
+
         /// <summary>add-on 특전 종류 ("bonus", "code"). 내장 특전은 null.</summary>
         [JsonProperty("kind")] public string Kind;
 
@@ -266,6 +265,33 @@ namespace PrestigePerks.Model
         public double DurationAt(int tier) => At(DurationTiers, tier);
 
         public double Value(string name, int tier) => name != null && Values != null && Values.TryGetValue(name, out var tiers) ? At(tiers, tier) : 0;
+
+        /// <summary>로그용: 그 단계의 서버 수치 (config perkAmounts) "cooldown 60 s, duration 20 s, reduction 70". 0 인 쿨타임·지속은 뺀다.</summary>
+        public string Describe(int tier)
+        {
+            var parts = new List<string>();
+            if (!IsOncePerRaid)
+            {
+                parts.Add($"cooldown {Number(CooldownAt(tier))} s");
+            }
+
+            if (DurationAt(tier) > 0)
+            {
+                parts.Add($"duration {Number(DurationAt(tier))} s");
+            }
+
+            if (Values != null)
+            {
+                foreach (var pair in Values)
+                {
+                    parts.Add($"{pair.Key} {Number(At(pair.Value, tier))}");
+                }
+            }
+
+            return parts.Count == 0 ? "no values" : string.Join(", ", parts);
+        }
+
+        private static string Number(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
         private static double At(List<double> tiers, int tier) => tiers != null && tier >= 1 && tier <= tiers.Count ? tiers[tier - 1] : 0;
     }

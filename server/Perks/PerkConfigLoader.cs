@@ -22,6 +22,9 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
 
     private readonly Lazy<ModConfig> config = new(() => Load(logger, modHelper));
 
+    private readonly object amountsLock = new();
+    private bool amountsApplied;
+
     public PerkConfig Config => config.Value.Perks;
 
     public ActivePerkConfig ActivePerks => config.Value.ActivePerks;
@@ -33,6 +36,29 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
     public SafeCoinConfig SafeCoins => config.Value.SafeCoins;
 
     public BossCoinConfig BossCoins => config.Value.BossCoins;
+
+    /// <summary>
+    /// config perkAmounts 를 내장 특전 수치로 넣는다 (<see cref="PerkCatalog.Configure"/>). 처음 한 번만 하고 다음 호출은 아무것도 하지 않는다.
+    /// 같은 순서(Preload + 10)의 IOnLoad 가 둘(<see cref="PrestigePerksMod"/>, <see cref="ActivePerkBuffs"/>)이라 수치를 읽는 쪽이 먼저 부른다.
+    /// 확인용으로 기본값과 다른 수치를 로그에 남긴다.
+    /// </summary>
+    public void ApplyPerkAmounts()
+    {
+        lock (amountsLock)
+        {
+            if (amountsApplied)
+            {
+                return;
+            }
+
+            amountsApplied = true;
+            var result = PerkAmountConfig.Resolve(config.Value.PerkAmounts, warning => logger.Warning($"[PrestigePerks] config/{FileName}: {warning}"));
+            PerkCatalog.Configure(result.Builtin, result.BuiltinActive);
+            logger.Info(result.Changed.Count == 0
+                ? "[PrestigePerks] perk amounts: defaults"
+                : $"[PrestigePerks] perk amounts changed by config ({result.Changed.Count}): {string.Join(", ", result.Changed)}");
+        }
+    }
 
     private static ModConfig Load(ISptLogger<PerksFileLogger> logger, ModHelper modHelper)
     {
@@ -59,6 +85,12 @@ public class PerkConfigLoader(ISptLogger<PerksFileLogger> logger, ModHelper modH
     internal static ModConfig Validated(ModConfig config, Action<string> warn)
     {
         var perks = (config.Perks ?? new PerkConfig()).Clamped(warn);
+        if (perks.LegacyTierEffectRatio is not null)
+        {
+            warn("perks.tierEffectRatio 는 더 이상 쓰지 않습니다 (무시합니다). 단계별 수치는 perkAmounts 에 특전마다 [I, II, III] 로 적습니다");
+            perks = perks with { LegacyTierEffectRatio = null };
+        }
+
         var prestige = config.Prestige ?? new PrestigeConfig();
         if (perks.Validate() is { } perkError)
         {

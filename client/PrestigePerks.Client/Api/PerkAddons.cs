@@ -27,7 +27,7 @@ namespace PrestigePerks.Api
         /// <summary>이 칸의 효과가 켜져 있는가 (PMC 의 열린 슬롯에 있고 단계 비율 &gt; 0). 모르는 칸이면 false.</summary>
         public static bool Has(int slot) => PerkEffects.Has(slot);
 
-        /// <summary>효과 비율 (단계 I 0.5, II 0.75, III 1, config tierEffectRatio 따름). 꺼져 있으면 0. III 효과량에 곱한다.</summary>
+        /// <summary>효과 비율: 그 단계 수치 ÷ III 수치 (perks.json 의 [I, II, III], 숫자 하나면 I 0.5, II 0.75, III 1). 꺼져 있으면 0. III 효과량에 곱한다.</summary>
         public static float Scale(int slot) => PerkEffects.Scale(slot);
 
         /// <summary>패치에서 예외가 났을 때. 그 특전을 이번 실행 동안 끄고 경고를 한 번 남긴다.</summary>

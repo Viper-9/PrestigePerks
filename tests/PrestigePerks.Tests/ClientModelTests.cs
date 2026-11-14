@@ -85,7 +85,6 @@ public class ClientModelTests
             TierCap = 2,
             TierOpensAt = [config.TierOpensAt(3, 2), config.TierOpensAt(3, 3)],
             TierPrices = config.TierPrices,
-            TierEffectRatio = config.TierEffectRatio,
             NewTierCap = 2,
             BuyCost = 100,
             Catalog = PerkCatalog.Entries,
@@ -99,7 +98,7 @@ public class ClientModelTests
         Assert.Equal(2, state.TierCap);
         Assert.Equal([null, 5], state.TierOpensAt);
         Assert.Equal([40, 100, 200], state.TierPrices);
-        Assert.Equal([0.5, 0.75, 1.0], state.TierEffectRatio);
+        Assert.Equal([-5, -7.5, -10], state.Info(Id(14))!.Tiers);
         Assert.Equal(2, state.NewTierCap);
         Assert.Equal(100, state.BuyCost);
     }
@@ -177,7 +176,6 @@ public class ClientModelTests
         state.Owned = new Dictionary<string, int> { [Id(14)] = 3, [Id(26)] = 1 };
         state.ActiveTiers = new Dictionary<string, int> { [Id(14)] = 2, [Id(11)] = 1 };
         state.TierPrices = [40, 100, 200];
-        state.TierEffectRatio = [0.5, 0.75, 1.0];
         state.TierOpensAt = [null, 5];
         return state;
     }
@@ -335,37 +333,45 @@ public class ClientModelTests
     }
 
     [Theory]
-    [InlineData(14, 0.5, "−5%")]
-    [InlineData(9, 0.75, "+15%")]
-    [InlineData(30, 0.75, "+7.5")]
-    [InlineData(11, 0.75, "−15%")]
-    [InlineData(32, 0.75, "+3.8%")]
-    [InlineData(10, 0.75, "+11.3%")]
-    [InlineData(1, 1.0, "+30%")]
-    public void Effect_values_scale_and_round_to_one_decimal(int perk, double ratio, string expected)
+    [InlineData(14, 1, "−5%")]
+    [InlineData(9, 2, "+15%")]
+    [InlineData(30, 2, "+7.5")]
+    [InlineData(11, 2, "−15%")]
+    [InlineData(32, 2, "+3.8%")]
+    [InlineData(10, 2, "+11.3%")]
+    [InlineData(1, 3, "+30%")]
+    public void Effect_values_scale_and_round_to_one_decimal(int perk, int tier, string expected)
     {
-        Assert.Equal(expected, PerkAmounts.Format(ClientCatalog().Single(entry => entry.Id == Id(perk)), ratio));
+        Assert.Equal(expected, PerkAmounts.Format(ClientCatalog().Single(entry => entry.Id == Id(perk)), tier));
     }
 
     [Theory]
-    [InlineData(1, 0.75, "+22.5%p")]
-    [InlineData(8, 1.0, "−30%p")]
-    [InlineData(14, 0.75, "−7.5%p")]
-    [InlineData(27, 0.75, "+18.8%p")]
-    [InlineData(11, 0.5, "−10%")] // 곱하는 특전은 그대로 %
-    [InlineData(24, 1.0, "+30%")]
-    [InlineData(30, 1.0, "+10")] // 고정값은 단위 없음
-    public void Added_perks_take_the_point_unit_and_multiplied_perks_keep_percent(int perk, double ratio, string expected)
+    [InlineData(1, 2, "+22.5%p")]
+    [InlineData(8, 3, "−30%p")]
+    [InlineData(14, 2, "−7.5%p")]
+    [InlineData(27, 2, "+18.8%p")]
+    [InlineData(11, 1, "−10%")] // 곱하는 특전은 그대로 %
+    [InlineData(24, 3, "+30%")]
+    [InlineData(30, 3, "+10")] // 고정값은 단위 없음
+    public void Added_perks_take_the_point_unit_and_multiplied_perks_keep_percent(int perk, int tier, string expected)
     {
-        Assert.Equal(expected, PerkAmounts.Format(ClientCatalog().Single(entry => entry.Id == Id(perk)), ratio, "%p"));
+        Assert.Equal(expected, PerkAmounts.Format(ClientCatalog().Single(entry => entry.Id == Id(perk)), tier, "%p"));
     }
 
     [Fact]
-    public void Tier_ratio_falls_back_to_defaults()
+    public void Tier_ratio_comes_from_the_tier_amounts_and_falls_back_to_defaults()
     {
+        var entry = new PerkCatalogEntryDto { Id = "porter", Amount = 20, Tiers = [4, 10, 20] };
+        Assert.Equal(0.2, PerkAmounts.Ratio(entry, 1), 6);
+        Assert.Equal(0.5, PerkAmounts.Ratio(entry, 2), 6);
+        Assert.Equal(1, PerkAmounts.Ratio(entry, 3), 6);
+        Assert.Equal("+4%", PerkAmounts.Format(entry, 1));
+        Assert.Equal(0, PerkAmounts.Ratio(entry, 4));
+        // 단계별 수치가 없거나 쓸 수 없으면 기본 비율 (0.5, 0.75, 1)
         Assert.Equal(0.75, PerkAmounts.Ratio(null!, 2));
-        Assert.Equal(0.4, PerkAmounts.Ratio([0.4, 0.6, 0.9], 1));
-        Assert.Equal(0, PerkAmounts.Ratio([0.5, 0.75, 1.0], 4));
+        Assert.Equal(0.5, PerkAmounts.Ratio(new PerkCatalogEntryDto { Amount = 20 }, 1));
+        Assert.Equal(0.5, PerkAmounts.Ratio(new PerkCatalogEntryDto { Amount = 20, Tiers = [1, 2] }, 1));
+        Assert.Equal(0.5, PerkAmounts.Ratio(new PerkCatalogEntryDto { Amount = 0, Tiers = [1, 2, 0] }, 1));
     }
 
     [Fact]
@@ -379,7 +385,7 @@ public class ClientModelTests
         Assert.Null(state.Info("someone.sprint"));
         Assert.Null(state.Info(null!));
         Assert.Empty(PerkStateDto.Parse("""{ "prestigeLevel": 1, "catalog": null }""")!.CatalogIds);
-        Assert.Equal("", PerkAmounts.Format((PerkCatalogEntryDto)null!, 1.0));
+        Assert.Equal("", PerkAmounts.Format((PerkCatalogEntryDto)null!, 3));
     }
 
     [Theory]

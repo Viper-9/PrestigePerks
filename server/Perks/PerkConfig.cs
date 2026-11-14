@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using PrestigePerks.Items;
 using PrestigePerks.Prestiges;
@@ -51,9 +52,11 @@ public sealed record PerkConfig
     [JsonPropertyName("prestigeLevel6Slots")]
     public int PrestigeLevel6Slots { get; init; } = 6;
 
-    /// <summary>단계 I·II·III 의 효과 비율. 특전 수치(III)의 효과량에 곱한다 (×0.8 의 I 은 ×0.9).</summary>
+    /// <summary>
+    /// 예전 단계 비율 설정 (0.1.8 까지). 지금은 쓰지 않고, 있으면 경고만 한다. 단계별 수치는 config perkAmounts 에 특전마다 적는다.
+    /// </summary>
     [JsonPropertyName("tierEffectRatio")]
-    public List<double> TierEffectRatio { get; init; } = [0.5, 0.75, 1.0];
+    public JsonElement? LegacyTierEffectRatio { get; init; }
 
     /// <summary>P0 ~ P6 에서 쓸 수 있는 가장 높은 단계 (1~3). 표보다 높은 단계는 마지막 값.</summary>
     [JsonPropertyName("tierCapByPrestige")]
@@ -77,9 +80,6 @@ public sealed record PerkConfig
         TierCapByPrestige is { Count: > 0 } caps
             ? Math.Clamp(caps[Math.Clamp(prestigeLevel, 0, caps.Count - 1)], 1, MaxTier)
             : 1;
-
-    /// <summary>tier 단계(1~3)의 효과 비율. 범위 밖이면 0 (효과 없음).</summary>
-    public double TierRatio(int tier) => tier >= 1 && tier <= TierEffectRatio.Count ? TierEffectRatio[tier - 1] : 0;
 
     /// <summary>tier 단계(1~3)의 가격.</summary>
     public int TierPrice(int tier) => TierPrices[Math.Clamp(tier, 1, MaxTier) - 1];
@@ -168,11 +168,6 @@ public sealed record PerkConfig
             return "lockCostStep >= 0, paidCostGrowth >= 1, paidCostCapRound >= 1 이어야 합니다";
         }
 
-        if (TierEffectRatio is not { Count: MaxTier } || TierEffectRatio.Any(ratio => ratio is < 0 or > 1))
-        {
-            return "tierEffectRatio 는 0~1 값 3개여야 합니다";
-        }
-
         if (TierPrices is not { Count: MaxTier } || TierPrices.Any(price => price < 0))
         {
             return "tierPrices 는 0 이상 값 3개여야 합니다";
@@ -194,6 +189,13 @@ public sealed record ModConfig
 
     [JsonPropertyName("activePerks")]
     public ActivePerkConfig ActivePerks { get; init; } = new();
+
+    /// <summary>
+    /// 내장 특전 수치 (특전 ID → 값). 패시브는 [I, II, III], 액티브는 { 이름: [I, II, III] }. 빠진 특전은 기본값.
+    /// 값마다 따로 검사하므로 한 특전이 잘못돼도 다른 설정은 그대로다 (<see cref="PerkAmountConfig"/>).
+    /// </summary>
+    [JsonPropertyName("perkAmounts")]
+    public Dictionary<string, JsonElement>? PerkAmounts { get; init; }
 
     [JsonPropertyName("prestige")]
     public PrestigeConfig Prestige { get; init; } = new();

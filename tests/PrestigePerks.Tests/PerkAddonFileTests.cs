@@ -190,4 +190,58 @@ public class PerkAddonFileTests
         Assert.DoesNotContain(BonusType.StashRows, PerkAddonFile.AllowedBonusTypes);
         Assert.DoesNotContain(BonusType.StashSize, PerkAddonFile.AllowedBonusTypes);
     }
+
+    [Fact]
+    public void Amounts_can_list_every_tier()
+    {
+        var perks = Parse("""
+            { "perks": [
+              { "id": "viper.sprint", "kind": "code", "unit": "percent", "amount": [2, 6, 10] },
+              { "id": "viper.study", "kind": "bonus", "unit": "points",
+                "bonuses": [ { "type": "SkillGroupLevelingBoost", "value": [5, 10, 20], "skillType": "Practical" },
+                             { "type": "SkillGroupLevelingBoost", "value": [5, 10, 20], "skillType": "Mental" } ] },
+              { "id": "viper.calm", "kind": "code", "unit": "percent", "amount": [-5, -5, -10] }
+            ] }
+            """);
+
+        Assert.Empty(warnings);
+        Assert.Equal((10.0, 0.2), (perks[0].Amount, perks[0].Ratio(1)));
+        Assert.Equal([2, 6, 10], perks[0].TierAmounts);
+        Assert.Equal([20.0, 20.0], perks[1].Bonuses.Select(bonus => bonus.Value));
+        Assert.Equal([5, 10, 20], perks[1].TierAmounts);
+        Assert.Equal(0.5, perks[2].Ratio(2));
+    }
+
+    [Fact]
+    public void A_single_amount_still_uses_the_default_tier_ratios()
+    {
+        var perk = Assert.Single(Parse("""{ "perks": [ { "id": "viper.sprint", "kind": "code", "unit": "percent", "amount": 10 } ] }"""));
+
+        Assert.Null(perk.Tiers);
+        Assert.Equal([5, 7.5, 10], perk.TierAmounts);
+    }
+
+    [Theory]
+    [InlineData("[5, 10]")]          // 3개가 아님
+    [InlineData("[0, 5, 10]")]       // 0
+    [InlineData("[5, 10, 200]")]     // 100 초과
+    [InlineData("[-5, 5, 10]")]      // 부호가 섞임
+    [InlineData("[10, 5, 20]")]      // 높은 단계가 약함
+    [InlineData("[\"5\", 5, 10]")] // 숫자가 아님
+    public void Bad_tier_amounts_skip_the_perk(string amount)
+    {
+        Assert.Empty(Parse($$"""{ "perks": [ { "id": "viper.sprint", "kind": "code", "unit": "percent", "amount": {{amount}} } ] }"""));
+        Assert.Contains(warnings, warning => warning.Contains("amount", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Bonus_tier_amounts_must_match()
+    {
+        Assert.Empty(Parse("""
+            { "perks": [ { "id": "viper.study", "kind": "bonus", "unit": "points",
+                "bonuses": [ { "type": "SkillGroupLevelingBoost", "value": [5, 10, 20], "skillType": "Practical" },
+                             { "type": "SkillGroupLevelingBoost", "value": 20, "skillType": "Mental" } ] } ] }
+            """));
+        Assert.Contains(warnings, warning => warning.Contains("differ", StringComparison.Ordinal));
+    }
 }

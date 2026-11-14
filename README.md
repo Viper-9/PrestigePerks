@@ -49,7 +49,7 @@ Open the character screen and click the **PRESTIGE** tab. It drops down two entr
 **PERKS** to open the page in the tab area. It opens any time outside a raid. Click the tab again and pick **PRESTIGE**,
 or any other tab, to leave.
 
-![Taskbar button](media/taskbar.png)
+![Prestige tab menu](media/prestige-tab.png)
 
 The page follows the game language: Korean, English for everything else. The F12 settings are always in English.
 
@@ -116,8 +116,8 @@ The page follows the game language: Korean, English for everything else. The F12
   it is in a slot, so once a reroll pushes it out you have to wait for it to come up again.
 - **BUY TIER II** (**100 coins**) and **BUY TIER III** (**200 coins**) upgrade an owned perk any time, up to your tier
   cap. Purchases are permanent and can't be refunded. Buttons buy on the first click, without a confirmation.
-- Effect by tier: **III is the full value** in the list below, II is 75% of it and I is 50%. Perks you don't own (rolled
-  or locked slots) work at tier I. Owned perks work at their tier, limited by the tier cap.
+- Effect by tier: the I / II / III columns in the list below. Perks you don't own (rolled or locked slots) work at
+  tier I. Owned perks work at their tier, limited by the tier cap.
 - The **COLLECTION** tab shows only the perks you own.
 
 ![Finished collection](media/complete.png)
@@ -138,8 +138,8 @@ A finished collection at P5: every slot holds an owned perk at tier III, and slo
 
 ### Perk list
 
-Values for tier I / II / III. "pp" means the value is added to the game's own bonus (from skills and hideout), not
-multiplied.
+Default values for tier I / II / III (you can change them, see `perkAmounts` in [Settings](#settings)). "pp" means
+the value is added to the game's own bonus (from skills and hideout), not multiplied.
 
 | Perk | Effect | I | II | III |
 |---|---|---|---|---|
@@ -277,7 +277,6 @@ defaults.
 | `paidCostGrowth` | 2 | Cost multiplier per paid reroll |
 | `paidCostCapRound` | 3 | Paid reroll number from which the cost stays fixed |
 | `tierPrices` | 40, 100, 200 | Coin price of tier I, II, III |
-| `tierEffectRatio` | 0.5, 0.75, 1.0 | Effect of tier I, II, III relative to the full value |
 | `tierCapByPrestige` | 1, 1, 1, 2, 2, 3, 3 | Tier cap from P0 to P6 |
 
 Lowering a slot count keeps the perks of the closed slots in your data; they just stop working until the slot opens
@@ -293,6 +292,23 @@ level that opens the active slot. `0` opens it before your first prestige. Raisi
 is already open.
 **`prestige`**: `stages` holds the requirements of P1–P6 from the table above (`level`, `skills`, `hideout`,
 `roubles`, `transferMultiplier` = share of progress **lost**, `newBeginningLevel`).
+
+**`perkAmounts`**: the values of every built-in perk for tier I, II and III, the same numbers as the perk tables
+above. The perk page shows whatever you set here.
+
+```json
+"agility": [2.5, 3.75, 5],
+"tough": [-10, -15, -20],
+"grit": { "duration": [20, 30, 40], "reduction": [10, 12, 15], "head": [5, 6, 7.5] }
+```
+
+- Passive perks take `[I, II, III]` with the sign from the table. A perk that lowers something stays negative, a
+  higher tier can't be weaker than a lower one, and decreases stay above −100.
+- Active perks list their values by name. `cooldown` and `duration` are seconds, `radius` is metres, `regen` is health
+  per second, `bloodstop` is seconds, the rest are percent (at most 100). Every value must be above 0.
+- A wrong value keeps the default for that perk (or that active value) with a warning in the server log. A perk left
+  out uses its default.
+- `perks.tierEffectRatio` from older versions is no longer used.
 
 ## Compatibility
 

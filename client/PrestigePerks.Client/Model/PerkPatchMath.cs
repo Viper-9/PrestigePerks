@@ -5,35 +5,121 @@ namespace PrestigePerks.Model
 {
     /// <summary>
     /// 클라이언트 패치 특전의 계수와 범위 자르기 (dev-docs 2_특전.md 6절 "클라이언트 패치 특전 (3차)").
-    /// 상수는 단계 III 값이다. scale 은 단계 효과 비율(I 0.5, II 0.75, III 1)이고 배수가 아니라 효과량에 곱한다 (×0.8 의 I 은 ×0.9).
+    /// 계수는 단계 III 값이고 서버 catalog 의 III 효과량(서버 config perkAmounts)으로 정한다 (<see cref="Configure"/>).
+    /// scale 은 단계 효과 비율(그 단계 효과량 ÷ III, 기본 I 0.5, II 0.75, III 1)이고 배수가 아니라 효과량에 곱한다 (×0.8 의 I 은 ×0.9).
     /// 게임 형식에 의존하지 않아 단위 테스트로 검증한다. 결과가 NaN·무한대이거나 바닐라가 만들 수 없는 범위면 바닐라 값을 그대로 쓴다.
     /// </summary>
     public static class PerkPatchMath
     {
-        public const float PorterWeight = 0.2f;       // 9: 근력 버프에 +0.2 (상수는 모두 단계 III 값)
-        public const float StaminaBuff = 0.15f;       // 10: 지구력 버프에 +0.15
-        public const float ConsumptionFactor = 0.85f; // 16: 에너지·수분 소모 ×0.85
-        public const float MasteringFactor = 1.3f;    // 24: 숙련도 증가 ×1.3
-        public const float SearchFactor = 1.3f;       // 26: 수색 속도 ×1.3
-        public const float ChanceFactor = 0.8f;       // 11: 골절·출혈 확률 ×0.8
-        public const float RecoilBuff = 0.1f;         // 14: 무기 종류 스킬 반동 버프 x 에 +0.1
-        public const float WeaponWearFactor = 0.8f;   // 15: 사격 시 무기 내구도 손실 ×0.8
-        public const float LoadTimeFactor = 0.8f;     // 25: 삽탄·탄 빼기 1발 시간 ×0.8
-        public const float ArmorWearFactor = 0.8f;    // 15: 방어구 내구도 감소 ×0.8 (28번을 합쳤다)
-        public const float ReloadFactor = 1.15f;      // 29: 재장전 애니메이션 속도 ×1.15
-        public const float ErgonomicsPoints = 10f;    // 30: 레이드 인체공학에 고정 +10
-        public const float MalfunctionFactor = 0.8f;  // 31: 사격 고장 확률 ×0.8
-        public const float OverheatFactor = 0.8f;     // 31: 발당 과열 ×0.8
-        public const float MoveSpeedFactor = 1.05f;   // 32: 걷기·전력질주 이동량 ×1.05
+        // 계수는 모두 단계 III 값이다. 주석의 수치는 기본값이고, state 를 받으면 서버 catalog 값으로 바뀐다 (Configure)
+        public static float PorterWeight { get; private set; }       // 9: 근력 버프에 +0.2
+        public static float StaminaBuff { get; private set; }        // 10: 지구력 버프에 +0.15
+        public static float ConsumptionFactor { get; private set; }  // 16: 에너지·수분 소모 ×0.85
+        public static float MasteringFactor { get; private set; }    // 24: 숙련도 증가 ×1.3
+        public static float SearchFactor { get; private set; }       // 26: 수색 속도 ×1.3
+        public static float ChanceFactor { get; private set; }       // 11: 골절·출혈 확률 ×0.8
+        public static float RecoilBuff { get; private set; }         // 14: 무기 종류 스킬 반동 버프 x 에 +0.1
+        public static float WeaponWearFactor { get; private set; }   // 15: 사격 시 무기 내구도 손실 ×0.8
+        public static float LoadTimeFactor { get; private set; }     // 25: 삽탄·탄 빼기 1발 시간 ×0.8
+        public static float ArmorWearFactor { get; private set; }    // 15: 방어구 내구도 감소 ×0.8 (28번을 합쳤다)
+        public static float ReloadFactor { get; private set; }       // 29: 재장전 애니메이션 속도 ×1.15
+        public static float ErgonomicsPoints { get; private set; }   // 30: 레이드 인체공학에 고정 +10
+        public static float MalfunctionFactor { get; private set; }  // 31: 사격 고장 확률 ×0.8
+        public static float OverheatFactor { get; private set; }     // 31: 발당 과열 ×0.8
+        public static float MoveSpeedFactor { get; private set; }    // 32: 걷기·전력질주 이동량 ×1.05
+        public static float SurgeryBuff { get; private set; }        // 27: 수술 속도 버프에 +0.25 (효과 시간만)
+        public static float CraftTimeFactor { get; private set; }    // 17: 은신처 생산 시간 ×0.8
+
+        static PerkPatchMath()
+        {
+            Configure(null);
+        }
+
+        /// <summary>
+        /// 계수를 서버 catalog 의 단계 III 효과량(amount)으로 정한다. state 를 받을 때마다 부른다 (PerkEffects.Set).
+        /// 특전이 catalog 에 없거나 쓸 수 없는 값(숫자 아님, 배수 0 이하)이면 기본값이다. 기본값은 서버 기본 수치와 같다 (테스트가 확인).
+        /// % 는 배수 <c>1 + amount/100</c>, 더하는 값(points)은 <c>|amount|/100</c>, 고정값(flat)은 <c>|amount|</c>다.
+        /// </summary>
+        public static void Configure(IList<PerkCatalogEntryDto> catalog)
+        {
+            PorterWeight = Points(catalog, "porter", 0.2f);         // +20 → +0.2
+            StaminaBuff = Points(catalog, "stamina", 0.15f);
+            ChanceFactor = Factor(catalog, "tough", 0.8f);          // −20% → ×0.8
+            RecoilBuff = Points(catalog, "control", 0.1f);          // 반동 −10 → 반동 버프 +0.1
+            WeaponWearFactor = Factor(catalog, "maintenance", 0.8f);
+            ArmorWearFactor = WeaponWearFactor;
+            ConsumptionFactor = Factor(catalog, "temperance", 0.85f);
+            CraftTimeFactor = Factor(catalog, "artisan", 0.8f);
+            MasteringFactor = Factor(catalog, "mastery", 1.3f);
+            LoadTimeFactor = Factor(catalog, "loading", 0.8f);
+            SearchFactor = Factor(catalog, "search", 1.3f);
+            SurgeryBuff = Points(catalog, "surgeon", 0.25f);
+            ReloadFactor = Factor(catalog, "reload", 1.15f);
+            ErgonomicsPoints = Flat(catalog, "handling", 10f);
+            MalfunctionFactor = Factor(catalog, "reliability", 0.8f);
+            OverheatFactor = MalfunctionFactor;
+            MoveSpeedFactor = Factor(catalog, "agility", 1.05f);
+        }
+
+        /// <summary>개발용 로그: 지금 계수 (단계 III).</summary>
+        public static string Describe()
+        {
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            return string.Format(culture,
+                "porter +{0:0.###}, stamina +{1:0.###}, tough x{2:0.###}, control +{3:0.###}, maintenance x{4:0.###}, temperance x{5:0.###}, artisan x{6:0.###}, " +
+                "mastery x{7:0.###}, loading x{8:0.###}, search x{9:0.###}, surgeon +{10:0.###}, reload x{11:0.###}, handling +{12:0.###}, reliability x{13:0.###}, agility x{14:0.###}",
+                PorterWeight, StaminaBuff, ChanceFactor, RecoilBuff, WeaponWearFactor, ConsumptionFactor, CraftTimeFactor,
+                MasteringFactor, LoadTimeFactor, SearchFactor, SurgeryBuff, ReloadFactor, ErgonomicsPoints, MalfunctionFactor, MoveSpeedFactor);
+        }
+
+        private static float Factor(IList<PerkCatalogEntryDto> catalog, string id, float fallback)
+        {
+            var entry = Find(catalog, id);
+            var factor = entry != null ? (float)(1 + entry.Amount / 100) : fallback;
+            return Finite(factor) && factor > 0f ? factor : fallback;
+        }
+
+        private static float Points(IList<PerkCatalogEntryDto> catalog, string id, float fallback)
+        {
+            var entry = Find(catalog, id);
+            var value = entry != null ? (float)Math.Abs(entry.Amount / 100) : fallback;
+            return Finite(value) && value > 0f ? value : fallback;
+        }
+
+        private static float Flat(IList<PerkCatalogEntryDto> catalog, string id, float fallback)
+        {
+            var entry = Find(catalog, id);
+            var value = entry != null ? (float)Math.Abs(entry.Amount) : fallback;
+            return Finite(value) && value > 0f ? value : fallback;
+        }
+
+        private static PerkCatalogEntryDto Find(IList<PerkCatalogEntryDto> catalog, string id)
+        {
+            if (catalog == null)
+            {
+                return null;
+            }
+
+            foreach (var entry in catalog)
+            {
+                if (entry != null && entry.Id == id)
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
 
         /// <summary>14: x 상한. 반동 힘 <c>1 − x − 0.1y</c>가 0 이하로 가지 않게.</summary>
         public const float MaxRecoilBuff = 0.8f;
 
         /// <summary>
-        /// 패치 칸별 효과 비율 배열 (0 = 꺼짐, 칸 번호는 <see cref="PerkPatchSlots"/>). 적용 단계(서버 activeTiers, 특전 ID → 단계)를 단계 비율(서버 tierEffectRatio)로 바꾼다.
+        /// 패치 칸별 효과 비율 배열 (0 = 꺼짐, 칸 번호는 <see cref="PerkPatchSlots"/>). 적용 단계(서버 activeTiers, 특전 ID → 단계)를
+        /// 특전마다 단계 비율(catalog tiers 의 그 단계 ÷ III, <see cref="PerkAmounts.Ratio"/>)로 바꾼다.
         /// 패치가 없는 특전(Bonus 특전, 모르는 ID)과 범위 밖 단계는 무시하고, 이번 실행 동안 끈 칸(disabled)은 켜지 않는다.
         /// </summary>
-        public static float[] BuildScales(IDictionary<string, int> tiers, IList<double> ratios, bool[] disabled)
+        public static float[] BuildScales(IDictionary<string, int> tiers, IList<PerkCatalogEntryDto> catalog, bool[] disabled)
         {
             var scales = new float[PerkPatchSlots.Count];
             if (tiers == null)
@@ -44,7 +130,7 @@ namespace PrestigePerks.Model
             foreach (var pair in tiers)
             {
                 var slot = PerkPatchSlots.Index(pair.Key);
-                var scale = (float)PerkAmounts.Ratio(ratios, pair.Value);
+                var scale = (float)PerkAmounts.Ratio(Find(catalog, pair.Key), pair.Value);
                 if (slot >= 0 && scale > 0f && Finite(scale) && !(disabled != null && slot < disabled.Length && disabled[slot]))
                 {
                     scales[slot] = Math.Min(scale, 1f);
@@ -140,8 +226,6 @@ namespace PrestigePerks.Model
         /// <summary>29: 재장전 애니메이션 속도 ×1.15.</summary>
         public static float ReloadSpeed(float vanilla, float scale) => vanilla > 0f && Finite(vanilla * Toward(ReloadFactor, scale)) ? vanilla * Toward(ReloadFactor, scale) : vanilla;
 
-        public const float SurgeryBuff = 0.25f;       // 27: 수술 속도 버프에 +0.25 (효과 시간만)
-
         /// <summary>
         /// 27: 바닐라는 파괴된 부위 수술 효과 시간을 <c>÷ (1 + 수술 속도)</c> 한다 (ActiveHealthController.DoMedEffect).
         /// 그 결과에 <c>(1 + s) ÷ (1 + s + 0.25 × 단계 비율)</c>를 곱해 버프 +0.25(III)와 같게 한다.
@@ -152,7 +236,6 @@ namespace PrestigePerks.Model
             return vanilla > 0f && 1f + surgerySpeed > 0f && Finite(value) ? value : vanilla;
         }
 
-        public const float CraftTimeFactor = 0.8f;    // 17: 은신처 생산 시간 ×0.8
         public const float MinCraftSeconds = 5f;      // 17: 서버 최소 생산 시간
 
         /// <summary>17: 생산 시간 배율(ReductionCoefficient, <c>1 − 스킬 감소</c>) ×0.8.</summary>
