@@ -19,7 +19,7 @@ namespace PrestigePerks.ExampleAddon
         /// <summary>Must match the id in the server's perks.json.</summary>
         public const string PorterId = "example.porter";
 
-        /// <summary>Tier III effect (perks.json amount 10 = +0.1).</summary>
+        /// <summary>Tier III effect (perks.json amount [4, 7, 10]: tier III 10 = +0.1; Scale gives 0.4 / 0.7 / 1 for tiers I / II / III).</summary>
         public const float PorterWeight = 0.1f;
 
         internal static int PorterSlot = -1;

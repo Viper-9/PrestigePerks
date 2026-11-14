@@ -58,7 +58,7 @@ SPT_Runtime/user/mods/<YourServerMod>/...                                       
       "kind": "bonus",                  // required: "bonus" (data perk) or "code"
       "unit": "points",                 // required: "percent", "points" or "flat"
       "bonuses": [                      // bonus perks only: 1 to 4 bonuses
-        { "type": "HealthRegeneration", "value": 20 }
+        { "type": "HealthRegeneration", "value": [10, 15, 20] }  // tier I, II, III
       ],
       "icon": "icons/yourname.medic.png", // optional
       "texts": {                        // optional
@@ -69,7 +69,7 @@ SPT_Runtime/user/mods/<YourServerMod>/...                                       
       "id": "yourname.sprint",
       "kind": "code",
       "unit": "percent",
-      "amount": 10                      // code perks only: the tier III amount shown in the list
+      "amount": [4, 7, 10]              // code perks only: the amount shown in the list for tier I, II, III
     }
   ]
 }
@@ -84,12 +84,20 @@ Comments and trailing commas are allowed.
 | `id` | Lower case `author.perk`: `[a-z0-9_-]+` then a dot then `[a-z0-9_.-]+`, at most 64 characters, not ending with a dot. Built-in perk ids have no dot, so a dotted id never clashes with them. **Never change an id after release.** Players' ownership and tiers are stored by id. |
 | `kind` | `"bonus"` or `"code"`. |
 | `unit` | How the number is shown. `percent` shows `%`. `points` shows `%` in English and `%p` in Korean; use it for bonuses that add to an existing percentage. `flat` shows the bare number. |
-| `bonuses` | Bonus perks only. 1 to 4 entries `{ "type", "value" }`. All values must be the same, because the list shows one number (the first value). `value` is the tier III value: not 0, at most 100 either way. `SkillGroupLevelingBoost` also needs `"skillType"`. |
-| `amount` | Code perks only, and required for them. The tier III amount shown in the list: not 0, at most 100 either way. It is for display; your code decides the real effect, so keep the two in step. A bonus perk ignores `amount` (with a warning). |
+| `bonuses` | Bonus perks only. 1 to 4 entries `{ "type", "value" }`. All values must be the same, because the list shows one number (the first value). `value` is `[I, II, III]`, see [Tier values](#tier-values). `SkillGroupLevelingBoost` also needs `"skillType"`. |
+| `amount` | Code perks only, and required for them. The amount shown in the list, `[I, II, III]`, see [Tier values](#tier-values). It is for display; your code decides the real effect, so keep the two in step. A bonus perk ignores `amount` (with a warning). |
 | `icon` | Optional. A path relative to your add-on folder. See [Icons](#icons). |
 | `texts` | Optional. See [Texts and translations](#texts-and-translations). |
 
 The sign of the value is shown as is, so a fee reduction is written as a negative value and shows as `-20%`.
+
+### Tier values
+
+`amount` and bonus `value` take one number per tier, `[I, II, III]`, like `[4, 7, 10]`.
+
+- Each number is not 0 and at most 100 either way. All three have the same sign.
+- A higher tier can't be weaker than a lower one (`[10, 5, 20]` is rejected).
+- A single number (`10`) still works: it is the tier III value, and tiers I and II are 50% and 75% of it.
 
 ## Bonus types
 
@@ -195,7 +203,7 @@ private void Awake()
 [HarmonyPatch]
 internal static class SprintPatch
 {
-    private const float Bonus = 0.10f;   // tier III effect, same as "amount": 10 in perks.json
+    private const float Bonus = 0.10f;   // tier III effect, same as the last value of "amount": [4, 7, 10] in perks.json
 
     private static MethodBase TargetMethod() => /* your target */;
 
@@ -257,10 +265,10 @@ The example add-on has no server part.
 ## Tiers and scale
 
 - Players buy tiers I, II and III with prestige coins. Prices and when tiers unlock are set by the PrestigePerks config, the same as for built-in perks. Add-ons cannot change them.
-- The strength of each tier comes from `tierEffectRatio` in the PrestigePerks config. The default is `[0.5, 0.75, 1.0]`, so tier I is half of your tier III value.
-- Bonus perks: PrestigePerks multiplies each bonus value by the ratio for you.
+- The strength of each tier comes from your `[I, II, III]` values. `Scale` is the tier's value divided by the tier III value: `[4, 7, 10]` gives 0.4, 0.7 and 1. With a single number it is 0.5, 0.75 and 1.
+- Bonus perks: PrestigePerks applies the value for the tier for you.
 - Code perks: multiply your tier III effect by `Scale`. Do not hard-code the tier ratios.
-- The list shows `amount`, or the first bonus value, times the ratio for the tier.
+- The list shows the value for the tier from `amount`, or from the first bonus value.
 
 ## Removing an add-on
 

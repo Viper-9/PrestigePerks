@@ -2,24 +2,25 @@
 // See examples/README.md for the format. Values are large on purpose so they are easy to see in game.
 {
   "perks": [
-    // Client code perk: the example client DLL (PrestigePerks.ExampleAddon) adds +0.1 at the same spot as the built-in Porter perk
+    // Client code perk: the example client DLL (PrestigePerks.ExampleAddon) adds +0.1 (tier III) at the same spot as the built-in Porter perk.
+    // [I, II, III]: tier I adds 0.04, tier II 0.07 (Scale is 0.4 and 0.7)
     {
       "id": "example.porter",
       "kind": "code",
       "unit": "points",
-      "amount": 10,
+      "amount": [4, 7, 10],
       "icon": "icons/example.porter.png",
       "texts": {
         "en": { "name": "Example Porter", "effect": "Carry weight limit {0}", "detail": "Example add-on: client patch" },
         "kr": { "name": "예제 짐꾼", "effect": "소지 무게 한도 {0}", "detail": "예제 add-on: 클라이언트 패치" }
       }
     },
-    // Data perks: one for each allowed bonus type
+    // Data perks: one for each allowed bonus type. Health lists every tier, the rest use one number (tier I 50%, II 75% of it)
     {
       "id": "example.health",
       "kind": "bonus",
       "unit": "points",
-      "bonuses": [ { "type": "HealthRegeneration", "value": 50 } ],
+      "bonuses": [ { "type": "HealthRegeneration", "value": [20, 35, 50] } ],
       "icon": "icons/example.health.png",
       "texts": {
         "en": { "name": "Example Medic", "effect": "Health regeneration {0}" },
