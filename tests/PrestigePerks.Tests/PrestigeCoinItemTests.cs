@@ -43,6 +43,14 @@ public class PrestigeCoinItemTests
     }
 
     [Fact]
+    public void Weighs_the_same_as_a_gp_coin()
+    {
+        var props = PrestigeCoinItem.BuildDetails(bundleAvailable: false).OverrideProperties!;
+
+        Assert.Equal(0.01, props.Weight);
+    }
+
+    [Fact]
     public void Stack_size_follows_config()
     {
         var props = PrestigeCoinItem.BuildDetails(bundleAvailable: false, coin: new CoinConfig { StackSize = 500 }).OverrideProperties!;
