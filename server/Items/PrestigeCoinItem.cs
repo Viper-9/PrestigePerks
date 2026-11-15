@@ -37,6 +37,9 @@ public class PrestigeCoinItem(
     /// <summary>1코인 = 100,000₽ (기획서 3장 환산 단가).</summary>
     internal const double PriceRoubles = 100_000;
 
+    /// <summary>GP 코인(5d235b4d86f7742e017bc88a)의 개당 무게 kg.</summary>
+    internal const double GpCoinWeight = 0.01;
+
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         var bundlePath = System.IO.Path.Combine(modHelper.GetAbsolutePathToModFolder(typeof(PrestigeCoinItem).Assembly), "bundles", BundleKey);
@@ -75,6 +78,8 @@ public class PrestigeCoinItem(
                 BackgroundColor = "green",
                 // 기획서 3장: 쌓이고(한 칸 최대 coin.stackSize), 보험·판매로 루블이 되지 않게 한다
                 StackMaxSize = (coin ?? new CoinConfig()).StackSize,
+                // TarCoin(0.05kg)은 안 쌓이지만 이 코인은 쌓이므로 GP 코인과 같은 개당 무게로 둔다 (100개 = 1kg)
+                Weight = GpCoinWeight,
                 InsuranceDisabled = true,
                 IsUnsaleable = true,
                 CanSellOnRagfair = false,
