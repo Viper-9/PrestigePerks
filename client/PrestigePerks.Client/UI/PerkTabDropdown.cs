@@ -10,8 +10,10 @@ namespace PrestigePerks.UI
     /// <summary>
     /// 프레스티지 탭 드롭다운 (Briefing 모드 임무 탭 드롭다운과 같은 방식). 프레스티지 탭을 누르면 그 아래로 프레스티지 탭을 복제한
     /// 두 항목(프레스티지, 특전)이 미끄러져 펼쳐진다.
-    /// 탭 줄 밑에 두지만 자기 Canvas(overrideSorting)로 그려 아래 화면 내용에 가리지 않는다. 탭 줄의 직접 자식 중 켜진 Tab 이 없게 해서
-    /// 탭 줄을 다시 배치하는 다른 모드(Operator Traits)가 이 메뉴를 탭으로 세지 않는다.
+    /// 메뉴는 탭 줄(Tabs)이 아니라 그 부모(Tab Bar) 밑에 두고 화면 좌표로 프레스티지 탭 자리를 따라간다. 자기 Canvas(overrideSorting)로 그려
+    /// 아래 화면 내용에 가리지 않는다. 탭 줄 자식을 탭으로 세는 다른 모드(Operator Traits, WeekendDrops)가 이 메뉴를 탭으로 세지 않게 하려는 것이다.
+    /// WeekendDrops 는 글자가 든 탭 줄 자식을 x 순으로 세워 맨 끝 둘의 간격으로 자기 탭을 놓는데, 메뉴가 프레스티지 탭과 같은 x 로 탭 줄에 있으면
+    /// 간격이 0 이 되어 DROPS 탭이 프레스티지 탭 위에 겹쳤다.
     /// 프레스티지 탭 글자는 지금 보는 쪽("프레스티지 ▼" / "특전 ▼")을 따르고, 특전을 보는 동안 프레스티지 탭을 고른 모양으로 칠한다.
     /// 메뉴가 열려 있거나 특전을 보는 동안에는 게임이 고른 탭에 하듯 프레스티지 탭을 탭 줄 맨 뒤로 옮겨 옆 탭 위에 그린다.
     /// </summary>
@@ -82,7 +84,8 @@ namespace PrestigePerks.UI
             var go = new GameObject(MenuName, typeof(RectTransform));
             try
             {
-                go.transform.SetParent(prestige.transform.parent, false);
+                var row = prestige.transform.parent;
+                go.transform.SetParent(row != null && row.parent != null ? row.parent : row, false);
                 var dropdown = go.AddComponent<PerkTabDropdown>();
                 dropdown.newLevelIcon = newLevelIcon != null && newLevelIcon.transform.IsChildOf(prestige.transform) ? newLevelIcon.transform : null;
                 dropdown.Build(prestige, perksShown, prestigeShown, pickPrestige, pickPerks);
@@ -530,7 +533,8 @@ namespace PrestigePerks.UI
             }
         }
 
-        // 프레스티지 탭 자리를 따라간다. 다른 모드나 게임이 탭 줄을 다시 배치할 수 있어서 매 프레임 맞춘다
+        // 프레스티지 탭 자리를 따라간다. 다른 모드나 게임이 탭 줄을 다시 배치할 수 있어서 매 프레임 맞춘다.
+        // 부모가 다르므로 (탭 줄의 부모) 크기·피벗을 같게 하고 월드 위치와 배율을 맞춘다
         private void Layout()
         {
             if (prestigeRect == null || root == null)
@@ -538,12 +542,17 @@ namespace PrestigePerks.UI
                 return;
             }
 
-            root.anchorMin = prestigeRect.anchorMin;
-            root.anchorMax = prestigeRect.anchorMax;
+            var size = prestigeRect.rect.size;
+            root.anchorMin = root.anchorMax = new Vector2(0.5f, 0.5f);
             root.pivot = prestigeRect.pivot;
-            root.sizeDelta = prestigeRect.sizeDelta;
-            root.anchoredPosition = prestigeRect.anchoredPosition;
-            root.localScale = prestigeRect.localScale;
+            root.sizeDelta = size;
+            var parentScale = root.parent != null ? root.parent.lossyScale : Vector3.one;
+            var tabScale = prestigeRect.lossyScale;
+            root.localScale = new Vector3(
+                parentScale.x != 0f ? tabScale.x / parentScale.x : 1f,
+                parentScale.y != 0f ? tabScale.y / parentScale.y : 1f,
+                1f);
+            root.position = prestigeRect.position;
 
             var h = prestigeRect.rect.height;
             if (h <= 0f)
