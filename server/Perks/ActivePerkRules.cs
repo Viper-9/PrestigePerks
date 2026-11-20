@@ -1,7 +1,7 @@
 namespace PrestigePerks.Perks;
 
 /// <summary>
-/// 액티브 특전 칸 규칙 (dev-docs 94 1절). 칸 하나, 열리는 단계는 config activePerks.opensAt (기본 P1), 가격 80 / 200 / 350 은 코드 값이다 (config 에 없음).
+/// 액티브 특전 칸 규칙 (dev-docs 94 1절). 칸 하나, 열리는 단계는 config activePerks.opensAt (기본 P1), 가격은 config activePerks.tierPrices (기본 80 / 200 / 350).
 /// 리롤·잠금·넣기·빼기·구매는 <see cref="PerkRules"/> 가 슬롯 번호 <see cref="SlotIndex"/> 로 받는다.
 /// 칸이 열렸다 = <see cref="PerkData.ActivePerkSlot"/> 이 있다 (열리는 단계에 들어갈 때 만들고 지우지 않는다).
 /// </summary>
@@ -12,9 +12,8 @@ public static class ActivePerkRules
 
     public const int DefaultOpensAt = 1;
 
-    public static IReadOnlyList<int> TierPrices { get; } = [80, 200, 350];
-
-    public static int TierPrice(int tier) => TierPrices[Math.Clamp(tier, 1, PerkConfig.MaxTier) - 1];
+    /// <summary>config activePerks.tierPrices 가 없거나 잘못됐을 때의 단계 I·II·III 가격.</summary>
+    public static IReadOnlyList<int> DefaultTierPrices { get; } = [80, 200, 350];
 
     /// <summary>액티브 칸에 적용하는 단계. 칸이 없거나 비었으면 0.</summary>
     public static int AppliedTier(PerkData data, int prestigeLevel, PerkConfig config) =>

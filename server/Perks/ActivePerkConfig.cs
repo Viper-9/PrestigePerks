@@ -15,7 +15,16 @@ public sealed record ActivePerkConfig
     [JsonPropertyName("opensAt")]
     public int OpensAt { get; init; } = ActivePerkRules.DefaultOpensAt;
 
-    /// <summary>범위를 벗어난 opensAt 을 0~6 의 가까운 끝값으로 맞추고 warn 을 부른다.</summary>
+    /// <summary>액티브 특전 단계 I·II·III 가격 (코인, 기본 80 / 200 / 350). 패시브 가격은 perks.tierPrices.</summary>
+    [JsonPropertyName("tierPrices")]
+    public List<int> TierPrices { get; init; } = [.. ActivePerkRules.DefaultTierPrices];
+
+    public int TierPrice(int tier) => TierPrices[Math.Clamp(tier, 1, PerkConfig.MaxTier) - 1];
+
+    /// <summary>
+    /// 범위를 벗어난 opensAt 을 0~6 의 가까운 끝값으로 맞추고, tierPrices 가 0 이상 값 3개가 아니면 기본값으로 바꾼다. 고칠 때마다 warn 을 부른다.
+    /// 잘못된 값 하나 때문에 enabled·opensAt 까지 기본값이 되지 않게 값마다 따로 본다.
+    /// </summary>
     public ActivePerkConfig Clamped(Action<string> warn)
     {
         var clamped = Math.Clamp(OpensAt, 0, PerkConfig.MaxLevel);
@@ -24,6 +33,13 @@ public sealed record ActivePerkConfig
             warn($"activePerks.opensAt={OpensAt} 은 0~{PerkConfig.MaxLevel} 밖이라 {clamped} 로 맞춥니다");
         }
 
-        return this with { OpensAt = clamped };
+        var prices = TierPrices;
+        if (prices is not { Count: PerkConfig.MaxTier } || prices.Any(price => price < 0))
+        {
+            warn($"activePerks.tierPrices 는 0 이상 값 3개여야 합니다. 기본값 [{string.Join(", ", ActivePerkRules.DefaultTierPrices)}] 을 씁니다");
+            prices = [.. ActivePerkRules.DefaultTierPrices];
+        }
+
+        return this with { OpensAt = clamped, TierPrices = prices };
     }
 }

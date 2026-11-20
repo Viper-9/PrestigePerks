@@ -17,7 +17,8 @@
   },
   "activePerks": {
     "enabled": true,
-    "opensAt": 1
+    "opensAt": 1,
+    "tierPrices": [80, 200, 350]
   },
   "perkAmounts": {
     "experience": [15, 22.5, 30],

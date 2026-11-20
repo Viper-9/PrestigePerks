@@ -269,9 +269,9 @@ public static class PerkRules
         return PerkCatalog.Ids.Where(perk => !kept.Contains(perk) && data.OwnedTier(perk) == 0).ToList();
     }
 
-    /// <summary>단계 가격: 액티브는 80 / 200 / 350 (코드), 패시브는 config tierPrices.</summary>
-    public static int TierPrice(PerkConfig config, string perk, int tier) =>
-        PerkCatalog.IsActive(perk) ? ActivePerkRules.TierPrice(tier) : config.TierPrice(tier);
+    /// <summary>단계 가격: 액티브는 config activePerks.tierPrices, 패시브는 config perks.tierPrices.</summary>
+    public static int TierPrice(PerkConfig config, ActivePerkConfig activeConfig, string perk, int tier) =>
+        PerkCatalog.IsActive(perk) ? activeConfig.TierPrice(tier) : config.TierPrice(tier);
 
     /// <summary>
     /// 단계 구매를 확인한다 (코인 제외). I 은 지금 열린 칸(액티브는 액티브 칸)에 있는 미보유 특전만, II·III 은 바로 아래 단계를 가졌고 상한 이하일 때만.
