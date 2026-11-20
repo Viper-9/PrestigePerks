@@ -102,7 +102,7 @@ namespace PrestigePerks.Model
         /// <summary>서버 config 를 받지 못했을 때 쓰는 단계 가격 기본값 (I, II, III).</summary>
         public static readonly int[] DefaultPrices = { 40, 100, 200 };
 
-        /// <summary>서버 값을 받지 못했을 때 쓰는 액티브 특전 단계 가격 (server ActivePerkRules.TierPrices).</summary>
+        /// <summary>서버 값을 받지 못했을 때 쓰는 액티브 특전 단계 가격 (server ActivePerkRules.DefaultTierPrices).</summary>
         public static readonly int[] DefaultActivePrices = { 80, 200, 350 };
 
         /// <summary>목록에 보여 줄 (패시브) 특전 (서버 카탈로그 순서). state 를 받기 전에는 비어 있다.</summary>

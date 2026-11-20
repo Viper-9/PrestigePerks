@@ -111,9 +111,9 @@ public sealed record PerkState
     [JsonPropertyName("activePerkOpensAt")]
     public int? ActivePerkOpensAt { get; init; }
 
-    /// <summary>액티브 단계 I·II·III 가격 (코드 값 80 / 200 / 350).</summary>
+    /// <summary>액티브 단계 I·II·III 가격 (config activePerks.tierPrices, 기본 80 / 200 / 350).</summary>
     [JsonPropertyName("activePerkPrices")]
-    public IReadOnlyList<int> ActivePerkPrices { get; init; } = ActivePerkRules.TierPrices;
+    public IReadOnlyList<int> ActivePerkPrices { get; init; } = ActivePerkRules.DefaultTierPrices;
 
     /// <summary>액티브 특전 목록 (표시 순서, 사용 제한, 단계별 값). 오류 응답에도 실린다.</summary>
     [JsonPropertyName("activeCatalog")]

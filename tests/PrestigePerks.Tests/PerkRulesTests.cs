@@ -653,6 +653,8 @@ public class PerkRulesTests
         Assert.Equal([40, 100, 200], config.TierPrices);
         Assert.DoesNotContain("shake", json, StringComparison.OrdinalIgnoreCase);
         Assert.True(PerkConfigLoader.ParseModConfig(json).ActivePerks.Enabled);
+        Assert.Equal([80, 200, 350], PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json), warning => Assert.Fail(warning)).ActivePerks.TierPrices);
+        Assert.Contains("\"tierPrices\": [80, 200, 350]", json);
     }
 
     [Fact]

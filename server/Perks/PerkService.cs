@@ -153,7 +153,7 @@ public class PerkService(
                 return BuildState(data, level, error);
             }
 
-            var cost = PerkRules.TierPrice(Config, perk, request.Tier);
+            var cost = PerkRules.TierPrice(Config, configLoader.ActivePerks, perk, request.Tier);
             if (cost != request.ExpectedCost)
             {
                 return BuildState(data, level, PerkError.CostChanged);
@@ -385,6 +385,7 @@ public class PerkService(
             ActivePerkSlot = data.ActivePerkSlot is { } activeSlot ? PerkSlotState.From(activeSlot) : null,
             ActivePerkTier = ActivePerkRules.AppliedTier(data, level, Config),
             ActivePerkOpensAt = data.ActivePerkSlot is null ? configLoader.ActivePerks.OpensAt : null,
+            ActivePerkPrices = configLoader.ActivePerks.TierPrices,
             Error = error == PerkError.None ? null : error.ToString(),
         };
 
