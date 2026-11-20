@@ -15,6 +15,7 @@ namespace PrestigePerks.UI
     /// 게임 탭과의 선택을 이어 준다. 특전은 탭 줄에 따로 보이지 않고 프레스티지 탭 드롭다운(<see cref="PerkTabDropdown"/>)에서 고른다.
     /// 선택에 쓰는 특전 탭은 숨겨 두고 그대로 쓴다. 특전 탭은 게임 TabGroup 배열 밖이라 그룹이 모른다. 그래서 특전을 고르면
     /// TabGroup.TryHide() 로 게임 탭을 내린 뒤 Select 하고, 게임 탭을 누르면 그룹이 그 탭을 고르게 두고 OnSelectionChanged 를 들어 특전 탭만 내린다.
+    /// 클릭 없이 게임 탭이 열리는 경우(다른 모드가 그룹을 바로 부를 때)는 <see cref="Patches.TabSelectPatch"/> 로 Tab.Select 를 들어 내린다.
     /// 다른 모드가 같은 방식으로 탭 줄 밑에 숨긴 탭(Briefing 모드 브리핑 탭)도 그룹 밖이라 서로 모르므로, 그 탭도 고르기를 듣고
     /// 특전을 고를 때 골라져 있으면 내린다 (안 그러면 두 패널이 겹쳐 뒤에 있는 쪽이 가려진다).
     /// </summary>
@@ -275,12 +276,19 @@ namespace PrestigePerks.UI
             {
                 other.OnSelectionChanged += OnOtherSelectionChanged;
             }
+
+            // 클릭 없이 열리는 게임 탭도 듣는다. 그룹 밖 탭(브리핑)은 그 모드가 클릭으로 고르니 OnSelectionChanged 로 충분하다
+            foreach (var other in native)
+            {
+                Patches.TabSelectPatch.Register(other, OnNativeShown);
+            }
         }
 
         private void UnsubscribeOtherTabs()
         {
             foreach (var other in otherTabs)
             {
+                Patches.TabSelectPatch.Unregister(other);
                 if (other != null)
                 {
                     other.OnSelectionChanged -= OnOtherSelectionChanged;
@@ -323,6 +331,15 @@ namespace PrestigePerks.UI
                     }
                 }
 
+                // 특전은 프레스티지 탭 자리의 화면이라 그룹에도 프레스티지 탭을 고른 것으로 둔다. 안 그러면 _selectedTab 이 드롭다운을 열기 전 탭(예: 지도)으로
+                // 남아, 그 값을 기준으로 탭을 넘기는 모드(탭 전환 단축키 등)가 엉뚱한 탭으로 가고 화면을 닫을 때 마지막 탭도 그 탭이 된다.
+                // 다음 탭 전환 때 그룹이 프레스티지 탭을 Deselect 하면 PrestigeScreen.Close 가 한 번 더 불린다. UIElement.Close(UI.Dispose + 끄기)라
+                // 한 번도 열리지 않았거나 이미 닫힌 화면이어도 괜찮다 (Briefing 모드의 임무 화면처럼 Show 에서 채우는 값을 쓰지 않는다).
+                if (group != null && screen._tabDictionary.TryGetValue(EInventoryTab.Prestige, out var prestige) && prestige != null)
+                {
+                    group._selectedTab = prestige;
+                }
+
                 tab.Select();
             }
             catch (Exception e)
@@ -344,6 +361,22 @@ namespace PrestigePerks.UI
             }
 
             if (!shouldSelect || !PerksShown)
+            {
+                return;
+            }
+
+            _ = DeselectOursAsync();
+        }
+
+        // 클릭 이벤트 없이 게임 탭이 열린 경우(다른 모드의 탭 전환 단축키 등). 클릭이면 OnOtherSelectionChanged 가 먼저 내려서 여기서는 할 일이 없다
+        private void OnNativeShown()
+        {
+            if (dropdown != null)
+            {
+                dropdown.Close();
+            }
+
+            if (!PerksShown)
             {
                 return;
             }
