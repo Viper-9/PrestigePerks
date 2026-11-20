@@ -26,6 +26,9 @@ public class Plugin : BaseUnityPlugin
     /// <summary>음파 탐지 파동 고리 (발 높이). 끄면 잔상만.</summary>
     internal static ConfigEntry<bool> SonarWaveRing;
 
+    // 액티브 HUD 연출 (dev-docs 6 "사용 연출"). 하나씩 끌 수 있다
+    internal static ConfigEntry<bool> FxEdgeLight, FxEnlarge, FxGoldPanel, FxHexRing, FxEndingBlink, FxReadyCountdown, FxReadyRing, FxReadyBlink;
+
     /// <summary>개발자 모드 시험: 슬롯과 상관없이 이 액티브 특전·단계로 레이드 시작 (slot = 액티브 칸 그대로, 단계 0 = 적용 단계).</summary>
     internal static ConfigEntry<string> ActiveTestPerk;
     internal static ConfigEntry<int> ActiveTestTier;
@@ -113,8 +116,9 @@ public class Plugin : BaseUnityPlugin
         SonarWaveRing = Config.Bind(section, "Sonar wave ring", true,
             new ConfigDescription("Shows the Sonar Pulse wave as a ring at foot height. Off = echoes only.",
                 null, new ConfigurationManagerAttributes { Order = 60 }));
+        BindEffects(section);
 
-        var perks = new[] { ActiveTestSlot }.Concat(PrestigePerks.Model.ActivePerkIds.All).ToArray();
+        var perks =new[] { ActiveTestSlot }.Concat(PrestigePerks.Model.ActivePerkIds.All).ToArray();
         ActiveTestPerk = Config.Bind("Developer", "Active perk test", ActiveTestSlot,
             new ConfigDescription("Developer mode only. Starts the next raid with this active perk instead of the one in the active slot (slot = the active slot). In a raid, press the reset key to switch.",
                 new AcceptableValueList<string>(perks), new ConfigurationManagerAttributes { Order = 90, IsAdvanced = true }));
@@ -130,6 +134,22 @@ public class Plugin : BaseUnityPlugin
         BleedKey = Config.Bind("Developer", "Bleed key", new KeyboardShortcut(UnityEngine.KeyCode.J, UnityEngine.KeyCode.LeftAlt),
             new ConfigDescription("Developer mode only. In a raid: gives you a light bleeding, pressing again swaps it for a heavy one and back. Does nothing while a blood loss blocker is on.",
                 null, new ConfigurationManagerAttributes { Order = 50, IsAdvanced = true }));
+    }
+
+    private void BindEffects(string section)
+    {
+        var order = 55;
+        ConfigEntry<bool> Effect(string name, string description) =>
+            Config.Bind(section, "Effect: " + name, true, new ConfigDescription(description, null, new ConfigurationManagerAttributes { Order = order-- }));
+
+        FxEdgeLight = Effect("screen edge light", "Lights the screen edges gold when you use an active perk and gray when its effect ends.");
+        FxEnlarge = Effect("larger panel while running", "Shows the active perk panel 1.2 times larger while its effect runs.");
+        FxGoldPanel = Effect("gold panel while running", "Gold shade, gold lines and a pulsing hex glow on the panel while the effect runs.");
+        FxHexRing = Effect("hex ring on use and end", "The hex bounces and sends out a ring: gold when you use the perk, gray when its effect ends.");
+        FxEndingBlink = Effect("blink last 5 seconds", "The time bar and status turn red and blink in the last 5 seconds of an effect.");
+        FxReadyCountdown = Effect("gold cooldown last 3 seconds", "The cooldown seconds in the hex turn gold in the last 3 seconds.");
+        FxReadyRing = Effect("ring when ready again", "The hex bounces, flashes and sends out a gold ring when the cooldown ends.");
+        FxReadyBlink = Effect("blink Ready", "\"Ready\" blinks green twice when the cooldown ends.");
     }
 
     // 하나가 실패해도 나머지는 걸리도록 패치 클래스마다 따로 등록한다.

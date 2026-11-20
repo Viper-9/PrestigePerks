@@ -199,10 +199,18 @@ public class ActivePerkClientTests
     {
         var plugin = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ClientSource", "Plugin.cs.txt"));
         var binds = System.Text.RegularExpressions.Regex.Matches(plugin, @"Config\.Bind\([^;]+;");
-        Assert.Equal(11, binds.Count);
+        Assert.Equal(12, binds.Count);
         foreach (System.Text.RegularExpressions.Match bind in binds)
         {
             Assert.DoesNotMatch("[가-힣]", bind.Value);
+        }
+
+        // HUD 연출 끄기 8개는 BindEffects 의 Effect(이름, 설명) 한 곳에서 Bind 한다
+        var effects = System.Text.RegularExpressions.Regex.Matches(plugin, @"= Effect\([^;]+;");
+        Assert.Equal(8, effects.Count);
+        foreach (System.Text.RegularExpressions.Match effect in effects)
+        {
+            Assert.DoesNotMatch("[가-힣]", effect.Value);
         }
 
         foreach (var culture in new[] { "en", "kr" })
@@ -307,5 +315,45 @@ public class ActivePerkClientTests
     public void Cooldown_text_is_minutes_and_seconds_rounded_up(float seconds, string expected)
     {
         Assert.Equal(expected, ActivePerkHudLook.Clock(seconds));
+    }
+
+    // HUD 연출 (2026-11-16 확정안): 모양이 바뀌는 순간 하나만 띄운다
+    [Theory]
+    [InlineData(HudLook.Ready, HudLook.Running, HudCue.Use)]
+    [InlineData(HudLook.NoTarget, HudLook.Running, HudCue.Use)]      // 누른 순간 대상을 다시 봐서 시작될 수 있다
+    [InlineData(HudLook.Ready, HudLook.Cooldown, HudCue.Use)]        // 즉시 효과 + 쿨타임
+    [InlineData(HudLook.Ready, HudLook.Used, HudCue.Use)]            // 즉시 효과 + 레이드당 1회
+    [InlineData(HudLook.Running, HudLook.Cooldown, HudCue.End)]
+    [InlineData(HudLook.Running, HudLook.Used, HudCue.End)]
+    [InlineData(HudLook.Cooldown, HudLook.Ready, HudCue.ReadyAgain)]
+    [InlineData(HudLook.Cooldown, HudLook.NoTarget, HudCue.ReadyAgain)] // 쿨타임은 끝났다 (대상이 없어도 알린다)
+    [InlineData(HudLook.Ready, HudLook.NoTarget, HudCue.None)]
+    [InlineData(HudLook.NoTarget, HudLook.Ready, HudCue.None)]
+    [InlineData(HudLook.Running, HudLook.Ready, HudCue.None)]        // 개발자 초기화 키
+    [InlineData(HudLook.Used, HudLook.Ready, HudCue.None)]           // 개발자 초기화 키
+    [InlineData(HudLook.Running, HudLook.Running, HudCue.None)]
+    public void Hud_cue_follows_the_look_change(HudLook from, HudLook to, HudCue expected)
+    {
+        Assert.Equal(expected, ActivePerkHudLook.CueOf(from, to));
+    }
+
+    [Theory]
+    [InlineData(HudLook.Running, 6, false)]
+    [InlineData(HudLook.Running, 5, true)]
+    [InlineData(HudLook.Running, 1, true)]
+    [InlineData(HudLook.Cooldown, 3, false)]
+    public void Hud_warns_in_the_last_five_seconds_of_a_run(HudLook look, int wholeSeconds, bool expected)
+    {
+        Assert.Equal(expected, ActivePerkHudLook.EndingSoon(look, wholeSeconds));
+    }
+
+    [Theory]
+    [InlineData(HudLook.Cooldown, 4, false)]
+    [InlineData(HudLook.Cooldown, 3, true)]
+    [InlineData(HudLook.Cooldown, 1, true)]
+    [InlineData(HudLook.Running, 2, false)]
+    public void Hud_marks_the_last_three_cooldown_seconds(HudLook look, int wholeSeconds, bool expected)
+    {
+        Assert.Equal(expected, ActivePerkHudLook.ReadySoon(look, wholeSeconds));
     }
 }

@@ -321,6 +321,7 @@ namespace PrestigePerks.Active
             }
 
             clock.Reset();
+            hud?.Restart();
             runStartedAt = cooldownStartedAt = -1;
             hasTarget = effect.HasTarget(use);
             ActivePerkLog.Event($"reset {use.Perk}");
