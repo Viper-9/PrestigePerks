@@ -175,8 +175,8 @@ the value is added to the game's own bonus (from skills and hideout), not multip
 - At **P1** an **active slot** opens to the right of the six perk slots. It holds one of 10 active perks that you
   use in raid with a key: **J** by default (F12 menu, `Active perk` > `Use key`).
 - Rerolls, locks, keeping, tiers and dragging work as in the other slots, but the active slot only rolls active
-  perks and active perks only fit the active slot. Prices: tier I **80**, II **200**, III **350** coins. The tier
-  cap is the same. The **PASSIVE** / **ACTIVE** tabs switch the list.
+  perks and active perks only fit the active slot. Prices: tier I **80**, II **200**, III **350** coins (change them
+  with `activePerks.tierPrices`). The tier cap is the same. The **PASSIVE** / **ACTIVE** tabs switch the list.
 
 ![Dragging an active perk](media/active-drag.png)
 
@@ -289,7 +289,7 @@ mods' bosses here).
 **`activePerks`**: `enabled` (default `true`). `false` hides the active slot and the active perks on the perk page
 and in raid. Your active slot and owned active perks stay in your data. `opensAt` (0–6, default `1`) is the prestige
 level that opens the active slot. `0` opens it before your first prestige. Raising it later doesn't close a slot that
-is already open.
+is already open. `tierPrices` (default `80, 200, 350`) is the coin price of active tier I, II, III.
 **`prestige`**: `stages` holds the requirements of P1–P6 from the table above (`level`, `skills`, `hideout`,
 `roubles`, `transferMultiplier` = share of progress **lost**, `newBeginningLevel`).
 
