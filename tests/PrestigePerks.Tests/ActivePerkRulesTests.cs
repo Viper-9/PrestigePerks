@@ -148,11 +148,37 @@ public class ActivePerkRulesTests
     }
 
     [Fact]
-    public void Active_prices_are_80_200_350_and_passive_prices_come_from_config()
+    public void Active_prices_default_to_80_200_350_and_passive_prices_come_from_config()
     {
         int[] tiers = [1, 2, 3];
-        Assert.Equal([80, 200, 350], tiers.Select(tier => PerkRules.TierPrice(Config, "grit", tier)));
-        Assert.Equal([40, 100, 200], tiers.Select(tier => PerkRules.TierPrice(Config, "porter", tier)));
+        var active = new ActivePerkConfig();
+        Assert.Equal([80, 200, 350], tiers.Select(tier => PerkRules.TierPrice(Config, active, "grit", tier)));
+        Assert.Equal([40, 100, 200], tiers.Select(tier => PerkRules.TierPrice(Config, active, "porter", tier)));
+    }
+
+    [Fact]
+    public void Active_prices_come_from_config_active_perks_tier_prices()
+    {
+        int[] tiers = [1, 2, 3];
+        var active = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig("""{ "activePerks": { "tierPrices": [10, 20, 30] } }"""), warning => Assert.Fail(warning)).ActivePerks;
+        Assert.Equal([10, 20, 30], active.TierPrices);
+        Assert.Equal([10, 20, 30], tiers.Select(tier => PerkRules.TierPrice(Config, active, "grit", tier)));
+        Assert.Equal([40, 100, 200], tiers.Select(tier => PerkRules.TierPrice(Config, active, "porter", tier)));
+        Assert.Equal([0, 0, 0], PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig("""{ "activePerks": { "tierPrices": [0, 0, 0] } }"""), warning => Assert.Fail(warning)).ActivePerks.TierPrices);
+    }
+
+    [Theory]
+    [InlineData("""{ "activePerks": { "tierPrices": [80, -1, 350] } }""")]
+    [InlineData("""{ "activePerks": { "tierPrices": [80, 200] } }""")]
+    [InlineData("""{ "activePerks": { "tierPrices": null } }""")]
+    public void Bad_active_prices_fall_back_to_the_defaults_and_keep_the_other_active_settings(string json)
+    {
+        var warnings = new List<string>();
+        var active = PerkConfigLoader.Validated(PerkConfigLoader.ParseModConfig(json.Replace("{ \"tierPrices\"", "{ \"opensAt\": 3, \"tierPrices\"")), warnings.Add).ActivePerks;
+        Assert.Equal([80, 200, 350], active.TierPrices);
+        Assert.Equal(3, active.OpensAt);
+        Assert.Single(warnings);
+        Assert.Contains("activePerks.tierPrices", warnings[0]);
     }
 
     [Fact]
