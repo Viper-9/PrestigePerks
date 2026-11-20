@@ -156,6 +156,37 @@ namespace PrestigePerks.UI
             return cache[key] = Make(pixels, horizontal ? steps : 1, horizontal ? 1 : steps, FilterMode.Bilinear, TextureWrapMode.Clamp, Vector4.zero);
         }
 
+        /// <summary>
+        /// 화면 가장자리 빛 (흰색, 색은 Image.color 로 입힌다). 화면 전체로 늘려 쓴다.
+        /// 가운데부터 타원 거리 d (가로 반지름 = 화면 폭 70%, 세로 = 높이 80%) 가 start 까지 투명, mid 에서 midAlpha, 1 에서 endAlpha (목업 7안 CSS 와 같다).
+        /// </summary>
+        public static Sprite EdgeLight(float start, float mid, float midAlpha, float endAlpha)
+        {
+            var key = $"edge {start} {mid} {midAlpha} {endAlpha}";
+            if (cache.TryGetValue(key, out var sprite) && sprite != null)
+            {
+                return sprite;
+            }
+
+            const int size = 128;
+            var pixels = new Color32[size * size];
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    var u = (x + 0.5f) / size - 0.5f;
+                    var v = (y + 0.5f) / size - 0.5f;
+                    var d = Mathf.Sqrt(u / 0.7f * (u / 0.7f) + v / 0.8f * (v / 0.8f));
+                    var a = d <= start ? 0f
+                        : d <= mid ? Mathf.Lerp(0f, midAlpha, (d - start) / (mid - start))
+                        : Mathf.Lerp(midAlpha, endAlpha, (d - mid) / (1f - mid));
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(Mathf.Clamp01(a) * 255));
+                }
+            }
+
+            return cache[key] = Make(pixels, size, size, FilterMode.Bilinear, TextureWrapMode.Clamp, Vector4.zero);
+        }
+
         // border: 왼쪽, 아래, 오른쪽, 위 (Sprite.Create 순서)
         private static Sprite Load(string name, bool mipmaps, Vector4 border = default, bool repeat = false)
         {
